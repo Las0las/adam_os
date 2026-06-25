@@ -51,14 +51,14 @@ export async function executeAction(
 
   // Idempotency: return prior execution for the same key.
   if (input.idempotencyKey) {
-    const prior = db.actionExecutions.find(
+    const prior = await db.actionExecutions.find(
       ctx.tenantId,
       (e) => e.idempotencyKey === input.idempotencyKey,
     );
     if (prior) return prior;
   }
 
-  const exec = db.actionExecutions.insert({
+  const exec = await db.actionExecutions.insert({
     id: id("aexec"),
     tenantId: ctx.tenantId,
     actionId: input.actionKey,
@@ -75,32 +75,38 @@ export async function executeAction(
 
   // Permission check.
   if (handler.requiredPermission && !hasPermission(ctx, handler.requiredPermission)) {
-    return block(ctx, exec.id, `missing permission: ${handler.requiredPermission}`);
+    return await block(ctx, exec.id, `missing permission: ${handler.requiredPermission}`);
   }
 
   // Precondition check.
   const reason = handler.precondition?.(ctx, input.input) ?? null;
-  if (reason) return block(ctx, exec.id, reason);
+  if (reason) return await block(ctx, exec.id, reason);
 
-  // Approval routing: open a review case and block until approved.
+  // Approval routing: open a review case and pause in awaiting_approval until
+  // approved. This is a human gate, NOT a failure — distinct from "blocked".
   if (handler.requiresApproval && !input.approvalExempt) {
-    const rc = openReviewCase(ctx, {
+    const rc = await openReviewCase(ctx, {
       caseType: `action:${input.actionKey}`,
       subject: input.object,
       severity: "medium",
       summary: `Approval required for action ${input.actionKey}`,
       gatedActionExecutionId: exec.id,
     });
-    const blocked = db.actionExecutions.update(exec.id, {
-      status: "blocked",
-      blockedReason: "awaiting approval",
+    const awaiting = await db.actionExecutions.update(exec.id, {
+      status: "awaiting_approval",
+      blockedReason: null,
       reviewCaseId: rc.id,
     });
-    emitAudit(ctx, "action.blocked", { type: "action_execution", id: exec.id }, { reviewCaseId: rc.id });
-    return blocked;
+    await emitAudit(
+      ctx,
+      "action.awaiting_approval",
+      { type: "action_execution", id: exec.id },
+      { reviewCaseId: rc.id },
+    );
+    return awaiting;
   }
 
-  return runHandler(ctx, handler, exec.id, input.input);
+  return await runHandler(ctx, handler, exec.id, input.input);
 }
 
 /** Release a previously approved, review-gated action and run it. */
@@ -108,11 +114,11 @@ export async function releaseApprovedAction(
   ctx: ActorContext,
   reviewCaseId: string,
 ): Promise<ActionExecution | null> {
-  const exec = db.actionExecutions.find(ctx.tenantId, (e) => e.reviewCaseId === reviewCaseId);
-  if (!exec || exec.status !== "blocked") return null;
+  const exec = await db.actionExecutions.find(ctx.tenantId, (e) => e.reviewCaseId === reviewCaseId);
+  if (!exec || exec.status !== "awaiting_approval") return null;
   const handler = handlers.get(exec.actionId);
   if (!handler) return null;
-  return runHandler(ctx, handler, exec.id, exec.input);
+  return await runHandler(ctx, handler, exec.id, exec.input);
 }
 
 async function runHandler(
@@ -121,32 +127,32 @@ async function runHandler(
   execId: string,
   actionInput: Record<string, unknown>,
 ): Promise<ActionExecution> {
-  db.actionExecutions.update(execId, { status: "running" });
+  await db.actionExecutions.update(execId, { status: "running" });
   try {
     const result = await handler.run(ctx, actionInput);
-    const completed = db.actionExecutions.update(execId, { status: "completed", result });
-    emitAudit(ctx, "action.completed", { type: "action_execution", id: execId }, { actionKey: handler.key });
+    const completed = await db.actionExecutions.update(execId, { status: "completed", result });
+    await emitAudit(ctx, "action.completed", { type: "action_execution", id: execId }, { actionKey: handler.key });
     return completed;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    const failed = db.actionExecutions.update(execId, { status: "failed", result: { error: message } });
-    emitAudit(ctx, "action.failed", { type: "action_execution", id: execId }, { error: message });
+    const failed = await db.actionExecutions.update(execId, { status: "failed", result: { error: message } });
+    await emitAudit(ctx, "action.failed", { type: "action_execution", id: execId }, { error: message });
     return failed;
   }
 }
 
-function block(ctx: ActorContext, execId: string, reason: string): ActionExecution {
-  const blocked = db.actionExecutions.update(execId, { status: "blocked", blockedReason: reason });
-  emitAudit(ctx, "action.blocked", { type: "action_execution", id: execId }, { reason });
+async function block(ctx: ActorContext, execId: string, reason: string): Promise<ActionExecution> {
+  const blocked = await db.actionExecutions.update(execId, { status: "blocked", blockedReason: reason });
+  await emitAudit(ctx, "action.blocked", { type: "action_execution", id: execId }, { reason });
   return blocked;
 }
 
 /** Register an action definition row (metadata for Studio/API surfaces). */
-export function defineAction(
+export async function defineAction(
   ctx: ActorContext,
   input: { key: string; name: string; objectType?: string; requiredPermission?: string },
-): ActionDefinition {
-  return db.actionDefinitions.insert({
+): Promise<ActionDefinition> {
+  return await db.actionDefinitions.insert({
     id: id("adef"),
     tenantId: ctx.tenantId,
     key: input.key,

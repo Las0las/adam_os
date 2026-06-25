@@ -22,10 +22,10 @@ Everything below runs today against an in-memory, tenant-scoped store and is cov
 (`npm test`) and an end-to-end seed (`npm run seed`).
 
 **DataOps**
-- Source registry + raw-asset ingestion with kind detection and checksums
-- Parser registry (JSON, CSV w/ RFC-4180 quoting, text/PDF/EML fallback) — pluggable via `supports()`
+- Asset ingestion: sha256 checksum **dedup** (with `force` override), ingestion batches, filesystem storage, kind detection, audit
+- Parser registry with **real parsers** — JSON, CSV, XML (fast-xml-parser), XLSX (SheetJS, `sheet:/row:` source paths), PDF (graceful `extractionStatus=unavailable`, never faked text), DOCX (mammoth), EML (mailparser, attachments → child assets), image (OCR-unsupported placeholder)
 - Transform registry with 7 deterministic transforms (trim, lowercase, cast, map_values, select/reorder columns, case_when)
-- Canonical pipeline runner executing the full §18 flow: parse → canonical doc/records → transforms → chunk/embed → ontology projection → lineage/audit
+- Canonical pipeline runner executing the full §18 flow plus **recursive EML attachment processing** (depth-limited, raw_asset→raw_asset lineage); pipeline preview (parse + transform, no persist)
 - Ontology object graph: idempotent upsert/merge on `(objectType, externalKey)`, links, history via audit
 - Evidence fabric: paragraph chunking + deterministic hashed embeddings
 
@@ -86,23 +86,42 @@ Postgres repository (`src/lib/lawrence-core/db/pg/`, schema in `db/migrations/`)
 
 ## Run it
 
+### In-memory (default — no external services)
+
 ```bash
 npm install
 npm run seed        # end-to-end: ingest CSV → ontology → evidence → retrieval → function w/ citations
-npm test            # 16 unit tests across the three fabrics
+npm test            # 21 unit tests across the three fabrics + domains
 npm run typecheck   # strict tsc, noUncheckedIndexedAccess
 npm run dev         # Next.js app at http://localhost:3000  (Command Center)
 ```
 
-`npm run seed` prints a summary proving the full path works (candidates projected, evidence
-chunked, retrieval ranked, a function run completed **with citations**, audit events emitted).
+### Postgres (set `DATABASE_URL` — the same code, real database)
+
+```bash
+export DATABASE_URL=postgres://user@host:5432/lawrence
+npm run migrate     # applies db/migrations/0001…0010 (idempotent, tracked in schema_migrations)
+npm run seed        # same seed, now persisted to Postgres (rt_* document tables)
+npm run test:pg     # unit + integration suite against Postgres (serial; proves the pg backend)
+npm run dev
+```
+
+The backend is chosen at startup by the presence of `DATABASE_URL`
+(`src/lib/lawrence-core/db/index.ts`): `PgCollection` (Postgres) or `MemoryCollection`
+(in-memory). Both implement the same async `Collection` interface, so every service behaves
+identically — verified by running the identical test suite against both. `npm run seed` prints a
+summary proving the full path works (candidates projected, evidence chunked, retrieval ranked, a
+function run completed **with citations**, audit events emitted) in either mode.
 
 ## Notable deviations from the spec
 
 - **Routing:** the spec lists both `(marketing)/page.tsx` and `(lawrence)/page.tsx` mapping to `/`,
   which collide in Next.js. The Command Center owns `/`; the marketing page lives at `/welcome`.
-- **Persistence:** Phase 1 uses an in-memory store (singleton) so the platform is runnable with no
-  external services. The SQL migration is the production target; swap `Collection` for a repository.
+- **Persistence:** the runtime persists to Postgres via jsonb document tables (`rt_*`, see
+  `db/runtime/README.md`) rather than the normalized `db/migrations/0001–0010` reference schema,
+  because functions/agents/actions are code registries (not rows) by design. Both schemas coexist;
+  the runtime can migrate onto the normalized tables table-by-table behind the same `Collection`
+  interface. The in-memory store remains the default for local dev and tests.
 - **Models/embeddings:** deterministic stand-ins ship so nothing requires API keys. Real providers
   implement `ModelProvider` / the embedding interface behind the same seams.
 

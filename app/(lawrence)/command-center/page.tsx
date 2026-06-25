@@ -8,10 +8,10 @@ export const dynamic = "force-dynamic";
 export default async function CommandCenterPage() {
   const ctx = await appContext();
 
-  const ontologyObjects = db.ontologyObjects.list(ctx.tenantId);
-  const openReviews = listReviewCases(ctx, "open");
-  const blockedActions = db.actionExecutions.list(ctx.tenantId, (a) => a.status === "blocked");
-  const notifications = db.notifications.list(ctx.tenantId);
+  const ontologyObjects = await db.ontologyObjects.list(ctx.tenantId);
+  const openReviews = await listReviewCases(ctx, "open");
+  const blockedActions = await db.actionExecutions.list(ctx.tenantId, (a) => a.status === "blocked");
+  const notifications = await db.notifications.list(ctx.tenantId);
 
   return (
     <>

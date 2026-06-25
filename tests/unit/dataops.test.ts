@@ -9,8 +9,8 @@ import { listObjects } from "@/lib/dataops/ontology/object-service";
 import { parseCsv } from "@/lib/dataops/parsers/csv-parser";
 import { resolveTransform } from "@/lib/dataops/transforms/transform-registry";
 
-function freshCtx() {
-  resetDatabase();
+async function freshCtx() {
+  await resetDatabase();
   resetClock();
   return systemActor("tnt_test");
 }
@@ -29,7 +29,7 @@ test("detectKind maps extensions", () => {
 });
 
 test("trim transform trims string columns", async () => {
-  const ctx = freshCtx();
+  const ctx = await freshCtx();
   const t = resolveTransform("trim")!;
   const out = await t.run({ rows: [{ name: "  ada  ", n: 3 }], config: {} }, ctx);
   assert.equal(out.rows[0]!.name, "ada");
@@ -37,7 +37,7 @@ test("trim transform trims string columns", async () => {
 });
 
 test("case_when transform writes derived column", async () => {
-  const ctx = freshCtx();
+  const ctx = await freshCtx();
   const t = resolveTransform("case_when")!;
   const out = await t.run(
     {
@@ -55,9 +55,9 @@ test("case_when transform writes derived column", async () => {
 });
 
 test("pipeline ingests CSV and projects ontology candidates", async () => {
-  const ctx = freshCtx();
-  const source = registerSource(ctx, { name: "Upload", kind: "upload" });
-  const asset = ingestAsset(ctx, {
+  const ctx = await freshCtx();
+  const source = await registerSource(ctx, { name: "Upload", kind: "upload" });
+  const asset = await ingestAsset(ctx, {
     fileName: "c.csv",
     content: "full_name,email\nAda,ada@x.com\nAlan,alan@x.com",
     sourceId: source.id,
@@ -65,15 +65,15 @@ test("pipeline ingests CSV and projects ontology candidates", async () => {
   const result = await runAssetPipeline(ctx, asset, { ontologyMapper: "recruiting" });
   assert.equal(result.run.status, "completed");
   assert.equal(result.records.length, 2);
-  const candidates = listObjects(ctx, "Candidate");
+  const candidates = await listObjects(ctx, "Candidate");
   assert.equal(candidates.length, 2);
   assert.ok(candidates.some((c) => c.externalKey === "ada@x.com"));
 });
 
 test("tenant isolation: another tenant sees no objects", async () => {
-  const ctx = freshCtx();
-  const asset = ingestAsset(ctx, { fileName: "c.csv", content: "full_name\nAda" });
+  const ctx = await freshCtx();
+  const asset = await ingestAsset(ctx, { fileName: "c.csv", content: "full_name\nAda" });
   await runAssetPipeline(ctx, asset, { ontologyMapper: "recruiting" });
   const other = systemActor("tnt_other");
-  assert.equal(listObjects(other, "Candidate").length, 0);
+  assert.equal((await listObjects(other, "Candidate")).length, 0);
 });

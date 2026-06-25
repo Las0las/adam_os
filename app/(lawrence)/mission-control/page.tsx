@@ -7,10 +7,10 @@ export const dynamic = "force-dynamic";
 
 export default async function MissionControlPage() {
   const ctx = await appContext();
-  const health = runtimeHealth(ctx);
-  const releases = db.releaseBundles.list(ctx.tenantId);
-  const actions = db.actionExecutions.list(ctx.tenantId);
-  const notifications = db.notifications.list(ctx.tenantId);
+  const health = await runtimeHealth(ctx);
+  const releases = await db.releaseBundles.list(ctx.tenantId);
+  const actions = await db.actionExecutions.list(ctx.tenantId);
+  const notifications = await db.notifications.list(ctx.tenantId);
 
   return (
     <>

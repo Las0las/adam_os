@@ -40,7 +40,7 @@ export const generateDraftResponse: LawrenceFunction<DraftInput, DraftOutput> = 
   },
   async run(ctx: ActorContext, input: DraftInput): Promise<FunctionExecutionResult<DraftOutput>> {
     const methods = input.methods ?? ["rank_fusion"];
-    const retrieval = retrieve(ctx, {
+    const retrieval = await retrieve(ctx, {
       tenantId: ctx.tenantId,
       query: input.prompt,
       objectTypes: input.objectTypes,
@@ -56,7 +56,7 @@ export const generateDraftResponse: LawrenceFunction<DraftInput, DraftOutput> = 
     });
     const completion = await getModelProvider().complete({ prompt });
     const traceId = id("trace");
-    recordTrace(ctx, "function_run", traceId, completion, methods[0]);
+    await recordTrace(ctx, "function_run", traceId, completion, methods[0]);
     return {
       output: { draft: completion.text, citationCount: retrieval.hits.length },
       citations: retrieval.hits,

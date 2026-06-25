@@ -19,6 +19,10 @@ export interface CanonicalParseOutput {
     fileName: string;
     mimeType?: string | null;
     bytesRef?: string | null;
+    /** Inline text/base64 payload for the child (e.g. EML attachment). */
+    content?: string | null;
+    /** Stored path for the child's bytes, if written to storage. */
+    storagePath?: string | null;
     metadata?: Record<string, unknown>;
   }>;
 }

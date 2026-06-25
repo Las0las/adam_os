@@ -10,6 +10,8 @@ import {
 } from "@/lib/domains";
 import type { AgentDefinition } from "@/types/aiops";
 
+export const dynamic = "force-dynamic";
+
 // POST /api/aiops/agents/:key/run  body: { input: {...} }
 export async function POST(
   request: Request,

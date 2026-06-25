@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function RecommendationsPage() {
   const ctx = await appContext();
-  const completedRuns = db.functionRuns.list(ctx.tenantId, (r) => r.status === "completed");
+  const completedRuns = await db.functionRuns.list(ctx.tenantId, (r) => r.status === "completed");
 
   return (
     <>

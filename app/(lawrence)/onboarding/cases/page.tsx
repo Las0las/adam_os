@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function OnboardingCasesPage() {
   const ctx = await appContext();
-  const cases = listObjects(ctx, "OnboardingCase");
+  const cases = await listObjects(ctx, "OnboardingCase");
 
   return (
     <>

@@ -10,7 +10,7 @@ export default async function FunctionEvalsPage({
   params: { functionId: string };
 }) {
   const ctx = await appContext();
-  const runs = db.evalRuns.list(ctx.tenantId);
+  const runs = await db.evalRuns.list(ctx.tenantId);
 
   if (runs.length === 0) {
     return (

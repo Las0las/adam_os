@@ -10,7 +10,7 @@ export default async function AgentRunsPage({
   params: { agentId: string };
 }) {
   const ctx = await appContext();
-  const runs = db.agentRuns.list(ctx.tenantId, (r) => r.agentId === params.agentId);
+  const runs = await db.agentRuns.list(ctx.tenantId, (r) => r.agentId === params.agentId);
 
   return (
     <>

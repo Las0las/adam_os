@@ -23,13 +23,13 @@ function str(value: unknown): string | null {
 // OnboardingCase ontology object.
 registerObjectMapper({
   key: "onboarding",
-  map(ctx: ActorContext, record: CanonicalRecord): OntologyObject[] {
+  async map(ctx: ActorContext, record: CanonicalRecord): Promise<OntologyObject[]> {
     const p = record.payload;
     const title = str(p.title);
     const caseId = str(p.case_id);
     if (!title && !caseId) return [];
 
-    const onboardingCase = upsertObject(ctx, {
+    const onboardingCase = await upsertObject(ctx, {
       objectType: "OnboardingCase",
       externalKey: caseId ?? title,
       title: title ?? caseId,
@@ -51,7 +51,7 @@ const onboardingReadinessSummary: LawrenceFunction<{ caseId: string }, { summary
   klass: "summarize",
   outputSchema: { type: "object", properties: { summary: { type: "string" } }, required: ["summary"] },
   async run(ctx, input): Promise<FunctionExecutionResult<{ summary: string }>> {
-    const chunks = db.evidenceChunks.list(ctx.tenantId, (c) => c.sourceObjectId === input.caseId);
+    const chunks = await db.evidenceChunks.list(ctx.tenantId, (c) => c.sourceObjectId === input.caseId);
     const evidence = chunks.map((c) => c.text).join(" ").slice(0, 600);
     return {
       output: {
@@ -134,15 +134,15 @@ export function onboardingAgent(tenantId: string): AgentDefinition {
 
 // ── Seed ────────────────────────────────────────────────────────────────
 /** Seed a small onboarding case with evidence. */
-export function seedOnboarding(ctx: ActorContext): void {
-  const onboardingCase = upsertObject(ctx, {
+export async function seedOnboarding(ctx: ActorContext): Promise<void> {
+  const onboardingCase = await upsertObject(ctx, {
     objectType: "OnboardingCase",
     externalKey: "case-1",
     title: "New hire — Ada",
     status: "in_progress",
     properties: { owner: "hr" },
   });
-  indexEvidence(
+  await indexEvidence(
     ctx,
     { objectType: "OnboardingCase", objectId: onboardingCase.id },
     "Equipment ordered. Background check pending. Payroll form missing.",

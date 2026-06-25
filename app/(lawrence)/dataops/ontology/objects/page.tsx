@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function OntologyObjectsPage() {
   const ctx = await appContext();
-  const objects = listObjects(ctx).slice(0, 200);
+  const objects = (await listObjects(ctx)).slice(0, 200);
 
   return (
     <>

@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function DeploymentsPage() {
   const ctx = await appContext();
-  const releases = db.releaseBundles.list(ctx.tenantId);
+  const releases = await db.releaseBundles.list(ctx.tenantId);
 
   return (
     <>

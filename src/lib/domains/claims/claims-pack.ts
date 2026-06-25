@@ -23,11 +23,11 @@ function str(value: unknown): string | null {
 // ── Object mapper: ClaimDocument ────────────────────────────────────────
 registerObjectMapper({
   key: "claims",
-  map(ctx: ActorContext, record: CanonicalRecord): OntologyObject[] {
+  async map(ctx: ActorContext, record: CanonicalRecord): Promise<OntologyObject[]> {
     const p = record.payload;
     const claimId = str(p.claim_id);
     if (!claimId) return [];
-    const claim = upsertObject(ctx, {
+    const claim = await upsertObject(ctx, {
       objectType: "ClaimDocument",
       externalKey: claimId,
       title: `Claim ${claimId}`,
@@ -147,7 +147,7 @@ const summarizeEvidence: LawrenceFunction<{ caseId?: unknown }, { summary: strin
   outputSchema: { type: "object", properties: { summary: { type: "string" } }, required: ["summary"] },
   async run(ctx, input): Promise<FunctionExecutionResult<{ summary: string }>> {
     const caseId = String(input.caseId ?? "");
-    const chunks = db.evidenceChunks.list(ctx.tenantId, (c) => c.sourceObjectId === caseId);
+    const chunks = await db.evidenceChunks.list(ctx.tenantId, (c) => c.sourceObjectId === caseId);
     const evidence = chunks
       .map((c) => c.text)
       .join(" ")
@@ -172,7 +172,7 @@ registerAction({
     return input.claimId ? null : "missing claimId";
   },
   async run(ctx: ActorContext, input) {
-    const rc = openReviewCase(ctx, {
+    const rc = await openReviewCase(ctx, {
       caseType: "claim_validation",
       subject: { type: "ClaimDocument", id: String(input.claimId) },
       severity: (input.severity as "low" | "medium" | "high" | "critical" | undefined) ?? "high",
@@ -216,15 +216,15 @@ export function claimsValidationAgent(tenantId: string): AgentDefinition {
 }
 
 /** Seed a single ClaimDocument plus contradictory evidence. */
-export function seedClaims(ctx: ActorContext): void {
-  const claim = upsertObject(ctx, {
+export async function seedClaims(ctx: ActorContext): Promise<void> {
+  const claim = await upsertObject(ctx, {
     objectType: "ClaimDocument",
     externalKey: "claim-1",
     title: "Claim #1001",
     status: "open",
     properties: { amount: 5000, claimant: "Acme" },
   });
-  indexEvidence(
+  await indexEvidence(
     ctx,
     { objectType: "ClaimDocument", objectId: claim.id },
     "Invoice total is 5000. The attached receipt shows 4200. Amounts do not match.",

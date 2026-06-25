@@ -4,17 +4,19 @@ import { listAudit } from "@/lib/lawrence-core/audit/audit-service";
 import { runtimeHealth } from "@/lib/mission-control/runtime/deployment-service";
 import { listReviewCases } from "@/lib/mission-control/review-queue/review-service";
 import { listObjects } from "@/lib/dataops/ontology/object-service";
+import { getCommandCenterOverview } from "@/lib/domains/command-center/command-center-service";
 import { Metric, PageHeader, StatusBadge } from "@/components/lawrence/shared/widgets";
 
 export const dynamic = "force-dynamic";
 
 export default async function CommandCenterPage() {
   const ctx = await appContext();
-  const health = runtimeHealth(ctx);
-  const reviews = listReviewCases(ctx);
-  const objects = listObjects(ctx);
-  const audit = listAudit(ctx.tenantId).slice(0, 8);
-  const blockedActions = db.actionExecutions.list(ctx.tenantId, (a) => a.status === "blocked");
+  const health = await runtimeHealth(ctx);
+  const reviews = await listReviewCases(ctx);
+  const objects = await listObjects(ctx);
+  const audit = (await listAudit(ctx.tenantId)).slice(0, 8);
+  const blockedActions = await db.actionExecutions.list(ctx.tenantId, (a) => a.status === "blocked");
+  const overview = await getCommandCenterOverview(ctx);
 
   return (
     <>
@@ -64,6 +66,47 @@ export default async function CommandCenterPage() {
             <span>{(health.notificationFailureRate * 100).toFixed(0)}%</span>
           </div>
         </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <h3>Cross-Domain Work Queue</h3>
+        {overview.items.length === 0 ? (
+          <p className="muted">No open cross-domain work.</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Domain</th>
+                <th>Type</th>
+                <th>Item</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th>Linked object</th>
+                <th>Next action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {overview.items.slice(0, 20).map((it, i) => (
+                <tr key={`${it.kind}-${it.linkedObjectId ?? i}-${i}`}>
+                  <td>
+                    <span className="badge neutral">{it.domain}</span>
+                  </td>
+                  <td className="muted">{it.kind}</td>
+                  <td>{it.title}</td>
+                  <td>{it.severity ? <StatusBadge status={it.severity} /> : <span className="muted">—</span>}</td>
+                  <td>{it.status ? <StatusBadge status={it.status} /> : <span className="muted">—</span>}</td>
+                  <td className="muted">
+                    {it.linkedObjectType ?? "—"}
+                    {it.linkedObjectId ? ` · ${it.linkedObjectId.slice(0, 12)}` : ""}
+                  </td>
+                  <td>
+                    <code>{it.nextAction ?? "—"}</code>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>

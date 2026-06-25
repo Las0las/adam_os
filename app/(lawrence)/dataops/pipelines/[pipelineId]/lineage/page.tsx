@@ -10,9 +10,9 @@ export default async function PipelineLineagePage({
   params: { pipelineId: string };
 }) {
   const ctx = await appContext();
-  const events = db.lineageEvents
-    .list(ctx.tenantId, (e) => (e.pipelineRunId ? true : false))
-    .slice(0, 100);
+  const events = (
+    await db.lineageEvents.list(ctx.tenantId, (e) => (e.pipelineRunId ? true : false))
+  ).slice(0, 100);
 
   return (
     <>

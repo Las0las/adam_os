@@ -1,12 +1,21 @@
-// The LAWRENCE in-memory database: one tenant-scoped Collection per table
-// from the §46 schema outline. A single module-level singleton stands in for
-// the Postgres operational store during this Phase-1 foundation.
+// The LAWRENCE operational database: one tenant-scoped Collection per table
+// from the §46 schema outline. The backend is selected at startup — Postgres
+// (PgCollection) when DATABASE_URL is set, otherwise the in-memory MemoryCollection.
 
-import { Collection } from "./collection";
+import { MemoryCollection } from "./collection";
+import { PgCollection } from "./pg/pg-collection";
+import type { Collection, TenantScoped } from "./collection";
+import { isPostgresConfigured } from "./pg/client";
+
+/** Construct a collection backed by the configured store. */
+function coll<T extends TenantScoped>(name: string): Collection<T> {
+  return isPostgresConfigured() ? new PgCollection<T>(name) : new MemoryCollection<T>(name);
+}
 import type { Role, Tenant, User, AuditEvent } from "@/types/platform";
 import type {
   Source,
   RawAsset,
+  IngestionBatch,
   PipelineDefinition,
   PipelineRun,
   CanonicalDocument,
@@ -51,6 +60,7 @@ export interface Database {
   // dataops
   sources: Collection<Source>;
   rawAssets: Collection<RawAsset>;
+  ingestionBatches: Collection<IngestionBatch>;
   pipelineDefinitions: Collection<PipelineDefinition>;
   pipelineRuns: Collection<PipelineRun>;
   canonicalDocuments: Collection<CanonicalDocument>;
@@ -82,37 +92,38 @@ export interface Database {
 
 function createDatabase(): Database {
   return {
-    tenants: new Collection("tenants"),
-    users: new Collection("users"),
-    roles: new Collection("roles"),
-    auditEvents: new Collection("audit_events"),
-    sources: new Collection("sources"),
-    rawAssets: new Collection("raw_assets"),
-    pipelineDefinitions: new Collection("pipeline_definitions"),
-    pipelineRuns: new Collection("pipeline_runs"),
-    canonicalDocuments: new Collection("canonical_documents"),
-    canonicalRecords: new Collection("canonical_records"),
-    evidenceChunks: new Collection("evidence_chunks"),
-    ontologyObjects: new Collection("ontology_objects"),
-    ontologyLinks: new Collection("ontology_links"),
-    lineageEvents: new Collection("lineage_events"),
-    aiFunctions: new Collection("ai_functions"),
-    agentDefinitions: new Collection("agent_definitions"),
-    promptTemplates: new Collection("prompt_templates"),
-    modelDefinitions: new Collection("model_definitions"),
-    functionRuns: new Collection("function_runs"),
-    agentRuns: new Collection("agent_runs"),
-    evalCases: new Collection("eval_cases"),
-    evalRuns: new Collection("eval_runs"),
-    modelTraces: new Collection("model_traces"),
-    actionDefinitions: new Collection("action_definitions"),
-    actionExecutions: new Collection("action_executions"),
-    reviewCases: new Collection("review_cases"),
-    reviewCaseEvents: new Collection("review_case_events"),
-    notificationRules: new Collection("notification_rules"),
-    notifications: new Collection("notifications"),
-    releaseBundles: new Collection("deployment_releases"),
-    runtimeIncidents: new Collection("runtime_incidents"),
+    tenants: coll("tenants"),
+    users: coll("users"),
+    roles: coll("roles"),
+    auditEvents: coll("audit_events"),
+    sources: coll("sources"),
+    rawAssets: coll("raw_assets"),
+    ingestionBatches: coll("ingestion_batches"),
+    pipelineDefinitions: coll("pipeline_definitions"),
+    pipelineRuns: coll("pipeline_runs"),
+    canonicalDocuments: coll("canonical_documents"),
+    canonicalRecords: coll("canonical_records"),
+    evidenceChunks: coll("evidence_chunks"),
+    ontologyObjects: coll("ontology_objects"),
+    ontologyLinks: coll("ontology_links"),
+    lineageEvents: coll("lineage_events"),
+    aiFunctions: coll("ai_functions"),
+    agentDefinitions: coll("agent_definitions"),
+    promptTemplates: coll("prompt_templates"),
+    modelDefinitions: coll("model_definitions"),
+    functionRuns: coll("function_runs"),
+    agentRuns: coll("agent_runs"),
+    evalCases: coll("eval_cases"),
+    evalRuns: coll("eval_runs"),
+    modelTraces: coll("model_traces"),
+    actionDefinitions: coll("action_definitions"),
+    actionExecutions: coll("action_executions"),
+    reviewCases: coll("review_cases"),
+    reviewCaseEvents: coll("review_case_events"),
+    notificationRules: coll("notification_rules"),
+    notifications: coll("notifications"),
+    releaseBundles: coll("deployment_releases"),
+    runtimeIncidents: coll("runtime_incidents"),
   };
 }
 
@@ -121,9 +132,8 @@ const globalRef = globalThis as unknown as { __lawrenceDb?: Database };
 export const db: Database = globalRef.__lawrenceDb ?? (globalRef.__lawrenceDb = createDatabase());
 
 /** Drop all data — used by tests and the seed script. */
-export function resetDatabase(): void {
-  const fresh = createDatabase();
-  for (const key of Object.keys(fresh) as (keyof Database)[]) {
-    (db[key] as { clear(): void }).clear();
+export async function resetDatabase(): Promise<void> {
+  for (const key of Object.keys(db) as (keyof Database)[]) {
+    await db[key].clear();
   }
 }

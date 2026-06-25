@@ -7,13 +7,13 @@ import type { ActorContext } from "@/types/platform";
 import type { ModelTrace } from "@/types/aiops";
 import type { CompletionResponse } from "../models/model-provider";
 
-export function recordTrace(
+export async function recordTrace(
   ctx: ActorContext,
   scope: ModelTrace["scope"],
   scopeId: string,
   completion: CompletionResponse,
   retrievalMethod?: ModelTrace["retrievalMethod"],
-): ModelTrace {
+): Promise<ModelTrace> {
   return db.modelTraces.insert({
     id: id("trace"),
     tenantId: ctx.tenantId,
@@ -38,8 +38,8 @@ export interface ObservabilitySummary {
   traceCount: number;
 }
 
-export function summarize(ctx: ActorContext): ObservabilitySummary {
-  const traces = db.modelTraces.list(ctx.tenantId);
+export async function summarize(ctx: ActorContext): Promise<ObservabilitySummary> {
+  const traces = await db.modelTraces.list(ctx.tenantId);
   const traceCount = traces.length;
   const totalLatency = traces.reduce((s, t) => s + t.latencyMs, 0);
   return {

@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ReviewQueuePage() {
   const ctx = await appContext();
-  const cases = listReviewCases(ctx);
+  const cases = await listReviewCases(ctx);
 
   return (
     <>

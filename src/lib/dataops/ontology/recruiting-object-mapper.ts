@@ -12,13 +12,13 @@ function str(value: unknown): string | null {
 
 export const recruitingObjectMapper: ObjectMapper = {
   key: "recruiting",
-  map(ctx: ActorContext, record: CanonicalRecord): OntologyObject[] {
+  async map(ctx: ActorContext, record: CanonicalRecord): Promise<OntologyObject[]> {
     const p = record.payload;
     const fullName = str(p.full_name ?? p.name ?? p.fullName);
     const email = str(p.email);
     if (!fullName && !email) return [];
 
-    const candidate = upsertObject(ctx, {
+    const candidate = await upsertObject(ctx, {
       objectType: "Candidate",
       externalKey: email ?? fullName,
       title: fullName ?? email,

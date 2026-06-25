@@ -6,8 +6,8 @@ export const dynamic = "force-dynamic";
 
 export default async function SupportPage() {
   const ctx = await appContext();
-  const tickets = listObjects(ctx, "SupportTicket");
-  const kb = listObjects(ctx, "KnowledgeDocument");
+  const tickets = await listObjects(ctx, "SupportTicket");
+  const kb = await listObjects(ctx, "KnowledgeDocument");
   return (
     <>
       <PageHeader title="Support" sub="Seed domain pack — tickets and knowledge base." />

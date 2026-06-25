@@ -10,7 +10,7 @@ export default async function OnboardingCaseDetailPage({
   params: { caseId: string };
 }) {
   const ctx = await appContext();
-  const onboardingCase = listObjects(ctx, "OnboardingCase").find((c) => c.id === params.caseId);
+  const onboardingCase = (await listObjects(ctx, "OnboardingCase")).find((c) => c.id === params.caseId);
 
   if (!onboardingCase) {
     return (

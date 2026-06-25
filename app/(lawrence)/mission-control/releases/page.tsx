@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ReleasesPage() {
   const ctx = await appContext();
-  const releases = db.releaseBundles.list(ctx.tenantId);
+  const releases = await db.releaseBundles.list(ctx.tenantId);
 
   const draft = releases.filter((r) => r.environment === "draft").length;
   const staging = releases.filter((r) => r.environment === "staging").length;

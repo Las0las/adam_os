@@ -8,6 +8,8 @@ import {
 } from "@/lib/aiops/evals/eval-runner";
 import type { EvalCase } from "@/types/aiops";
 
+export const dynamic = "force-dynamic";
+
 // POST /api/aiops/evals/run  body: { suite: "retrieval"|"extraction"|"response", functionKey?, cases: EvalCase[] }
 export async function POST(request: Request) {
   const ctx = await appContext();
@@ -24,7 +26,7 @@ export async function POST(request: Request) {
   if (body.suite === "response" && body.functionKey) {
     return NextResponse.json(await runResponseEvals(ctx, body.functionKey, cases));
   }
-  const run = runRetrievalEvals(ctx, cases);
+  const run = await runRetrievalEvals(ctx, cases);
   // Persisted for the observability/evals surfaces.
   void db.evalRuns.get(ctx.tenantId, run.id);
   return NextResponse.json(run);

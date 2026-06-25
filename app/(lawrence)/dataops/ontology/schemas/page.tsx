@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function OntologySchemasPage() {
   const ctx = await appContext();
-  const objects = listObjects(ctx);
+  const objects = await listObjects(ctx);
 
   const types = new Set<string>();
   for (const o of objects) types.add(o.objectType);

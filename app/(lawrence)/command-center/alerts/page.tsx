@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AlertsPage() {
   const ctx = await appContext();
-  const incidents = db.runtimeIncidents.list(ctx.tenantId);
+  const incidents = await db.runtimeIncidents.list(ctx.tenantId);
 
   return (
     <>

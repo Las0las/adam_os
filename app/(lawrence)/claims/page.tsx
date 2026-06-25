@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 
 export default async function ClaimsPage() {
   const ctx = await appContext();
-  const claims = listObjects(ctx, "ClaimDocument");
-  const validations = listReviewCases(ctx).filter((c) => c.caseType === "claim_validation");
+  const claims = await listObjects(ctx, "ClaimDocument");
+  const validations = (await listReviewCases(ctx)).filter((c) => c.caseType === "claim_validation");
   return (
     <>
       <PageHeader title="Claims / Validation" sub="Seed domain pack — claim documents and validation cases." />

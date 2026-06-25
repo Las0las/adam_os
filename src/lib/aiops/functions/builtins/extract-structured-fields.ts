@@ -24,7 +24,7 @@ export const extractStructuredFields: LawrenceFunction<ExtractInput, ExtractOutp
       outputSchema: input.schema,
     });
     const traceId = id("trace");
-    recordTrace(ctx, "function_run", traceId, completion);
+    await recordTrace(ctx, "function_run", traceId, completion);
     return { output: completion.json ?? {}, trace: { traceId } };
   },
 };

@@ -10,7 +10,7 @@ export default async function CanonicalDocumentDetailPage({
   params: { documentId: string };
 }) {
   const ctx = await appContext();
-  const document = db.canonicalDocuments.get(ctx.tenantId, params.documentId);
+  const document = await db.canonicalDocuments.get(ctx.tenantId, params.documentId);
 
   if (!document) {
     return (
@@ -24,7 +24,7 @@ export default async function CanonicalDocumentDetailPage({
     );
   }
 
-  const records = db.canonicalRecords.list(
+  const records = await db.canonicalRecords.list(
     ctx.tenantId,
     (r) => r.documentId === params.documentId,
   );

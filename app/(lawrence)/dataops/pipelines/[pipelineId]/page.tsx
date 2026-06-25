@@ -11,7 +11,7 @@ export default async function PipelineDetailPage({
   params: { pipelineId: string };
 }) {
   const ctx = await appContext();
-  const runs = db.pipelineRuns.list(ctx.tenantId, (r) => r.pipelineId === params.pipelineId);
+  const runs = await db.pipelineRuns.list(ctx.tenantId, (r) => r.pipelineId === params.pipelineId);
 
   return (
     <>

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { appContext } from "@/lib/app/demo-context";
 import { executeAction } from "@/lib/mission-control/actions/action-service";
 
+export const dynamic = "force-dynamic";
+
 // POST /api/mission-control/actions/:key/execute
 // body: { input, object?, idempotencyKey?, approvalExempt? }
 export async function POST(

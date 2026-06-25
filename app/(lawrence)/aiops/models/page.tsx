@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ModelsPage() {
   const ctx = await appContext();
-  const defs = db.modelDefinitions.list(ctx.tenantId);
+  const defs = await db.modelDefinitions.list(ctx.tenantId);
 
   return (
     <>

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SupportTicketsPage() {
   const ctx = await appContext();
-  const tickets = listObjects(ctx, "SupportTicket");
+  const tickets = await listObjects(ctx, "SupportTicket");
 
   return (
     <>

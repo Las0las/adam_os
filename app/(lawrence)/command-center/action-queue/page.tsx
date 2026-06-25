@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ActionQueuePage() {
   const ctx = await appContext();
-  const actions = db.actionExecutions.list(ctx.tenantId);
+  const actions = await db.actionExecutions.list(ctx.tenantId);
 
   return (
     <>

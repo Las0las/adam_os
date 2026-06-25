@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function OntologyLinksPage() {
   const ctx = await appContext();
-  const links = db.ontologyLinks.list(ctx.tenantId);
+  const links = await db.ontologyLinks.list(ctx.tenantId);
 
   return (
     <>

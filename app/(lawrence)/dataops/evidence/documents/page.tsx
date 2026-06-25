@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CanonicalDocumentsPage() {
   const ctx = await appContext();
-  const documents = db.canonicalDocuments.list(ctx.tenantId);
+  const documents = await db.canonicalDocuments.list(ctx.tenantId);
 
   return (
     <>

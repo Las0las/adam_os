@@ -22,13 +22,13 @@ function str(value: unknown): string | null {
 // SupportTicket ontology object.
 registerObjectMapper({
   key: "support",
-  map(ctx: ActorContext, record: CanonicalRecord): OntologyObject[] {
+  async map(ctx: ActorContext, record: CanonicalRecord): Promise<OntologyObject[]> {
     const p = record.payload;
     const subject = str(p.subject);
     const ticketId = str(p.ticket_id);
     if (!subject && !ticketId) return [];
 
-    const ticket = upsertObject(ctx, {
+    const ticket = await upsertObject(ctx, {
       objectType: "SupportTicket",
       externalKey: ticketId ?? subject,
       title: subject ?? ticketId,
@@ -134,19 +134,19 @@ export function supportTriageAgent(tenantId: string): AgentDefinition {
 
 // ── Seed ────────────────────────────────────────────────────────────────
 /** Seed a knowledge document with evidence plus a support ticket. */
-export function seedSupport(ctx: ActorContext): void {
-  const doc = upsertObject(ctx, {
+export async function seedSupport(ctx: ActorContext): Promise<void> {
+  const doc = await upsertObject(ctx, {
     objectType: "KnowledgeDocument",
     externalKey: "kb-1",
     title: "Password reset",
     properties: {},
   });
-  indexEvidence(
+  await indexEvidence(
     ctx,
     { objectType: "KnowledgeDocument", objectId: doc.id },
     "To reset a password, use the self-service portal and follow the email link.",
   );
-  upsertObject(ctx, {
+  await upsertObject(ctx, {
     objectType: "SupportTicket",
     externalKey: "t-1",
     title: "Cannot reset password",

@@ -10,7 +10,7 @@ export default async function OntologyObjectTypePage({
   params: { objectType: string };
 }) {
   const ctx = await appContext();
-  const objects = listObjects(ctx, params.objectType);
+  const objects = await listObjects(ctx, params.objectType);
 
   return (
     <>

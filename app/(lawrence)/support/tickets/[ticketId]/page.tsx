@@ -10,7 +10,7 @@ export default async function SupportTicketDetailPage({
   params: { ticketId: string };
 }) {
   const ctx = await appContext();
-  const ticket = listObjects(ctx, "SupportTicket").find((t) => t.id === params.ticketId);
+  const ticket = (await listObjects(ctx, "SupportTicket")).find((t) => t.id === params.ticketId);
 
   if (!ticket) {
     return (

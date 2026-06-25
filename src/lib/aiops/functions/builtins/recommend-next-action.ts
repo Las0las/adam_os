@@ -34,7 +34,7 @@ export const recommendNextAction: LawrenceFunction<RecommendInput, RecommendOutp
     required: ["recommendedAction", "rationale", "confidence"],
   },
   async run(ctx: ActorContext, input: RecommendInput): Promise<FunctionExecutionResult<RecommendOutput>> {
-    const obj = db.ontologyObjects.get(ctx.tenantId, input.objectId);
+    const obj = await db.ontologyObjects.get(ctx.tenantId, input.objectId);
     const status = obj?.status ?? "unknown";
     // Deterministic policy: pick the first candidate action whose name is not
     // the current status; a real provider reasons over evidence here.
@@ -45,7 +45,7 @@ export const recommendNextAction: LawrenceFunction<RecommendInput, RecommendOutp
       outputSchema: recommendNextAction.outputSchema,
     });
     const traceId = id("trace");
-    recordTrace(ctx, "function_run", traceId, completion);
+    await recordTrace(ctx, "function_run", traceId, completion);
     return {
       output: {
         recommendedAction: recommended,

@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function RuntimePage() {
   const ctx = await appContext();
-  const health = runtimeHealth(ctx);
+  const health = await runtimeHealth(ctx);
 
   const pct = (x: number) => (x * 100).toFixed(0) + "%";
 

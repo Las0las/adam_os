@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 
 export default async function ObservabilityPage() {
   const ctx = await appContext();
-  const obs = summarize(ctx);
-  const traces = db.modelTraces.list(ctx.tenantId).slice(-20).reverse();
+  const obs = await summarize(ctx);
+  const traces = (await db.modelTraces.list(ctx.tenantId)).slice(-20).reverse();
 
   return (
     <>

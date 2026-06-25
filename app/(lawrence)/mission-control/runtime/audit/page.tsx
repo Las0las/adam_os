@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AuditPage() {
   const ctx = await appContext();
-  const events = listAudit(ctx.tenantId).slice(0, 100);
+  const events = (await listAudit(ctx.tenantId)).slice(0, 100);
 
   return (
     <>

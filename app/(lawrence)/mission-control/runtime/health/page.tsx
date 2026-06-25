@@ -19,7 +19,7 @@ function formatValue(key: string, value: number): string {
 
 export default async function RuntimeHealthPage() {
   const ctx = await appContext();
-  const health = runtimeHealth(ctx);
+  const health = await runtimeHealth(ctx);
   const entries = Object.entries(health) as Array<[string, number]>;
 
   return (

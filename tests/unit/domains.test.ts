@@ -34,11 +34,11 @@ test("domain functions and actions are registered", () => {
 test("bootstrap seeds objects across every domain", async () => {
   await bootstrap();
   const ctx = systemActor(DEMO_TENANT_ID);
-  assert.ok(listObjects(ctx, "Candidate").length >= 1);
-  assert.ok(listObjects(ctx, "OnboardingCase").length >= 1);
-  assert.ok(listObjects(ctx, "KnowledgeDocument").length >= 1);
-  assert.ok(listObjects(ctx, "ClaimDocument").length >= 1);
-  assert.ok(listObjects(ctx, "Account").length >= 1);
+  assert.ok((await listObjects(ctx, "Candidate")).length >= 1);
+  assert.ok((await listObjects(ctx, "OnboardingCase")).length >= 1);
+  assert.ok((await listObjects(ctx, "KnowledgeDocument")).length >= 1);
+  assert.ok((await listObjects(ctx, "ClaimDocument")).length >= 1);
+  assert.ok((await listObjects(ctx, "Account")).length >= 1);
 });
 
 test("classify_ticket_severity returns a severity", async () => {

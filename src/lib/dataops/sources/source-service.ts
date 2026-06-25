@@ -8,12 +8,12 @@ import { emitAudit } from "@/lib/lawrence-core/audit/audit-service";
 import type { ActorContext } from "@/types/platform";
 import type { Source, SourceKind, RawAsset, RawAssetKind } from "@/types/dataops";
 
-export function registerSource(
+export async function registerSource(
   ctx: ActorContext,
   input: { name: string; kind: SourceKind; config?: Record<string, unknown> },
-): Source {
+): Promise<Source> {
   requirePermission(ctx, "dataops.admin");
-  const source = db.sources.insert({
+  const source = await db.sources.insert({
     id: id("src"),
     tenantId: ctx.tenantId,
     name: input.name,
@@ -21,7 +21,7 @@ export function registerSource(
     config: input.config ?? {},
     createdAt: now(),
   });
-  emitAudit(ctx, "dataops.source.register", { type: "source", id: source.id }, { kind: input.kind });
+  await emitAudit(ctx, "dataops.source.register", { type: "source", id: source.id }, { kind: input.kind });
   return source;
 }
 
@@ -43,7 +43,7 @@ export function detectKind(fileName: string, explicit?: RawAssetKind): RawAssetK
   return EXTENSION_KIND[ext] ?? "unknown";
 }
 
-export function ingestAsset(
+export async function ingestAsset(
   ctx: ActorContext,
   input: {
     fileName: string;
@@ -53,9 +53,9 @@ export function ingestAsset(
     mimeType?: string | null;
     metadata?: Record<string, unknown>;
   },
-): RawAsset {
+): Promise<RawAsset> {
   requirePermission(ctx, "dataops.admin");
-  const asset = db.rawAssets.insert({
+  const asset = await db.rawAssets.insert({
     id: id("asset"),
     tenantId: ctx.tenantId,
     sourceId: input.sourceId ?? null,
@@ -70,6 +70,6 @@ export function ingestAsset(
     metadata: input.metadata ?? {},
     createdAt: now(),
   });
-  emitAudit(ctx, "dataops.asset.ingest", { type: "raw_asset", id: asset.id }, { kind: asset.kind });
+  await emitAudit(ctx, "dataops.asset.ingest", { type: "raw_asset", id: asset.id }, { kind: asset.kind });
   return asset;
 }

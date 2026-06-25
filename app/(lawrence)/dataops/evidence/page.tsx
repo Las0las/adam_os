@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function EvidencePage() {
   const ctx = await appContext();
-  const chunks = db.evidenceChunks.list(ctx.tenantId);
+  const chunks = await db.evidenceChunks.list(ctx.tenantId);
 
   return (
     <>

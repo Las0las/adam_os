@@ -4,13 +4,13 @@ import { db } from "../db";
 import { id, now } from "../utils/ids";
 import type { ActorContext } from "@/types/platform";
 
-export function emitAudit(
+export async function emitAudit(
   ctx: ActorContext,
   action: string,
   subject?: { type?: string | null; id?: string | null },
   metadata: Record<string, unknown> = {},
-): void {
-  db.auditEvents.insert({
+): Promise<void> {
+  await db.auditEvents.insert({
     id: id("audit"),
     tenantId: ctx.tenantId,
     actorUserId: ctx.actorUserId ?? null,
@@ -22,8 +22,8 @@ export function emitAudit(
   });
 }
 
-export function listAudit(tenantId: string): ReturnType<typeof db.auditEvents.list> {
-  return db.auditEvents
-    .list(tenantId)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+export async function listAudit(tenantId: string): ReturnType<typeof db.auditEvents.list> {
+  return (await db.auditEvents.list(tenantId)).sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt),
+  );
 }

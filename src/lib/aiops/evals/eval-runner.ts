@@ -10,25 +10,26 @@ import type { EvalCase, EvalRun, EvalCaseResult } from "@/types/aiops";
 import type { RetrievalMethod } from "@/types/dataops";
 
 /** Retrieval eval: does the expected chunk/object appear in the top-k hits? */
-export function runRetrievalEvals(
+export async function runRetrievalEvals(
   ctx: ActorContext,
   cases: EvalCase[],
   methods: RetrievalMethod[] = ["rank_fusion"],
-): EvalRun {
-  const results: EvalCaseResult[] = cases.map((c) => {
+): Promise<EvalRun> {
+  const results: EvalCaseResult[] = [];
+  for (const c of cases) {
     const query = String(c.input.query ?? "");
     const expectedObjectId = String(c.expected.objectId ?? "");
-    const response = retrieve(ctx, { tenantId: ctx.tenantId, query, methods, limit: 5 });
+    const response = await retrieve(ctx, { tenantId: ctx.tenantId, query, methods, limit: 5 });
     const rank = response.hits.findIndex((h) => h.objectId === expectedObjectId);
     const passed = rank >= 0;
-    return {
+    results.push({
       caseId: c.id,
       passed,
       score: passed ? 1 / (rank + 1) : 0,
       detail: { rank, returned: response.hits.length },
-    };
-  });
-  return persist(ctx, "retrieval", results);
+    });
+  }
+  return await persist(ctx, "retrieval", results);
 }
 
 /**
@@ -55,7 +56,7 @@ export async function runExtractionEvals(
       detail: { matched, total: keys.length, status: run.status },
     });
   }
-  return persist(ctx, "extraction", results);
+  return await persist(ctx, "extraction", results);
 }
 
 /**
@@ -82,16 +83,16 @@ export async function runResponseEvals(
       detail: { hits, total: keywords.length, citations: run.citations?.length ?? 0 },
     });
   }
-  return persist(ctx, "response", results);
+  return await persist(ctx, "response", results);
 }
 
-function persist(
+async function persist(
   ctx: ActorContext,
   suiteType: EvalCase["suiteType"],
   results: EvalCaseResult[],
-): EvalRun {
+): Promise<EvalRun> {
   const score = results.length ? results.reduce((s, r) => s + r.score, 0) / results.length : 0;
-  return db.evalRuns.insert({
+  return await db.evalRuns.insert({
     id: id("evalrun"),
     tenantId: ctx.tenantId,
     suiteType,

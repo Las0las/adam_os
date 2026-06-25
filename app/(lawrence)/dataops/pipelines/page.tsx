@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function PipelinesPage() {
   const ctx = await appContext();
-  const runs = db.pipelineRuns.list(ctx.tenantId);
+  const runs = await db.pipelineRuns.list(ctx.tenantId);
 
   return (
     <>

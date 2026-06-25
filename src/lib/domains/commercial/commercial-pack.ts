@@ -23,12 +23,12 @@ function str(value: unknown): string | null {
 // ── Object mapper: Opportunity ──────────────────────────────────────────
 registerObjectMapper({
   key: "commercial",
-  map(ctx: ActorContext, record: CanonicalRecord): OntologyObject[] {
+  async map(ctx: ActorContext, record: CanonicalRecord): Promise<OntologyObject[]> {
     const p = record.payload;
     const name = str(p.name);
     const externalKey = str(p.opp_id) ?? name;
     if (!externalKey) return [];
-    const opportunity = upsertObject(ctx, {
+    const opportunity = await upsertObject(ctx, {
       objectType: "Opportunity",
       externalKey,
       title: name ?? externalKey,
@@ -52,7 +52,7 @@ const summarizeAccountRisk: LawrenceFunction<{ accountId?: unknown }, { summary:
   outputSchema: { type: "object", properties: { summary: { type: "string" } }, required: ["summary"] },
   async run(ctx, input): Promise<FunctionExecutionResult<{ summary: string }>> {
     const accountId = String(input.accountId ?? "");
-    const chunks = db.evidenceChunks.list(ctx.tenantId, (c) => c.sourceObjectId === accountId);
+    const chunks = await db.evidenceChunks.list(ctx.tenantId, (c) => c.sourceObjectId === accountId);
     const evidence = chunks
       .map((c) => c.text)
       .join(" ")
@@ -137,21 +137,21 @@ export function accountRiskMonitorAgent(tenantId: string): AgentDefinition {
 }
 
 /** Seed an Account + Opportunity plus account risk evidence. */
-export function seedCommercial(ctx: ActorContext): void {
-  const account = upsertObject(ctx, {
+export async function seedCommercial(ctx: ActorContext): Promise<void> {
+  const account = await upsertObject(ctx, {
     objectType: "Account",
     externalKey: "acct-1",
     title: "Acme Corp",
     status: "active",
   });
-  upsertObject(ctx, {
+  await upsertObject(ctx, {
     objectType: "Opportunity",
     externalKey: "opp-1",
     title: "Acme renewal",
     status: "negotiation",
     properties: { value: 120000 },
   });
-  indexEvidence(
+  await indexEvidence(
     ctx,
     { objectType: "Account", objectId: account.id },
     "Margin declined 8 points this quarter due to discounting. Renewal at risk.",

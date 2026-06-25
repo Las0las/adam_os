@@ -72,7 +72,8 @@ export interface AgentRun {
   agentId: string;
   input: Record<string, unknown>;
   output?: Record<string, unknown> | null;
-  status: "queued" | "running" | "completed" | "failed";
+  // "awaiting_review" = paused on a human review gate (not a failure).
+  status: "queued" | "running" | "completed" | "failed" | "awaiting_review";
   steps: AgentRunStep[];
   traceId?: string | null;
   error?: string | null;
