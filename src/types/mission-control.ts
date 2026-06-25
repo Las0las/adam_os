@@ -21,7 +21,9 @@ export interface ActionExecution {
   objectId?: string | null;
   input: Record<string, unknown>;
   result?: Record<string, unknown> | null;
-  status: "queued" | "running" | "completed" | "failed" | "blocked";
+  // "blocked" = policy/precondition/permission failure (fail-closed).
+  // "awaiting_approval" = human approval gate (not a failure).
+  status: "queued" | "running" | "completed" | "failed" | "blocked" | "awaiting_approval";
   /** Idempotency key — re-executing with the same key returns the prior result. */
   idempotencyKey?: string | null;
   blockedReason?: string | null;

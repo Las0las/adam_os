@@ -82,7 +82,8 @@ export async function executeAction(
   const reason = handler.precondition?.(ctx, input.input) ?? null;
   if (reason) return await block(ctx, exec.id, reason);
 
-  // Approval routing: open a review case and block until approved.
+  // Approval routing: open a review case and pause in awaiting_approval until
+  // approved. This is a human gate, NOT a failure — distinct from "blocked".
   if (handler.requiresApproval && !input.approvalExempt) {
     const rc = await openReviewCase(ctx, {
       caseType: `action:${input.actionKey}`,
@@ -91,13 +92,18 @@ export async function executeAction(
       summary: `Approval required for action ${input.actionKey}`,
       gatedActionExecutionId: exec.id,
     });
-    const blocked = await db.actionExecutions.update(exec.id, {
-      status: "blocked",
-      blockedReason: "awaiting approval",
+    const awaiting = await db.actionExecutions.update(exec.id, {
+      status: "awaiting_approval",
+      blockedReason: null,
       reviewCaseId: rc.id,
     });
-    await emitAudit(ctx, "action.blocked", { type: "action_execution", id: exec.id }, { reviewCaseId: rc.id });
-    return blocked;
+    await emitAudit(
+      ctx,
+      "action.awaiting_approval",
+      { type: "action_execution", id: exec.id },
+      { reviewCaseId: rc.id },
+    );
+    return awaiting;
   }
 
   return await runHandler(ctx, handler, exec.id, input.input);
@@ -109,7 +115,7 @@ export async function releaseApprovedAction(
   reviewCaseId: string,
 ): Promise<ActionExecution | null> {
   const exec = await db.actionExecutions.find(ctx.tenantId, (e) => e.reviewCaseId === reviewCaseId);
-  if (!exec || exec.status !== "blocked") return null;
+  if (!exec || exec.status !== "awaiting_approval") return null;
   const handler = handlers.get(exec.actionId);
   if (!handler) return null;
   return await runHandler(ctx, handler, exec.id, exec.input);

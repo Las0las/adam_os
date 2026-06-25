@@ -32,7 +32,7 @@ test("approval-gated action blocks then runs after approval", async () => {
     input: { candidateId: candidate.id, toStage: "interview" },
     object: { type: "Candidate", id: candidate.id },
   });
-  assert.equal(exec.status, "blocked");
+  assert.equal(exec.status, "awaiting_approval");
   assert.ok(exec.reviewCaseId);
 
   await resolveReviewCase(ctx, exec.reviewCaseId!, "approved");

@@ -45,10 +45,22 @@ export interface RawAsset {
   sizeBytes?: number | null;
   parentAssetId?: string | null;
   ingestionBatchId?: string | null;
-  /** Raw bytes / text payload reference. In-memory store keeps the content here. */
+  /** Path to the stored bytes (filesystem/object storage). Parsers read from here. */
+  storagePath?: string | null;
+  /** Inline text payload — kept for text formats and the in-memory store. */
   content?: string | null;
   metadata: Record<string, unknown>;
   createdAt: string;
+}
+
+export interface IngestionBatch {
+  id: string;
+  tenantId: string;
+  sourceId?: string | null;
+  status: "queued" | "running" | "completed" | "failed";
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  completedAt?: string | null;
 }
 
 export type PipelineNodeKind =

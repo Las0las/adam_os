@@ -15,6 +15,7 @@ import type { Role, Tenant, User, AuditEvent } from "@/types/platform";
 import type {
   Source,
   RawAsset,
+  IngestionBatch,
   PipelineDefinition,
   PipelineRun,
   CanonicalDocument,
@@ -59,6 +60,7 @@ export interface Database {
   // dataops
   sources: Collection<Source>;
   rawAssets: Collection<RawAsset>;
+  ingestionBatches: Collection<IngestionBatch>;
   pipelineDefinitions: Collection<PipelineDefinition>;
   pipelineRuns: Collection<PipelineRun>;
   canonicalDocuments: Collection<CanonicalDocument>;
@@ -96,6 +98,7 @@ function createDatabase(): Database {
     auditEvents: coll("audit_events"),
     sources: coll("sources"),
     rawAssets: coll("raw_assets"),
+    ingestionBatches: coll("ingestion_batches"),
     pipelineDefinitions: coll("pipeline_definitions"),
     pipelineRuns: coll("pipeline_runs"),
     canonicalDocuments: coll("canonical_documents"),
