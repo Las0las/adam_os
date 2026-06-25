@@ -6,6 +6,8 @@
 import { db, resetDatabase } from "./db";
 import { id, now, resetClock } from "./utils/ids";
 import { systemActor } from "./permissions/permissions";
+import { setModelProvider } from "@/lib/aiops/models/model-provider";
+import { resolveDefaultProvider } from "@/lib/aiops/models/model-router";
 import { registerSource, ingestAsset } from "@/lib/dataops/sources/source-service";
 import { runAssetPipeline } from "@/lib/dataops/pipelines/pipeline-runner";
 import { indexEvidence } from "@/lib/dataops/evidence/chunking-service";
@@ -38,6 +40,12 @@ export function ensureBootstrapped(): Promise<void> {
 export async function bootstrap(): Promise<void> {
   await resetDatabase();
   resetClock();
+
+  // Install the process-wide default model provider from the environment. With
+  // no provider key set this is the deterministic mock, so local/test runs stay
+  // key-free; with a key it transparently upgrades every getModelProvider()
+  // caller to a real provider.
+  setModelProvider(resolveDefaultProvider());
 
   const tenant = await db.tenants.insert({
     id: DEMO_TENANT_ID,
