@@ -13,42 +13,38 @@ async function idByExternalKey(ctx: ReturnType<typeof systemActor>, type: string
   return obj.id;
 }
 
-test("Command Center aggregates work across domains", async () => {
+test("Command Center aggregates ranked work across domains", async () => {
   await bootstrap();
   const ctx = systemActor(DEMO_TENANT_ID);
 
-  // Drive two domain workflows to generate cross-domain work.
   const claimId = await idByExternalKey(ctx, "ValidationCase", "clm-001");
-  const claimResult = await runClaimValidationWorkflow(ctx, { validationCaseId: claimId });
-  assert.ok(claimResult.actionExecutionIds.length > 0, "claims workflow created findings");
-
+  await runClaimValidationWorkflow(ctx, { validationCaseId: claimId });
   const accountId = await idByExternalKey(ctx, "Account", "acct-meridian");
-  const execResult = await runAccountRiskWorkflow(ctx, { accountId });
-  assert.ok(execResult.actionExecutionIds.length > 0, "executive workflow created a memo");
+  await runAccountRiskWorkflow(ctx, { accountId });
 
-  const overview = await getCommandCenterOverview(ctx);
+  const o = await getCommandCenterOverview(ctx, { mode: "executive" });
 
-  // Raw aggregates are populated.
-  assert.ok(overview.recommendations.length > 0, "recommendations present");
-  assert.ok(overview.recentAuditEvents.length > 0, "audit present");
-  assert.ok(overview.items.length > 0, "flattened items present");
+  assert.ok(o.reviewQueue.length > 0, "review queue populated");
+  assert.ok(o.recommendationQueue.length > 0, "recommendation queue populated");
+  assert.ok(o.recentActivity.length > 0, "recent activity populated");
 
-  // Items span more than one domain and carry the required annotations.
-  const domains = new Set(overview.items.map((i) => i.domain));
-  assert.ok(domains.size >= 2, "items span multiple domains");
-  for (const item of overview.items) {
-    assert.ok(item.domain, "item has domain");
-    assert.ok(item.kind, "item has kind");
-    assert.ok(item.title, "item has title");
-    assert.ok("nextAction" in item, "item has nextAction");
+  // Items carry the required annotations and are ranked desc.
+  const all = [...o.actionQueue, ...o.reviewQueue, ...o.riskQueue, ...o.recommendationQueue];
+  const domains = new Set(all.map((i) => i.domain));
+  assert.ok(domains.size >= 2, "work spans multiple domains");
+  for (const item of all) {
+    assert.ok(item.domain && item.kind && item.title, "item has domain/kind/title");
+    assert.ok(typeof item.priorityScore === "number", "item has priorityScore");
   }
+  const scores = o.reviewQueue.map((i) => i.priorityScore);
+  assert.deepEqual(scores, [...scores].sort((a, b) => b - a), "review queue sorted by priority");
 });
 
 test("Command Center overview is tenant-scoped", async () => {
   await bootstrap();
   const other = systemActor("tnt_empty");
-  const overview = await getCommandCenterOverview(other);
-  assert.equal(overview.items.length, 0);
-  assert.equal(overview.reviewQueue.length, 0);
-  assert.equal(overview.recommendations.length, 0);
+  const o = await getCommandCenterOverview(other, { mode: "executive" });
+  assert.equal(o.reviewQueue.length, 0);
+  assert.equal(o.recommendationQueue.length, 0);
+  assert.equal(o.riskQueue.length, 0);
 });
