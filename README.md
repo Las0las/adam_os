@@ -56,26 +56,32 @@ Everything below runs today against an in-memory, tenant-scoped store and is cov
 - Each pack self-registers (functions/actions/mappers) and seeds live ontology objects + evidence
 
 **UI & API**
-- Next.js 14 App Router shell: Command Center + DataOps / AIOps / Mission Control dashboards + sub-pages + all five domain surfaces, server-rendered from the live store
+- Next.js 14 App Router shell with **config-driven navigation** (`src/config/navigation`): Command Center + DataOps / AIOps / Mission Control dashboards, the **complete route tree** of sub-pages, and all six domain surfaces — server-rendered from the live store
 - API route handlers from the §45 surface: evidence search, function run, **agent run**, **evals run**, action execute, observability, runtime health
+
+**Persistence (Phase 2 schema pack)**
+- The production Postgres schema ships as a split migration set (`db/migrations/0001_core.sql … 0009_claims.sql`, plus `0010_seed_views.sql` and `db/seeds/`).
+- A Postgres adapter seam (`src/lib/lawrence-core/db/pg/`) + an example repository (`recruiting-repository.ts`) demonstrate the production read path; it activates when `DATABASE_URL` is set. With no `DATABASE_URL`, the in-memory `Collection` store backs the runtime so everything is runnable/testable locally.
 
 ## Architecture
 
 ```
 src/lib/
-  lawrence-core/   db (tenant-scoped collections), audit, permissions, bootstrap, utils
+  lawrence-core/   db (in-memory collections + pg adapter seam), audit, permissions, bootstrap, utils
   dataops/         sources, parsers, transforms, ontology, evidence, lineage, pipelines
   aiops/           models, retrieval, prompts, functions(+builtins), agents, evals, observability
   mission-control/ actions, review-queue, notifications, runtime(deployments/health/rollback)
-  domains/         recruiting (seed pack)
+  domains/         recruiting, onboarding, support, claims, commercial (seed packs)
+src/config/        navigation, permissions, models
 src/types/         platform.ts, dataops.ts, aiops.ts, mission-control.ts, domain.ts
-app/               (marketing) + (lawrence) route groups, api/ route handlers
-supabase/migrations/0001_lawrence_core.sql   the §46 Postgres schema
-tests/unit/        dataops, aiops, mission-control suites (16 tests)
+app/               (marketing) + (lawrence) route groups (full route tree), api/ route handlers
+db/migrations/     0001_core … 0009_claims + 0010_seed_views   (production Postgres schema pack)
+db/seeds/          permissions, models, notification templates
+tests/unit/        dataops, aiops, mission-control, domains suites (21 tests)
 ```
 
-The in-memory `Collection` (`src/lib/lawrence-core/db/collection.ts`) is the seam where a real
-Postgres/Supabase repository slots in — `0001_lawrence_core.sql` is the matching schema. Likewise
+The in-memory `Collection` (`src/lib/lawrence-core/db/collection.ts`) is the seam where the real
+Postgres repository (`src/lib/lawrence-core/db/pg/`, schema in `db/migrations/`) slots in. Likewise
 `MockModelProvider` is the seam for a real Claude/OpenAI provider.
 
 ## Run it

@@ -9,6 +9,17 @@ export function Metric({ label, value }: { label: string; value: string | number
   );
 }
 
+/** Scaffold placeholder card — marks a surface that is routed but not yet wired
+ *  to live data (Phase 2 §60 explicitly leaves some UX unfinished). */
+export function Placeholder({ title, note }: { title: string; note?: string }) {
+  return (
+    <div className="card">
+      <h3>{title}</h3>
+      <p className="muted">{note ?? "Scaffolded surface — wiring lands in a later pass."}</p>
+    </div>
+  );
+}
+
 export function PageHeader({ title, sub }: { title: string; sub?: string }) {
   return (
     <header>
