@@ -22,10 +22,10 @@ Everything below runs today against an in-memory, tenant-scoped store and is cov
 (`npm test`) and an end-to-end seed (`npm run seed`).
 
 **DataOps**
-- Source registry + raw-asset ingestion with kind detection and checksums
-- Parser registry (JSON, CSV w/ RFC-4180 quoting, text/PDF/EML fallback) — pluggable via `supports()`
+- Asset ingestion: sha256 checksum **dedup** (with `force` override), ingestion batches, filesystem storage, kind detection, audit
+- Parser registry with **real parsers** — JSON, CSV, XML (fast-xml-parser), XLSX (SheetJS, `sheet:/row:` source paths), PDF (graceful `extractionStatus=unavailable`, never faked text), DOCX (mammoth), EML (mailparser, attachments → child assets), image (OCR-unsupported placeholder)
 - Transform registry with 7 deterministic transforms (trim, lowercase, cast, map_values, select/reorder columns, case_when)
-- Canonical pipeline runner executing the full §18 flow: parse → canonical doc/records → transforms → chunk/embed → ontology projection → lineage/audit
+- Canonical pipeline runner executing the full §18 flow plus **recursive EML attachment processing** (depth-limited, raw_asset→raw_asset lineage); pipeline preview (parse + transform, no persist)
 - Ontology object graph: idempotent upsert/merge on `(objectType, externalKey)`, links, history via audit
 - Evidence fabric: paragraph chunking + deterministic hashed embeddings
 
