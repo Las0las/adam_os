@@ -11,7 +11,12 @@ import { runAssetPipeline } from "@/lib/dataops/pipelines/pipeline-runner";
 import { indexEvidence } from "@/lib/dataops/evidence/chunking-service";
 import { listObjects } from "@/lib/dataops/ontology/object-service";
 import { createNotificationRule } from "@/lib/mission-control/notifications/notification-service";
-import "@/lib/domains/recruiting/recruiting-pack";
+import {
+  seedOnboarding,
+  seedSupport,
+  seedClaims,
+  seedCommercial,
+} from "@/lib/domains";
 
 export const DEMO_TENANT_ID = "tnt_demo";
 
@@ -67,12 +72,31 @@ export async function bootstrap(): Promise<void> {
     }
   }
 
-  // Mission Control: a notification rule for new review cases.
+  // Seed the remaining domain packs (onboarding / support / claims / commercial)
+  // so every domain surface has live ontology objects and evidence.
+  seedOnboarding(ctx);
+  seedSupport(ctx);
+  seedClaims(ctx);
+  seedCommercial(ctx);
+
+  // Mission Control: notification rules for review cases and critical findings.
   createNotificationRule(ctx, {
     name: "Review case opened",
     eventKey: "review_case.created",
     channel: "in_app",
     template: "A new review case requires attention: {{summary}}",
+  });
+  createNotificationRule(ctx, {
+    name: "Claim critical finding",
+    eventKey: "claim.critical_finding",
+    channel: "in_app",
+    template: "Critical claim finding requires validator attention.",
+  });
+  createNotificationRule(ctx, {
+    name: "Onboarding blocker",
+    eventKey: "onboarding.blocker",
+    channel: "in_app",
+    template: "Onboarding blocker escalated to the accountable owner.",
   });
 
   // A draft release bundle for the recruiting pack.

@@ -32,9 +32,9 @@ Everything below runs today against an in-memory, tenant-scoped store and is cov
 **AIOps**
 - Model provider abstraction (deterministic `MockModelProvider` ships by default; real providers implement the same interface)
 - Retrieval service implementing all five methods: `keyword`, `vector`, `augmented_keyword`, `hyde`, `rank_fusion` (reciprocal-rank fusion) — every hit carries method + score + source + excerpt
-- Function runtime + built-ins: `answer_with_citations`, `summarize_object`, `classify_document`, `extract_structured_fields`
+- Function runtime + 6 built-ins: `answer_with_citations`, `summarize_object`, `classify_document`, `extract_structured_fields`, `generate_draft_response`, `recommend_next_action`
 - Agent runtime: a state machine over the §28 graph primitives (input/retrieve/function/condition/action/review/notify/output) with per-step traces
-- Prompt template registry; evals harness (retrieval reciprocal-rank scoring); observability traces (cost/latency/tokens/method)
+- Prompt template registry; evals harness with all three tracks (retrieval reciprocal-rank, extraction field-match, response keyword-coverage); observability traces (cost/latency/tokens/method)
 
 **Mission Control**
 - Action engine: idempotency → permission → precondition → approval routing → run → audit; customer-affecting actions gate on a review case unless explicitly exempted
@@ -47,9 +47,17 @@ Everything below runs today against an in-memory, tenant-scoped store and is cov
 - Permission guards (`requirePermission`) on every privileged operation; permission classes per §47.2
 - Audit emission on every state change
 
+**Domain seed packs (§49–§53) — all five shipped**
+- **Recruiting** — Candidate projection, approval-gated `advance_candidate_stage`, shortlist-builder agent
+- **Onboarding** — OnboardingCase mapper, `onboarding_readiness_summary` / `detect_missing_docs`, blocker-escalation agent
+- **Support** — SupportTicket/KnowledgeDocument, `classify_ticket_severity` / `draft_support_response`, triage agent with KB retrieval
+- **Claims / Validation** — ClaimDocument, `extract_claim_fields` / `detect_contradictions` / `summarize_evidence`, `recommend_manual_review`, validation agent
+- **Executive / Commercial Ops** — Account/Opportunity, `summarize_account_risk` / `generate_executive_brief`, approval-gated `escalate_margin_exception`, account-risk-monitor agent
+- Each pack self-registers (functions/actions/mappers) and seeds live ontology objects + evidence
+
 **UI & API**
-- Next.js 14 App Router shell: Command Center + DataOps / AIOps / Mission Control dashboards + sub-pages, all server-rendered from the live store
-- Representative API route handlers from the §45 surface (evidence search, function run, action execute, observability, runtime health)
+- Next.js 14 App Router shell: Command Center + DataOps / AIOps / Mission Control dashboards + sub-pages + all five domain surfaces, server-rendered from the live store
+- API route handlers from the §45 surface: evidence search, function run, **agent run**, **evals run**, action execute, observability, runtime health
 
 ## Architecture
 

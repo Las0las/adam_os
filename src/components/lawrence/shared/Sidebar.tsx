@@ -35,7 +35,12 @@ const NAV: Array<{ group: string; links: Array<{ href: string; label: string }> 
   },
   {
     group: "Domain Packs",
-    links: [{ href: "/recruiting", label: "Recruiting" }],
+    links: [
+      { href: "/recruiting", label: "Recruiting" },
+      { href: "/onboarding", label: "Onboarding" },
+      { href: "/support", label: "Support" },
+      { href: "/claims", label: "Claims / Validation" },
+    ],
   },
 ];
 

@@ -6,6 +6,8 @@ import { answerWithCitations } from "./builtins/answer-with-citations";
 import { summarizeObject } from "./builtins/summarize-object";
 import { classifyDocument } from "./builtins/classify-document";
 import { extractStructuredFields } from "./builtins/extract-structured-fields";
+import { generateDraftResponse } from "./builtins/generate-draft-response";
+import { recommendNextAction } from "./builtins/recommend-next-action";
 
 const registry = new Map<string, LawrenceFunction<any, any>>();
 
@@ -21,6 +23,13 @@ export function listFunctions(): LawrenceFunction<any, any>[] {
   return [...registry.values()];
 }
 
-for (const fn of [answerWithCitations, summarizeObject, classifyDocument, extractStructuredFields]) {
+for (const fn of [
+  answerWithCitations,
+  summarizeObject,
+  classifyDocument,
+  extractStructuredFields,
+  generateDraftResponse,
+  recommendNextAction,
+]) {
   registerFunction(fn);
 }
