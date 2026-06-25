@@ -10,7 +10,7 @@ export default async function EvidenceChunkDetailPage({
   params: { chunkId: string };
 }) {
   const ctx = await appContext();
-  const chunk = db.evidenceChunks.get(ctx.tenantId, params.chunkId);
+  const chunk = await db.evidenceChunks.get(ctx.tenantId, params.chunkId);
 
   if (!chunk) {
     return (

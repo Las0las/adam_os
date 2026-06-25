@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function JobDetailPage({ params }: { params: { jobId: string } }) {
   const ctx = await appContext();
-  const job = listObjects(ctx, "Job").find((j) => j.id === params.jobId);
+  const job = (await listObjects(ctx, "Job")).find((j) => j.id === params.jobId);
 
   if (!job) {
     return <Placeholder title="Job not found" note={`No Job object with id ${params.jobId}.`} />;

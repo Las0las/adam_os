@@ -7,7 +7,7 @@ import { recruitingObjectMapper } from "./recruiting-object-mapper";
 
 export interface ObjectMapper {
   key: string;
-  map(ctx: ActorContext, record: CanonicalRecord): OntologyObject[];
+  map(ctx: ActorContext, record: CanonicalRecord): Promise<OntologyObject[]>;
 }
 
 const registry = new Map<string, ObjectMapper>();

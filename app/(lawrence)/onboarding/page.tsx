@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function OnboardingPage() {
   const ctx = await appContext();
-  const cases = listObjects(ctx, "OnboardingCase");
+  const cases = await listObjects(ctx, "OnboardingCase");
   return (
     <>
       <PageHeader title="Onboarding" sub="Seed domain pack — OnboardingCase objects and readiness." />

@@ -10,7 +10,7 @@ export default async function CandidateDetailPage({
   params: { candidateId: string };
 }) {
   const ctx = await appContext();
-  const candidate = listObjects(ctx, "Candidate").find((c) => c.id === params.candidateId);
+  const candidate = (await listObjects(ctx, "Candidate")).find((c) => c.id === params.candidateId);
 
   if (!candidate) {
     return (

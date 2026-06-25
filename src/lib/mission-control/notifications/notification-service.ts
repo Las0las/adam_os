@@ -16,7 +16,7 @@ export function allowDestination(destination: string): void {
   allowlist.add(destination);
 }
 
-export function createNotificationRule(
+export async function createNotificationRule(
   ctx: ActorContext,
   input: {
     name: string;
@@ -26,9 +26,9 @@ export function createNotificationRule(
     destination?: string;
     recipientRole?: string;
   },
-): NotificationRule {
+): Promise<NotificationRule> {
   requirePermission(ctx, "notifications.manage");
-  return db.notificationRules.insert({
+  return await db.notificationRules.insert({
     id: id("nrule"),
     tenantId: ctx.tenantId,
     name: input.name,
@@ -43,14 +43,14 @@ export function createNotificationRule(
 }
 
 /** Fire an event; matching enabled rules render + deliver notifications. */
-export function emitEvent(
+export async function emitEvent(
   ctx: ActorContext,
   eventKey: string,
   recipientUserId: string,
   vars: Record<string, unknown>,
   deepLink?: string,
-): Notification[] {
-  const rules = db.notificationRules.list(
+): Promise<Notification[]> {
+  const rules = await db.notificationRules.list(
     ctx.tenantId,
     (r) => r.enabled && r.eventKey === eventKey,
   );
@@ -60,7 +60,7 @@ export function emitEvent(
     const dedupeKey = `${rule.id}:${recipientUserId}:${eventKey}:${vars.subjectId ?? ""}`;
 
     // Dedupe: suppress identical pending/sent notifications.
-    const duplicate = db.notifications.find(
+    const duplicate = await db.notifications.find(
       ctx.tenantId,
       (n) => n.dedupeKey === dedupeKey && n.state !== "failed",
     );
@@ -72,7 +72,7 @@ export function emitEvent(
     const blocked =
       rule.channel !== "in_app" && (!rule.destination || !allowlist.has(rule.destination));
 
-    const notification = db.notifications.insert({
+    const notification = await db.notifications.insert({
       id: id("notif"),
       tenantId: ctx.tenantId,
       ruleId: rule.id,
@@ -86,7 +86,7 @@ export function emitEvent(
       error: blocked ? "destination not allowlisted" : null,
       createdAt: now(),
     });
-    emitAudit(ctx, "notifications.deliver", { type: "notification", id: notification.id }, {
+    await emitAudit(ctx, "notifications.deliver", { type: "notification", id: notification.id }, {
       eventKey,
       channel: rule.channel,
       state: notification.state,
@@ -96,8 +96,8 @@ export function emitEvent(
   return out;
 }
 
-export function listNotifications(ctx: ActorContext, recipientUserId?: string): Notification[] {
-  return db.notifications
-    .list(ctx.tenantId, recipientUserId ? (n) => n.recipientUserId === recipientUserId : undefined)
+export async function listNotifications(ctx: ActorContext, recipientUserId?: string): Promise<Notification[]> {
+  return (await db.notifications
+    .list(ctx.tenantId, recipientUserId ? (n) => n.recipientUserId === recipientUserId : undefined))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }

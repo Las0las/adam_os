@@ -18,7 +18,7 @@ export async function runFunction(
   const fn = resolveFunction(functionKey);
   if (!fn) throw new Error(`Unknown function: ${functionKey}`);
 
-  const run = db.functionRuns.insert({
+  const run = await db.functionRuns.insert({
     id: id("frun"),
     tenantId: ctx.tenantId,
     functionId: fn.key,
@@ -33,18 +33,18 @@ export async function runFunction(
 
   try {
     const result = await fn.run(ctx, input);
-    const completed = db.functionRuns.update(run.id, {
+    const completed = await db.functionRuns.update(run.id, {
       status: "completed",
       output: result.output as Record<string, unknown>,
       citations: result.citations ?? [],
       traceId: (result.trace?.traceId as string | undefined) ?? null,
     });
-    emitAudit(ctx, "aiops.function.run", { type: "function_run", id: run.id }, { functionKey });
+    await emitAudit(ctx, "aiops.function.run", { type: "function_run", id: run.id }, { functionKey });
     return completed;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    const failed = db.functionRuns.update(run.id, { status: "failed", error: message });
-    emitAudit(ctx, "aiops.function.run.failed", { type: "function_run", id: run.id }, { functionKey, error: message });
+    const failed = await db.functionRuns.update(run.id, { status: "failed", error: message });
+    await emitAudit(ctx, "aiops.function.run.failed", { type: "function_run", id: run.id }, { functionKey, error: message });
     return failed;
   }
 }

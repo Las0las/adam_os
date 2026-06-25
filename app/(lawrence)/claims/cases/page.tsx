@@ -8,8 +8,8 @@ export const dynamic = "force-dynamic";
 
 export default async function ClaimCasesPage() {
   const ctx = await appContext();
-  const cases = listReviewCases(ctx).filter((c) => c.caseType === "claim_validation");
-  const docs = listObjects(ctx, "ClaimDocument");
+  const cases = (await listReviewCases(ctx)).filter((c) => c.caseType === "claim_validation");
+  const docs = await listObjects(ctx, "ClaimDocument");
 
   return (
     <>

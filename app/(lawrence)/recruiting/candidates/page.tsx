@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CandidatesPage() {
   const ctx = await appContext();
-  const candidates = listObjects(ctx, "Candidate");
+  const candidates = await listObjects(ctx, "Candidate");
 
   return (
     <>

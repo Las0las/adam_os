@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function PromptsPage() {
   const ctx = await appContext();
-  const prompts = db.promptTemplates.list(ctx.tenantId);
+  const prompts = await db.promptTemplates.list(ctx.tenantId);
 
   if (prompts.length === 0) {
     return (

@@ -29,10 +29,10 @@ export function ensureBootstrapped(): Promise<void> {
 }
 
 export async function bootstrap(): Promise<void> {
-  resetDatabase();
+  await resetDatabase();
   resetClock();
 
-  const tenant = db.tenants.insert({
+  const tenant = await db.tenants.insert({
     id: DEMO_TENANT_ID,
     tenantId: DEMO_TENANT_ID,
     name: "Demo Tenant",
@@ -41,7 +41,7 @@ export async function bootstrap(): Promise<void> {
   });
   const ctx = systemActor(tenant.id);
 
-  db.users.insert({
+  await db.users.insert({
     id: "usr_demo",
     tenantId: tenant.id,
     email: "operator@lawrence.dev",
@@ -51,22 +51,22 @@ export async function bootstrap(): Promise<void> {
   });
 
   // DataOps: ingest a candidate CSV and run the canonical pipeline.
-  const source = registerSource(ctx, { name: "Candidate Upload", kind: "upload" });
+  const source = await registerSource(ctx, { name: "Candidate Upload", kind: "upload" });
   const csv = [
     "full_name,email,location,summary",
     "Ada Lovelace,ada@example.com,London,Analytical engine pioneer and mathematician",
     "Alan Turing,alan@example.com,Manchester,Computing theory and cryptanalysis expert",
     "Grace Hopper,grace@example.com,New York,Compiler inventor and systems programmer",
   ].join("\n");
-  const asset = ingestAsset(ctx, { fileName: "candidates.csv", content: csv, sourceId: source.id });
+  const asset = await ingestAsset(ctx, { fileName: "candidates.csv", content: csv, sourceId: source.id });
 
   await runAssetPipeline(ctx, asset, { ontologyMapper: "recruiting" });
 
   // Index each candidate's summary as evidence so retrieval/functions work.
-  for (const candidate of listObjects(ctx, "Candidate")) {
+  for (const candidate of await listObjects(ctx, "Candidate")) {
     const summary = String(candidate.properties.summary ?? candidate.title ?? "");
     if (summary) {
-      indexEvidence(ctx, { objectType: "Candidate", objectId: candidate.id }, summary, {
+      await indexEvidence(ctx, { objectType: "Candidate", objectId: candidate.id }, summary, {
         documentTitle: candidate.title,
       });
     }
@@ -74,25 +74,25 @@ export async function bootstrap(): Promise<void> {
 
   // Seed the remaining domain packs (onboarding / support / claims / commercial)
   // so every domain surface has live ontology objects and evidence.
-  seedOnboarding(ctx);
-  seedSupport(ctx);
-  seedClaims(ctx);
-  seedCommercial(ctx);
+  await seedOnboarding(ctx);
+  await seedSupport(ctx);
+  await seedClaims(ctx);
+  await seedCommercial(ctx);
 
   // Mission Control: notification rules for review cases and critical findings.
-  createNotificationRule(ctx, {
+  await createNotificationRule(ctx, {
     name: "Review case opened",
     eventKey: "review_case.created",
     channel: "in_app",
     template: "A new review case requires attention: {{summary}}",
   });
-  createNotificationRule(ctx, {
+  await createNotificationRule(ctx, {
     name: "Claim critical finding",
     eventKey: "claim.critical_finding",
     channel: "in_app",
     template: "Critical claim finding requires validator attention.",
   });
-  createNotificationRule(ctx, {
+  await createNotificationRule(ctx, {
     name: "Onboarding blocker",
     eventKey: "onboarding.blocker",
     channel: "in_app",
@@ -100,7 +100,7 @@ export async function bootstrap(): Promise<void> {
   });
 
   // A draft release bundle for the recruiting pack.
-  db.releaseBundles.insert({
+  await db.releaseBundles.insert({
     id: id("rel"),
     tenantId: tenant.id,
     name: "Recruiting pack v1",

@@ -54,14 +54,14 @@ export function cosine(a: number[], b: number[]): number {
 }
 
 /** Chunk + embed a piece of text and persist evidence chunks for an object. */
-export function indexEvidence(
+export async function indexEvidence(
   ctx: ActorContext,
   source: { objectType: string; objectId: string },
   text: string,
   metadata: Record<string, unknown> = {},
-): EvidenceChunk[] {
+): Promise<EvidenceChunk[]> {
   const chunks = splitIntoChunks(text);
-  return chunks.map((chunkText, index) => {
+  return await Promise.all(chunks.map((chunkText, index) => {
     const vector = embed(chunkText);
     return db.evidenceChunks.insert({
       id: id("chunk"),
@@ -74,5 +74,5 @@ export function indexEvidence(
       embeddingId: `emb_${index}`,
       createdAt: now(),
     });
-  });
+  }));
 }

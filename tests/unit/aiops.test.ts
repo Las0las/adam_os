@@ -10,14 +10,14 @@ import { runFunction } from "@/lib/aiops/functions/function-runner";
 import { runRetrievalEvals } from "@/lib/aiops/evals/eval-runner";
 import { id } from "@/lib/lawrence-core/utils/ids";
 
-function seedEvidence() {
-  resetDatabase();
+async function seedEvidence() {
+  await resetDatabase();
   resetClock();
   const ctx = systemActor("tnt_test");
-  const ada = upsertObject(ctx, { objectType: "Candidate", externalKey: "ada", title: "Ada" });
-  const grace = upsertObject(ctx, { objectType: "Candidate", externalKey: "grace", title: "Grace" });
-  indexEvidence(ctx, { objectType: "Candidate", objectId: ada.id }, "Analytical engine pioneer and mathematician");
-  indexEvidence(ctx, { objectType: "Candidate", objectId: grace.id }, "Compiler inventor and systems programmer");
+  const ada = await upsertObject(ctx, { objectType: "Candidate", externalKey: "ada", title: "Ada" });
+  const grace = await upsertObject(ctx, { objectType: "Candidate", externalKey: "grace", title: "Grace" });
+  await indexEvidence(ctx, { objectType: "Candidate", objectId: ada.id }, "Analytical engine pioneer and mathematician");
+  await indexEvidence(ctx, { objectType: "Candidate", objectId: grace.id }, "Compiler inventor and systems programmer");
   return { ctx, ada, grace };
 }
 
@@ -26,17 +26,17 @@ test("splitIntoChunks packs paragraphs", () => {
   assert.ok(chunks.length >= 2);
 });
 
-test("keyword retrieval finds the matching candidate", () => {
-  const { ctx, grace } = seedEvidence();
-  const res = retrieve(ctx, { tenantId: ctx.tenantId, query: "compiler", methods: ["keyword"] });
+test("keyword retrieval finds the matching candidate", async () => {
+  const { ctx, grace } = await seedEvidence();
+  const res = await retrieve(ctx, { tenantId: ctx.tenantId, query: "compiler", methods: ["keyword"] });
   assert.ok(res.hits.length > 0);
   assert.equal(res.hits[0]!.objectId, grace.id);
   assert.equal(res.hits[0]!.method, "keyword");
 });
 
-test("rank_fusion retrieval returns scored, citeable hits", () => {
-  const { ctx, ada } = seedEvidence();
-  const res = retrieve(ctx, { tenantId: ctx.tenantId, query: "mathematician engine", methods: ["rank_fusion"] });
+test("rank_fusion retrieval returns scored, citeable hits", async () => {
+  const { ctx, ada } = await seedEvidence();
+  const res = await retrieve(ctx, { tenantId: ctx.tenantId, query: "mathematician engine", methods: ["rank_fusion"] });
   assert.ok(res.hits.length > 0);
   assert.equal(res.hits[0]!.objectId, ada.id);
   assert.ok(res.hits[0]!.chunkId);
@@ -44,7 +44,7 @@ test("rank_fusion retrieval returns scored, citeable hits", () => {
 });
 
 test("answer_with_citations returns citations used", async () => {
-  const { ctx } = seedEvidence();
+  const { ctx } = await seedEvidence();
   const run = await runFunction(ctx, "answer_with_citations", {
     question: "who invented compilers",
     objectTypes: ["Candidate"],
@@ -53,9 +53,9 @@ test("answer_with_citations returns citations used", async () => {
   assert.ok((run.citations?.length ?? 0) > 0);
 });
 
-test("retrieval eval scores reciprocal rank", () => {
-  const { ctx, grace } = seedEvidence();
-  const run = runRetrievalEvals(ctx, [
+test("retrieval eval scores reciprocal rank", async () => {
+  const { ctx, grace } = await seedEvidence();
+  const run = await runRetrievalEvals(ctx, [
     {
       id: id("evalcase"),
       tenantId: ctx.tenantId,

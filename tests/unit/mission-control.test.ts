@@ -17,15 +17,15 @@ import {
 import { promoteRelease, createRelease } from "@/lib/mission-control/runtime/deployment-service";
 import "@/lib/domains/recruiting/recruiting-pack";
 
-function ctxFresh() {
-  resetDatabase();
+async function ctxFresh() {
+  await resetDatabase();
   resetClock();
   return systemActor("tnt_test");
 }
 
 test("approval-gated action blocks then runs after approval", async () => {
-  const ctx = ctxFresh();
-  const candidate = upsertObject(ctx, { objectType: "Candidate", externalKey: "ada", title: "Ada", status: "new" });
+  const ctx = await ctxFresh();
+  const candidate = await upsertObject(ctx, { objectType: "Candidate", externalKey: "ada", title: "Ada", status: "new" });
 
   const exec = await executeAction(ctx, {
     actionKey: "advance_candidate_stage",
@@ -35,15 +35,15 @@ test("approval-gated action blocks then runs after approval", async () => {
   assert.equal(exec.status, "blocked");
   assert.ok(exec.reviewCaseId);
 
-  resolveReviewCase(ctx, exec.reviewCaseId!, "approved");
+  await resolveReviewCase(ctx, exec.reviewCaseId!, "approved");
   const released = await releaseApprovedAction(ctx, exec.reviewCaseId!);
   assert.equal(released?.status, "completed");
-  assert.equal(db.ontologyObjects.get(ctx.tenantId, candidate.id)!.status, "interview");
+  assert.equal((await db.ontologyObjects.get(ctx.tenantId, candidate.id))!.status, "interview");
 });
 
 test("precondition blocks invalid stage", async () => {
-  const ctx = ctxFresh();
-  const candidate = upsertObject(ctx, { objectType: "Candidate", externalKey: "x", title: "X" });
+  const ctx = await ctxFresh();
+  const candidate = await upsertObject(ctx, { objectType: "Candidate", externalKey: "x", title: "X" });
   const exec = await executeAction(ctx, {
     actionKey: "advance_candidate_stage",
     input: { candidateId: candidate.id, toStage: "nonsense" },
@@ -54,8 +54,8 @@ test("precondition blocks invalid stage", async () => {
 });
 
 test("idempotency returns the same execution", async () => {
-  const ctx = ctxFresh();
-  const candidate = upsertObject(ctx, { objectType: "Candidate", externalKey: "y", title: "Y" });
+  const ctx = await ctxFresh();
+  const candidate = await upsertObject(ctx, { objectType: "Candidate", externalKey: "y", title: "Y" });
   const a = await executeAction(ctx, {
     actionKey: "advance_candidate_stage",
     input: { candidateId: candidate.id, toStage: "screen" },
@@ -71,28 +71,28 @@ test("idempotency returns the same execution", async () => {
   assert.equal(a.id, b.id);
 });
 
-test("notification: external channel blocked unless allowlisted", () => {
-  const ctx = ctxFresh();
-  createNotificationRule(ctx, {
+test("notification: external channel blocked unless allowlisted", async () => {
+  const ctx = await ctxFresh();
+  await createNotificationRule(ctx, {
     name: "slack ping",
     eventKey: "test.event",
     channel: "slack",
     destination: "https://hooks.slack.com/x",
     template: "hi {{name}}",
   });
-  let notes = emitEvent(ctx, "test.event", "usr_1", { name: "Ada" });
+  let notes = await emitEvent(ctx, "test.event", "usr_1", { name: "Ada" });
   assert.equal(notes[0]!.state, "failed");
 
   allowDestination("https://hooks.slack.com/x");
-  notes = emitEvent(ctx, "test.event", "usr_2", { name: "Ada" });
+  notes = await emitEvent(ctx, "test.event", "usr_2", { name: "Ada" });
   assert.equal(notes[0]!.state, "sent");
 });
 
-test("release promotes draft -> staging -> production", () => {
-  const ctx = ctxFresh();
-  const rel = createRelease(ctx, { name: "r1", artifacts: [] });
+test("release promotes draft -> staging -> production", async () => {
+  const ctx = await ctxFresh();
+  const rel = await createRelease(ctx, { name: "r1", artifacts: [] });
   assert.equal(rel.environment, "draft");
-  assert.equal(promoteRelease(ctx, rel.id).environment, "staging");
-  assert.equal(promoteRelease(ctx, rel.id).environment, "production");
-  assert.throws(() => promoteRelease(ctx, rel.id));
+  assert.equal((await promoteRelease(ctx, rel.id)).environment, "staging");
+  assert.equal((await promoteRelease(ctx, rel.id)).environment, "production");
+  await assert.rejects(() => promoteRelease(ctx, rel.id));
 });

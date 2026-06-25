@@ -10,11 +10,11 @@ export const dynamic = "force-dynamic";
 
 export default async function CommandCenterPage() {
   const ctx = await appContext();
-  const health = runtimeHealth(ctx);
-  const reviews = listReviewCases(ctx);
-  const objects = listObjects(ctx);
-  const audit = listAudit(ctx.tenantId).slice(0, 8);
-  const blockedActions = db.actionExecutions.list(ctx.tenantId, (a) => a.status === "blocked");
+  const health = await runtimeHealth(ctx);
+  const reviews = await listReviewCases(ctx);
+  const objects = await listObjects(ctx);
+  const audit = (await listAudit(ctx.tenantId)).slice(0, 8);
+  const blockedActions = await db.actionExecutions.list(ctx.tenantId, (a) => a.status === "blocked");
 
   return (
     <>

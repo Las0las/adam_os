@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 export default async function AiOpsPage() {
   const ctx = await appContext();
   const fns = listFunctions();
-  const runs = db.functionRuns.list(ctx.tenantId);
-  const obs = summarize(ctx);
+  const runs = await db.functionRuns.list(ctx.tenantId);
+  const obs = await summarize(ctx);
 
   return (
     <>

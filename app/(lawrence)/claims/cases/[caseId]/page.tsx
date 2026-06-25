@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ClaimCaseDetailPage({ params }: { params: { caseId: string } }) {
   const ctx = await appContext();
-  const reviewCase = listReviewCases(ctx).find((c) => c.id === params.caseId);
+  const reviewCase = (await listReviewCases(ctx)).find((c) => c.id === params.caseId);
 
   if (!reviewCase) {
     return (

@@ -46,7 +46,7 @@ export async function runAssetPipeline(
 ): Promise<PipelineRunResult> {
   requirePermission(ctx, "dataops.admin");
 
-  const run = db.pipelineRuns.insert({
+  const run = await db.pipelineRuns.insert({
     id: id("run"),
     tenantId: ctx.tenantId,
     pipelineId: options.pipelineId ?? "ad_hoc",
@@ -65,7 +65,7 @@ export async function runAssetPipeline(
 
     let document: CanonicalDocument | undefined;
     if (parsed.document) {
-      document = db.canonicalDocuments.insert({
+      document = await db.canonicalDocuments.insert({
         id: id("doc"),
         tenantId: ctx.tenantId,
         rawAssetId: asset.id,
@@ -75,7 +75,7 @@ export async function runAssetPipeline(
         metadata: parsed.document.metadata ?? {},
         createdAt: now(),
       });
-      emitLineage(ctx, {
+      await emitLineage(ctx, {
         pipelineRunId: run.id,
         kind: "parse",
         from: { type: "raw_asset", id: asset.id },
@@ -83,16 +83,18 @@ export async function runAssetPipeline(
       });
     }
 
-    let records: CanonicalRecord[] = (parsed.records ?? []).map((r) =>
-      db.canonicalRecords.insert({
-        id: id("rec"),
-        tenantId: ctx.tenantId,
-        documentId: document?.id ?? "",
-        recordType: r.recordType,
-        payload: r.payload,
-        sourcePath: r.sourcePath ?? null,
-        createdAt: now(),
-      }),
+    let records: CanonicalRecord[] = await Promise.all(
+      (parsed.records ?? []).map((r) =>
+        db.canonicalRecords.insert({
+          id: id("rec"),
+          tenantId: ctx.tenantId,
+          documentId: document?.id ?? "",
+          recordType: r.recordType,
+          payload: r.payload,
+          sourcePath: r.sourcePath ?? null,
+          createdAt: now(),
+        }),
+      ),
     );
 
     // 5. Apply deterministic transforms over record payloads.
@@ -103,13 +105,15 @@ export async function runAssetPipeline(
         if (!transform) throw new Error(`Unknown transform: ${step.key}`);
         rows = (await transform.run({ rows, config: step.config }, ctx)).rows;
       }
-      records = records.map((r, i) => db.canonicalRecords.update(r.id, { payload: rows[i] ?? r.payload }));
+      records = await Promise.all(
+        records.map((r, i) => db.canonicalRecords.update(r.id, { payload: rows[i] ?? r.payload })),
+      );
     }
 
     // 6–7. Optionally extract evidence chunks + embeddings from doc text.
     const chunkIds: string[] = [];
     if (options.buildEvidence && document?.textContent) {
-      const chunks = indexEvidence(
+      const chunks = await indexEvidence(
         ctx,
         { objectType: "canonical_document", objectId: document.id },
         document.textContent,
@@ -117,7 +121,7 @@ export async function runAssetPipeline(
       );
       for (const c of chunks) {
         chunkIds.push(c.id);
-        emitLineage(ctx, {
+        await emitLineage(ctx, {
           pipelineRunId: run.id,
           kind: "chunk",
           from: { type: "canonical_document", id: document.id },
@@ -132,10 +136,10 @@ export async function runAssetPipeline(
       const mapper = resolveObjectMapper(options.ontologyMapper);
       if (!mapper) throw new Error(`Unknown ontology mapper: ${options.ontologyMapper}`);
       for (const record of records) {
-        const objects = mapper.map(ctx, record);
+        const objects = await mapper.map(ctx, record);
         for (const obj of objects) {
           ontologyObjectIds.push(obj.id);
-          emitLineage(ctx, {
+          await emitLineage(ctx, {
             pipelineRunId: run.id,
             kind: "project",
             from: { type: "canonical_record", id: record.id },
@@ -146,7 +150,7 @@ export async function runAssetPipeline(
     }
 
     // 10. Finalise.
-    const finished = db.pipelineRuns.update(run.id, {
+    const finished = await db.pipelineRuns.update(run.id, {
       status: "completed",
       finishedAt: now(),
       stats: {
@@ -155,17 +159,17 @@ export async function runAssetPipeline(
         ontologyObjects: ontologyObjectIds.length,
       },
     });
-    emitAudit(ctx, "dataops.pipeline.run", { type: "pipeline_run", id: run.id }, finished.stats);
+    await emitAudit(ctx, "dataops.pipeline.run", { type: "pipeline_run", id: run.id }, finished.stats);
 
     return { run: finished, document, records, ontologyObjectIds, chunkIds };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    const failed = db.pipelineRuns.update(run.id, {
+    const failed = await db.pipelineRuns.update(run.id, {
       status: "failed",
       finishedAt: now(),
       error: message,
     });
-    emitAudit(ctx, "dataops.pipeline.run.failed", { type: "pipeline_run", id: run.id }, { error: message });
+    await emitAudit(ctx, "dataops.pipeline.run.failed", { type: "pipeline_run", id: run.id }, { error: message });
     return { run: failed, records: [], ontologyObjectIds: [], chunkIds: [] };
   }
 }

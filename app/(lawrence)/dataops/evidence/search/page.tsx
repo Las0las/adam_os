@@ -13,7 +13,7 @@ export default async function EvidenceSearchPage({
   const query = searchParams.q;
 
   const result = query
-    ? retrieve(ctx, {
+    ? await retrieve(ctx, {
         tenantId: ctx.tenantId,
         query,
         methods: ["rank_fusion"],

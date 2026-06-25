@@ -6,8 +6,8 @@ export const dynamic = "force-dynamic";
 
 export default async function NotificationsPage() {
   const ctx = await appContext();
-  const rules = db.notificationRules.list(ctx.tenantId);
-  const delivered = db.notifications.list(ctx.tenantId).slice(-20).reverse();
+  const rules = await db.notificationRules.list(ctx.tenantId);
+  const delivered = (await db.notifications.list(ctx.tenantId)).slice(-20).reverse();
 
   return (
     <>

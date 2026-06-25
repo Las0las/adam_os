@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ApprovalsPage() {
   const ctx = await appContext();
-  const approvals = listReviewCases(ctx, "open").filter(
+  const approvals = (await listReviewCases(ctx, "open")).filter(
     (c) => c.gatedActionExecutionId,
   );
 

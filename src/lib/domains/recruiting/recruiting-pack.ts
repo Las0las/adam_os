@@ -19,9 +19,9 @@ registerAction({
     return valid.includes(String(input.toStage)) ? null : `invalid stage: ${input.toStage}`;
   },
   async run(ctx: ActorContext, input) {
-    const obj = db.ontologyObjects.get(ctx.tenantId, String(input.candidateId));
+    const obj = await db.ontologyObjects.get(ctx.tenantId, String(input.candidateId));
     if (!obj) throw new Error(`Candidate not found: ${input.candidateId}`);
-    const updated = db.ontologyObjects.update(obj.id, {
+    const updated = await db.ontologyObjects.update(obj.id, {
       status: String(input.toStage),
       updatedAt: now(),
     });
@@ -37,7 +37,7 @@ const explainShortlist: LawrenceFunction<{ candidateId: string; jobTitle: string
   klass: "reason",
   outputSchema: { type: "object", properties: { rationale: { type: "string" } }, required: ["rationale"] },
   async run(ctx, input): Promise<FunctionExecutionResult<{ rationale: string }>> {
-    const chunks = db.evidenceChunks.list(ctx.tenantId, (c) => c.sourceObjectId === input.candidateId);
+    const chunks = await db.evidenceChunks.list(ctx.tenantId, (c) => c.sourceObjectId === input.candidateId);
     const evidence = chunks.map((c) => c.text).join(" ").slice(0, 600);
     return {
       output: {

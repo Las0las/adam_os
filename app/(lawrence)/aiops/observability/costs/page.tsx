@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CostsPage() {
   const ctx = await appContext();
-  const obs = summarize(ctx);
+  const obs = await summarize(ctx);
 
   return (
     <>

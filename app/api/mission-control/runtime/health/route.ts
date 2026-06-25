@@ -5,5 +5,5 @@ import { runtimeHealth } from "@/lib/mission-control/runtime/deployment-service"
 // GET /api/mission-control/runtime/health
 export async function GET() {
   const ctx = await appContext();
-  return NextResponse.json(runtimeHealth(ctx));
+  return NextResponse.json(await runtimeHealth(ctx));
 }

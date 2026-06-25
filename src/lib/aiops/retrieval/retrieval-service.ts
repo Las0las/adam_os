@@ -14,8 +14,8 @@ import type {
   RetrievalResponse,
 } from "@/types/dataops";
 
-function candidateChunks(req: RetrievalRequest): EvidenceChunk[] {
-  return db.evidenceChunks.list(req.tenantId, (c) => {
+async function candidateChunks(req: RetrievalRequest): Promise<EvidenceChunk[]> {
+  return await db.evidenceChunks.list(req.tenantId, (c) => {
     if (req.objectTypes?.length && !req.objectTypes.includes(c.sourceObjectType)) return false;
     if (req.subjectObjectId && c.sourceObjectId !== req.subjectObjectId) return false;
     return true;
@@ -116,8 +116,8 @@ const dispatch: Record<RetrievalMethod, (r: RetrievalRequest, c: EvidenceChunk[]
   rank_fusion: rankFusion,
 };
 
-export function retrieve(_ctx: ActorContext, req: RetrievalRequest): RetrievalResponse {
-  const chunks = candidateChunks(req);
+export async function retrieve(_ctx: ActorContext, req: RetrievalRequest): Promise<RetrievalResponse> {
+  const chunks = await candidateChunks(req);
   const limit = req.limit ?? 10;
   const merged = new Map<string, RetrievalHit>();
   for (const method of req.methods) {

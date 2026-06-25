@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function KnowledgePage() {
   const ctx = await appContext();
-  const docs = listObjects(ctx, "KnowledgeDocument");
+  const docs = await listObjects(ctx, "KnowledgeDocument");
 
   return (
     <>

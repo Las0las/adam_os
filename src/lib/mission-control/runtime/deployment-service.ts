@@ -14,12 +14,12 @@ const PROMOTION_PATH: Record<DeploymentEnvironment, DeploymentEnvironment | null
   production: null,
 };
 
-export function createRelease(
+export async function createRelease(
   ctx: ActorContext,
   input: { name: string; artifacts: ReleaseBundle["artifacts"] },
-): ReleaseBundle {
+): Promise<ReleaseBundle> {
   requirePermission(ctx, "mission_control.admin");
-  return db.releaseBundles.insert({
+  return await db.releaseBundles.insert({
     id: id("rel"),
     tenantId: ctx.tenantId,
     name: input.name,
@@ -31,41 +31,41 @@ export function createRelease(
   });
 }
 
-export function promoteRelease(ctx: ActorContext, releaseId: string): ReleaseBundle {
+export async function promoteRelease(ctx: ActorContext, releaseId: string): Promise<ReleaseBundle> {
   requirePermission(ctx, "deploy.promote");
-  const release = db.releaseBundles.get(ctx.tenantId, releaseId);
+  const release = await db.releaseBundles.get(ctx.tenantId, releaseId);
   if (!release) throw new Error(`Release not found: ${releaseId}`);
   const next = PROMOTION_PATH[release.environment];
   if (!next) throw new Error(`Release already in production: ${releaseId}`);
-  const updated = db.releaseBundles.update(release.id, {
+  const updated = await db.releaseBundles.update(release.id, {
     environment: next,
     status: "deployed",
     promotedFrom: release.environment,
   });
-  emitAudit(ctx, "deploy.promote", { type: "deployment_release", id: release.id }, {
+  await emitAudit(ctx, "deploy.promote", { type: "deployment_release", id: release.id }, {
     from: release.environment,
     to: next,
   });
   return updated;
 }
 
-export function rollbackRelease(ctx: ActorContext, releaseId: string): ReleaseBundle {
+export async function rollbackRelease(ctx: ActorContext, releaseId: string): Promise<ReleaseBundle> {
   requirePermission(ctx, "deploy.promote");
-  const release = db.releaseBundles.get(ctx.tenantId, releaseId);
+  const release = await db.releaseBundles.get(ctx.tenantId, releaseId);
   if (!release) throw new Error(`Release not found: ${releaseId}`);
-  const updated = db.releaseBundles.update(release.id, {
+  const updated = await db.releaseBundles.update(release.id, {
     status: "rolled_back",
     environment: release.promotedFrom ?? release.environment,
   });
-  emitAudit(ctx, "deploy.rollback", { type: "deployment_release", id: release.id }, {});
+  await emitAudit(ctx, "deploy.rollback", { type: "deployment_release", id: release.id }, {});
   return updated;
 }
 
-export function raiseIncident(
+export async function raiseIncident(
   ctx: ActorContext,
   input: { title: string; severity: RuntimeIncident["severity"]; source: string; detail?: string },
-): RuntimeIncident {
-  const incident = db.runtimeIncidents.insert({
+): Promise<RuntimeIncident> {
+  const incident = await db.runtimeIncidents.insert({
     id: id("inc"),
     tenantId: ctx.tenantId,
     title: input.title,
@@ -75,7 +75,7 @@ export function raiseIncident(
     detail: input.detail ?? null,
     createdAt: now(),
   });
-  emitAudit(ctx, "runtime.incident.raise", { type: "runtime_incident", id: incident.id }, {
+  await emitAudit(ctx, "runtime.incident.raise", { type: "runtime_incident", id: incident.id }, {
     severity: input.severity,
   });
   return incident;
@@ -90,15 +90,24 @@ export interface RuntimeHealth {
   reviewBacklog: number;
 }
 
-export function runtimeHealth(ctx: ActorContext): RuntimeHealth {
+export async function runtimeHealth(ctx: ActorContext): Promise<RuntimeHealth> {
   const rate = <T>(rows: T[], get: (r: T) => string, failStates: string[]) =>
     rows.length ? rows.filter((r) => failStates.includes(get(r))).length / rows.length : 0;
+  const [pipelineRuns, functionRuns, actionExecutions, notifications, openIncidents, reviewBacklog] =
+    await Promise.all([
+      db.pipelineRuns.list(ctx.tenantId),
+      db.functionRuns.list(ctx.tenantId),
+      db.actionExecutions.list(ctx.tenantId),
+      db.notifications.list(ctx.tenantId),
+      db.runtimeIncidents.list(ctx.tenantId, (i) => i.status === "open"),
+      db.reviewCases.list(ctx.tenantId, (c) => c.status === "open"),
+    ]);
   return {
-    pipelineFailureRate: rate(db.pipelineRuns.list(ctx.tenantId), (r) => r.status, ["failed"]),
-    functionFailureRate: rate(db.functionRuns.list(ctx.tenantId), (r) => r.status, ["failed"]),
-    actionFailureRate: rate(db.actionExecutions.list(ctx.tenantId), (r) => r.status, ["failed"]),
-    notificationFailureRate: rate(db.notifications.list(ctx.tenantId), (r) => r.state, ["failed"]),
-    openIncidents: db.runtimeIncidents.list(ctx.tenantId, (i) => i.status === "open").length,
-    reviewBacklog: db.reviewCases.list(ctx.tenantId, (c) => c.status === "open").length,
+    pipelineFailureRate: rate(pipelineRuns, (r) => r.status, ["failed"]),
+    functionFailureRate: rate(functionRuns, (r) => r.status, ["failed"]),
+    actionFailureRate: rate(actionExecutions, (r) => r.status, ["failed"]),
+    notificationFailureRate: rate(notifications, (r) => r.state, ["failed"]),
+    openIncidents: openIncidents.length,
+    reviewBacklog: reviewBacklog.length,
   };
 }

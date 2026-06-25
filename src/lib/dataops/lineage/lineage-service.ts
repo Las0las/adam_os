@@ -6,7 +6,7 @@ import { id, now } from "@/lib/lawrence-core/utils/ids";
 import type { ActorContext } from "@/types/platform";
 import type { LineageEvent } from "@/types/dataops";
 
-export function emitLineage(
+export async function emitLineage(
   ctx: ActorContext,
   event: {
     pipelineRunId?: string | null;
@@ -15,8 +15,8 @@ export function emitLineage(
     to: { type: string; id: string };
     metadata?: Record<string, unknown>;
   },
-): LineageEvent {
-  return db.lineageEvents.insert({
+): Promise<LineageEvent> {
+  return await db.lineageEvents.insert({
     id: id("lin"),
     tenantId: ctx.tenantId,
     pipelineRunId: event.pipelineRunId ?? null,
@@ -30,6 +30,6 @@ export function emitLineage(
   });
 }
 
-export function lineageFor(ctx: ActorContext, objectId: string): LineageEvent[] {
-  return db.lineageEvents.list(ctx.tenantId, (e) => e.fromId === objectId || e.toId === objectId);
+export async function lineageFor(ctx: ActorContext, objectId: string): Promise<LineageEvent[]> {
+  return await db.lineageEvents.list(ctx.tenantId, (e) => e.fromId === objectId || e.toId === objectId);
 }

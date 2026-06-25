@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 
 export default async function OntologyPage() {
   const ctx = await appContext();
-  const objects = listObjects(ctx);
-  const linkCount = db.ontologyLinks.list(ctx.tenantId).length;
+  const objects = await listObjects(ctx);
+  const linkCount = (await db.ontologyLinks.list(ctx.tenantId)).length;
 
   // Group objects by objectType, preserving first-seen order.
   const groups = new Map<string, typeof objects>();

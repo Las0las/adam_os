@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SourcesPage() {
   const ctx = await appContext();
-  const sources = db.sources.list(ctx.tenantId);
+  const sources = await db.sources.list(ctx.tenantId);
 
   return (
     <>

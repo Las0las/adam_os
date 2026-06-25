@@ -10,7 +10,7 @@ export default async function SourceDetailPage({
   params: { sourceId: string };
 }) {
   const ctx = await appContext();
-  const source = db.sources.get(ctx.tenantId, params.sourceId);
+  const source = await db.sources.get(ctx.tenantId, params.sourceId);
 
   if (!source) {
     return (
@@ -21,7 +21,7 @@ export default async function SourceDetailPage({
     );
   }
 
-  const assets = db.rawAssets.list(ctx.tenantId, (a) => a.sourceId === params.sourceId);
+  const assets = await db.rawAssets.list(ctx.tenantId, (a) => a.sourceId === params.sourceId);
 
   return (
     <>

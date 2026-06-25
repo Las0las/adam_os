@@ -23,7 +23,7 @@ export async function runAgent(
   input: Record<string, unknown>,
 ): Promise<AgentRun> {
   requirePermission(ctx, "aiops.agent_admin");
-  const run = db.agentRuns.insert({
+  const run = await db.agentRuns.insert({
     id: id("arun"),
     tenantId: ctx.tenantId,
     agentId: agent.key,
@@ -63,17 +63,17 @@ export async function runAgent(
       current = nextNode(agent, current, blackboard, nodesById);
     }
 
-    const completed = db.agentRuns.update(run.id, {
+    const completed = await db.agentRuns.update(run.id, {
       status: "completed",
       steps,
       output: blackboard,
     });
-    emitAudit(ctx, "aiops.agent.run", { type: "agent_run", id: run.id }, { agentKey: agent.key });
+    await emitAudit(ctx, "aiops.agent.run", { type: "agent_run", id: run.id }, { agentKey: agent.key });
     return completed;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    const failed = db.agentRuns.update(run.id, { status: "failed", steps, error: message });
-    emitAudit(ctx, "aiops.agent.run.failed", { type: "agent_run", id: run.id }, { error: message });
+    const failed = await db.agentRuns.update(run.id, { status: "failed", steps, error: message });
+    await emitAudit(ctx, "aiops.agent.run.failed", { type: "agent_run", id: run.id }, { error: message });
     return failed;
   }
 }
@@ -89,7 +89,7 @@ async function executeNode(
     case "output":
       return {};
     case "retrieve": {
-      const response = retrieve(ctx, {
+      const response = await retrieve(ctx, {
         tenantId: ctx.tenantId,
         query: String(cfg.query ?? bb.query ?? ""),
         objectTypes: cfg.objectTypes as string[] | undefined,
@@ -117,7 +117,7 @@ async function executeNode(
       return { lastAction: exec };
     }
     case "review": {
-      const rc = openReviewCase(ctx, {
+      const rc = await openReviewCase(ctx, {
         caseType: String(cfg.caseType ?? "agent_review"),
         severity: (cfg.severity as never) ?? "medium",
         summary: String(cfg.summary ?? ""),
@@ -125,7 +125,7 @@ async function executeNode(
       return { lastReviewCase: rc };
     }
     case "notify": {
-      const notes = emitEvent(
+      const notes = await emitEvent(
         ctx,
         String(cfg.eventKey),
         String(cfg.recipientUserId ?? ctx.actorUserId ?? "system"),

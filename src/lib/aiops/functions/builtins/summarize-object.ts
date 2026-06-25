@@ -22,7 +22,7 @@ export const summarizeObject: LawrenceFunction<SummarizeInput, SummarizeOutput> 
   klass: "summarize",
   outputSchema: { type: "object", properties: { summary: { type: "string" } }, required: ["summary"] },
   async run(ctx: ActorContext, input: SummarizeInput): Promise<FunctionExecutionResult<SummarizeOutput>> {
-    const chunks = db.evidenceChunks.list(
+    const chunks = await db.evidenceChunks.list(
       ctx.tenantId,
       (c) => c.sourceObjectId === input.objectId,
     );
@@ -31,7 +31,7 @@ export const summarizeObject: LawrenceFunction<SummarizeInput, SummarizeOutput> 
       prompt: `Summarize the following ${input.objectType} concisely:\n${body}`,
     });
     const traceId = id("trace");
-    recordTrace(ctx, "function_run", traceId, completion);
+    await recordTrace(ctx, "function_run", traceId, completion);
     return { output: { summary: completion.text }, trace: { traceId } };
   },
 };

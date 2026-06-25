@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function TracesPage() {
   const ctx = await appContext();
-  const all = db.modelTraces.list(ctx.tenantId);
+  const all = await db.modelTraces.list(ctx.tenantId);
   const traces = all.slice(-50).reverse();
 
   return (

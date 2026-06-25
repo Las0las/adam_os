@@ -43,7 +43,7 @@ export const answerWithCitations: LawrenceFunction<AnswerInput, AnswerOutput> = 
   },
   async run(ctx: ActorContext, input: AnswerInput): Promise<FunctionExecutionResult<AnswerOutput>> {
     const methods = input.methods ?? ["rank_fusion"];
-    const retrieval = retrieve(ctx, {
+    const retrieval = await retrieve(ctx, {
       tenantId: ctx.tenantId,
       query: input.question,
       objectTypes: input.objectTypes,
@@ -59,7 +59,7 @@ export const answerWithCitations: LawrenceFunction<AnswerInput, AnswerOutput> = 
 
     const completion = await getModelProvider().complete({ prompt });
     const traceId = id("trace");
-    recordTrace(ctx, "function_run", traceId, completion, methods[0]);
+    await recordTrace(ctx, "function_run", traceId, completion, methods[0]);
 
     return {
       output: { answer: completion.text, citationCount: retrieval.hits.length },

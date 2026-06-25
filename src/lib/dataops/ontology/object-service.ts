@@ -16,28 +16,28 @@ export interface UpsertObjectInput {
   properties?: Record<string, unknown>;
 }
 
-export function upsertObject(ctx: ActorContext, input: UpsertObjectInput): OntologyObject {
+export async function upsertObject(ctx: ActorContext, input: UpsertObjectInput): Promise<OntologyObject> {
   requirePermission(ctx, "ontology.admin");
   const existing = input.externalKey
-    ? db.ontologyObjects.find(
+    ? await db.ontologyObjects.find(
         ctx.tenantId,
         (o) => o.objectType === input.objectType && o.externalKey === input.externalKey,
       )
     : undefined;
 
   if (existing) {
-    const merged = db.ontologyObjects.update(existing.id, {
+    const merged = await db.ontologyObjects.update(existing.id, {
       title: input.title ?? existing.title,
       status: input.status ?? existing.status,
       properties: { ...existing.properties, ...(input.properties ?? {}) },
       updatedAt: now(),
     });
-    recordHistory(ctx, merged, "update");
+    await recordHistory(ctx, merged, "update");
     return merged;
   }
 
   const ts = now();
-  const created = db.ontologyObjects.insert({
+  const created = await db.ontologyObjects.insert({
     id: id("obj"),
     tenantId: ctx.tenantId,
     objectType: input.objectType,
@@ -48,11 +48,11 @@ export function upsertObject(ctx: ActorContext, input: UpsertObjectInput): Ontol
     createdAt: ts,
     updatedAt: ts,
   });
-  recordHistory(ctx, created, "create");
+  await recordHistory(ctx, created, "create");
   return created;
 }
 
-export function linkObjects(
+export async function linkObjects(
   ctx: ActorContext,
   input: {
     linkType: string;
@@ -60,9 +60,9 @@ export function linkObjects(
     to: { objectType: string; objectId: string };
     properties?: Record<string, unknown>;
   },
-): OntologyLink {
+): Promise<OntologyLink> {
   requirePermission(ctx, "ontology.admin");
-  const existing = db.ontologyLinks.find(
+  const existing = await db.ontologyLinks.find(
     ctx.tenantId,
     (l) =>
       l.linkType === input.linkType &&
@@ -71,7 +71,7 @@ export function linkObjects(
   );
   if (existing) return existing;
 
-  return db.ontologyLinks.insert({
+  return await db.ontologyLinks.insert({
     id: id("link"),
     tenantId: ctx.tenantId,
     linkType: input.linkType,
@@ -84,19 +84,19 @@ export function linkObjects(
   });
 }
 
-export function listObjects(ctx: ActorContext, objectType?: string): OntologyObject[] {
-  return db.ontologyObjects.list(ctx.tenantId, objectType ? (o) => o.objectType === objectType : undefined);
+export async function listObjects(ctx: ActorContext, objectType?: string): Promise<OntologyObject[]> {
+  return await db.ontologyObjects.list(ctx.tenantId, objectType ? (o) => o.objectType === objectType : undefined);
 }
 
-export function linksFor(ctx: ActorContext, objectId: string): OntologyLink[] {
-  return db.ontologyLinks.list(
+export async function linksFor(ctx: ActorContext, objectId: string): Promise<OntologyLink[]> {
+  return await db.ontologyLinks.list(
     ctx.tenantId,
     (l) => l.fromObjectId === objectId || l.toObjectId === objectId,
   );
 }
 
-function recordHistory(ctx: ActorContext, obj: OntologyObject, kind: "create" | "update"): void {
-  emitAudit(ctx, `ontology.object.${kind}`, { type: obj.objectType, id: obj.id }, {
+async function recordHistory(ctx: ActorContext, obj: OntologyObject, kind: "create" | "update"): Promise<void> {
+  await emitAudit(ctx, `ontology.object.${kind}`, { type: obj.objectType, id: obj.id }, {
     objectType: obj.objectType,
     externalKey: obj.externalKey,
   });

@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   if (body.suite === "response" && body.functionKey) {
     return NextResponse.json(await runResponseEvals(ctx, body.functionKey, cases));
   }
-  const run = runRetrievalEvals(ctx, cases);
+  const run = await runRetrievalEvals(ctx, cases);
   // Persisted for the observability/evals surfaces.
   void db.evalRuns.get(ctx.tenantId, run.id);
   return NextResponse.json(run);

@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function RecommendationsEvalsPage() {
   const ctx = await appContext();
-  const runs = db.evalRuns.list(ctx.tenantId, (r) => r.suiteType === "recommendation");
+  const runs = await db.evalRuns.list(ctx.tenantId, (r) => r.suiteType === "recommendation");
 
   if (runs.length === 0) {
     return (

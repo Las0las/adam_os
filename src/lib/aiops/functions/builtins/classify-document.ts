@@ -42,7 +42,7 @@ export const classifyDocument: LawrenceFunction<ClassifyInput, ClassifyOutput> =
       outputSchema: classifyDocument.outputSchema,
     });
     const traceId = id("trace");
-    recordTrace(ctx, "function_run", traceId, completion);
+    await recordTrace(ctx, "function_run", traceId, completion);
 
     return {
       output: { label: top.label, confidence: Number((top.score / total).toFixed(3)) },

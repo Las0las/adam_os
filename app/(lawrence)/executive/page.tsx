@@ -6,8 +6,8 @@ export const dynamic = "force-dynamic";
 
 export default async function ExecutivePage() {
   const ctx = await appContext();
-  const accounts = listObjects(ctx, "Account");
-  const opportunities = listObjects(ctx, "Opportunity");
+  const accounts = await listObjects(ctx, "Account");
+  const opportunities = await listObjects(ctx, "Opportunity");
 
   return (
     <>
