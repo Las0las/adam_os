@@ -18,6 +18,8 @@ import {
   seedClaims,
   seedCommercial,
 } from "@/lib/domains";
+import "@/lib/domains/phase4-packs";
+import { installAllDomainPacks } from "@/lib/domains/domain-seed-runner";
 
 export const DEMO_TENANT_ID = "tnt_demo";
 
@@ -79,6 +81,11 @@ export async function bootstrap(): Promise<void> {
   await seedSupport(ctx);
   await seedClaims(ctx);
   await seedCommercial(ctx);
+
+  // Phase 4: install the richer domain workflow packs (recruiting / onboarding /
+  // support / claims / executive) — sample objects, evidence, functions, agents,
+  // actions, and notification rules — for the demo tenant.
+  await installAllDomainPacks(ctx);
 
   // Mission Control: notification rules for review cases and critical findings.
   await createNotificationRule(ctx, {
