@@ -4,6 +4,8 @@ import { appContext } from "@/lib/app/demo-context";
 import { db } from "@/lib/lawrence-core/db";
 import { registerSource } from "@/lib/dataops/sources/source-service";
 
+export const dynamic = "force-dynamic";
+
 const SourceKind = z.enum([
   "upload",
   "dataset",

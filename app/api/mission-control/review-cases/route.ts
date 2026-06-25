@@ -3,6 +3,8 @@ import { appContext } from "@/lib/app/demo-context";
 import { listReviewCases, openReviewCase } from "@/lib/mission-control/review-queue/review-service";
 import type { ReviewCase } from "@/types/mission-control";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/mission-control/review-cases?status=open
 export async function GET(request: Request) {
   const ctx = await appContext();

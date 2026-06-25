@@ -3,6 +3,8 @@ import { appContext } from "@/lib/app/demo-context";
 import { runFunction } from "@/lib/aiops/functions/function-runner";
 import "@/lib/domains/executive/executive-seed-pack";
 
+export const dynamic = "force-dynamic";
+
 // POST /api/executive/account-risk-brief  body: { accountId }
 export async function POST(request: Request) {
   const ctx = await appContext();

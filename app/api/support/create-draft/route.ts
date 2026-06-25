@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { appContext } from "@/lib/app/demo-context";
 import { runTicketResponseWorkflow } from "@/lib/domains/support/support-workflow-service";
+
+export const dynamic = "force-dynamic";
 // Side-effect import: registers the support function + draft action handlers.
 import "@/lib/domains/support/support-functions";
 import "@/lib/domains/support/support-actions";

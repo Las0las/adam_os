@@ -3,6 +3,8 @@ import { appContext } from "@/lib/app/demo-context";
 import { resolveReviewCase } from "@/lib/mission-control/review-queue/review-service";
 import { releaseApprovedAction } from "@/lib/mission-control/actions/action-service";
 
+export const dynamic = "force-dynamic";
+
 // POST /api/mission-control/review-cases/:caseId/resolve
 // body: { decision: "approved" | "rejected" | "resolved", note? }
 export async function POST(

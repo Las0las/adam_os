@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { appContext } from "@/lib/app/demo-context";
 import { runOnboardingReadinessWorkflow } from "@/lib/domains/onboarding/onboarding-workflow-service";
+
+export const dynamic = "force-dynamic";
 // Side-effect import: ensure the onboarding function/actions are registered.
 import "@/lib/domains/onboarding/onboarding-seed-pack";
 

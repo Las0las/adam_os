@@ -3,6 +3,8 @@ import { appContext } from "@/lib/app/demo-context";
 import { runFunction } from "@/lib/aiops/functions/function-runner";
 import "@/lib/domains/claims/claims-seed-pack";
 
+export const dynamic = "force-dynamic";
+
 // POST /api/claims/validate-case  body: { validationCaseId }
 export async function POST(request: Request) {
   const ctx = await appContext();

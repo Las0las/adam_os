@@ -4,6 +4,8 @@ import { appContext } from "@/lib/app/demo-context";
 import { db } from "@/lib/lawrence-core/db";
 import { id, now } from "@/lib/lawrence-core/utils/ids";
 
+export const dynamic = "force-dynamic";
+
 const NodeSchema = z.object({
   id: z.string(),
   kind: z.enum([

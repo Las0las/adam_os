@@ -3,6 +3,8 @@ import { z } from "zod";
 import { appContext } from "@/lib/app/demo-context";
 import { ingestUpload } from "@/lib/dataops/ingestion/asset-ingest-service";
 
+export const dynamic = "force-dynamic";
+
 const UploadSchema = z.object({
   fileName: z.string().min(1),
   mimeType: z.string().optional(),

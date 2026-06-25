@@ -3,6 +3,8 @@ import { appContext } from "@/lib/app/demo-context";
 import { retrieve } from "@/lib/aiops/retrieval/retrieval-service";
 import type { RetrievalMethod } from "@/types/dataops";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/dataops/evidence/search?q=...&methods=keyword,vector
 export async function GET(request: Request) {
   const ctx = await appContext();

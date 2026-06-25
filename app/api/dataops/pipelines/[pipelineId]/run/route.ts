@@ -4,6 +4,8 @@ import { appContext } from "@/lib/app/demo-context";
 import { db } from "@/lib/lawrence-core/db";
 import { runAssetPipeline } from "@/lib/dataops/pipelines/pipeline-runner";
 
+export const dynamic = "force-dynamic";
+
 const TransformSchema = z.object({ key: z.string(), config: z.record(z.unknown()).default({}) });
 
 const RunSchema = z.object({

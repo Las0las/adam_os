@@ -3,6 +3,8 @@ import { appContext } from "@/lib/app/demo-context";
 import { db } from "@/lib/lawrence-core/db";
 import { summarize } from "@/lib/aiops/observability/trace-service";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/aiops/observability/traces
 export async function GET() {
   const ctx = await appContext();

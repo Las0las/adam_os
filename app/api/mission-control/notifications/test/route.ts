@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { appContext } from "@/lib/app/demo-context";
 import { emitEvent } from "@/lib/mission-control/notifications/notification-service";
 
+export const dynamic = "force-dynamic";
+
 // POST /api/mission-control/notifications/test
 // body: { eventKey, recipientUserId?, vars? }
 export async function POST(request: Request) {

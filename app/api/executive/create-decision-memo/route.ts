@@ -3,6 +3,8 @@ import { appContext } from "@/lib/app/demo-context";
 import { executeAction } from "@/lib/mission-control/actions/action-service";
 import "@/lib/domains/executive/executive-seed-pack";
 
+export const dynamic = "force-dynamic";
+
 // POST /api/executive/create-decision-memo
 // body: { input, object?, idempotencyKey?, approvalExempt? }
 export async function POST(request: Request) {

@@ -3,6 +3,8 @@ import { appContext } from "@/lib/app/demo-context";
 import { runCandidateFitWorkflow } from "@/lib/domains/recruiting/recruiting-workflow-service";
 import "@/lib/domains/recruiting/recruiting-seed-pack";
 
+export const dynamic = "force-dynamic";
+
 // POST /api/recruiting/shortlist  body: { candidateId, jobId, recipientUserId? }
 export async function POST(request: Request) {
   const ctx = await appContext();

@@ -3,6 +3,8 @@ import { appContext } from "@/lib/app/demo-context";
 import { runFunction } from "@/lib/aiops/functions/function-runner";
 import "@/lib/domains/recruiting/recruiting-seed-pack";
 
+export const dynamic = "force-dynamic";
+
 // POST /api/recruiting/candidate-fit  body: { candidateId, jobId }
 export async function POST(request: Request) {
   const ctx = await appContext();

@@ -3,6 +3,8 @@ import { appContext } from "@/lib/app/demo-context";
 import { executeAction } from "@/lib/mission-control/actions/action-service";
 import "@/lib/domains/claims/claims-seed-pack";
 
+export const dynamic = "force-dynamic";
+
 // POST /api/claims/create-finding  body: ExecuteAction input for the
 // claims.create_validation_finding action. No logic in the route — thin call
 // straight through to the action engine.

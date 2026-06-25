@@ -23,12 +23,16 @@ import { installAllDomainPacks } from "@/lib/domains/domain-seed-runner";
 
 export const DEMO_TENANT_ID = "tnt_demo";
 
-let bootstrapped: Promise<void> | null = null;
+// The memo lives on globalThis (not a module-level let): Next.js bundling can
+// duplicate this module across route chunks, and `db` is itself a process
+// global, so a per-module memo could let two bootstrap() runs race on the shared
+// store. A process-wide memo guarantees bootstrap runs exactly once per process.
+const globalRef = globalThis as unknown as { __lawrenceBootstrap?: Promise<void> };
 
 /** Idempotent: safe to call from any API route to ensure demo data exists. */
 export function ensureBootstrapped(): Promise<void> {
-  if (!bootstrapped) bootstrapped = bootstrap();
-  return bootstrapped;
+  if (!globalRef.__lawrenceBootstrap) globalRef.__lawrenceBootstrap = bootstrap();
+  return globalRef.__lawrenceBootstrap;
 }
 
 export async function bootstrap(): Promise<void> {

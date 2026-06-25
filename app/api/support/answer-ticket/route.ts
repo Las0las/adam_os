@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { appContext } from "@/lib/app/demo-context";
 import { runFunction } from "@/lib/aiops/functions/function-runner";
+
+export const dynamic = "force-dynamic";
 // Side-effect import: registers the support.answer_with_citations handler.
 import "@/lib/domains/support/support-functions";
 

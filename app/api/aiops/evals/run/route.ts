@@ -8,6 +8,8 @@ import {
 } from "@/lib/aiops/evals/eval-runner";
 import type { EvalCase } from "@/types/aiops";
 
+export const dynamic = "force-dynamic";
+
 // POST /api/aiops/evals/run  body: { suite: "retrieval"|"extraction"|"response", functionKey?, cases: EvalCase[] }
 export async function POST(request: Request) {
   const ctx = await appContext();
