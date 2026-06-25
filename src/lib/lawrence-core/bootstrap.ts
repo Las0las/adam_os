@@ -11,6 +11,7 @@ import { runAssetPipeline } from "@/lib/dataops/pipelines/pipeline-runner";
 import { indexEvidence } from "@/lib/dataops/evidence/chunking-service";
 import { listObjects } from "@/lib/dataops/ontology/object-service";
 import { createNotificationRule } from "@/lib/mission-control/notifications/notification-service";
+import "@/lib/mission-control/actions/builtins";
 import {
   seedOnboarding,
   seedSupport,
