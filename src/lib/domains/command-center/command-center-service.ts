@@ -7,6 +7,7 @@ import { listObjects } from "@/lib/dataops/ontology/object-service";
 import { now } from "@/lib/lawrence-core/utils/ids";
 import { availableActionsForObject } from "@/lib/domains/object-detail/available-actions";
 import { rankItems } from "./command-center-rankers";
+import { inferDomain } from "./command-center-domain";
 import type { ActorContext } from "@/types/platform";
 import type {
   CommandCenterItem,
@@ -17,35 +18,7 @@ import type {
   SurfaceMode,
 } from "./command-center-types";
 
-const DOMAIN_BY_OBJECT_TYPE: Record<string, CommandDomain> = {
-  Candidate: "recruiting",
-  Job: "recruiting",
-  Submission: "recruiting",
-  RecruiterNote: "recruiting",
-  OnboardingCase: "onboarding",
-  OnboardingTask: "onboarding",
-  SupportTicket: "support",
-  KnowledgeDocument: "support",
-  SupportDraftResponse: "support",
-  ValidationCase: "claims",
-  ValidationFinding: "claims",
-  ClaimDocument: "claims",
-  EmailMessage: "claims",
-  Account: "executive",
-  Opportunity: "executive",
-  RiskSignal: "executive",
-  DecisionMemo: "executive",
-};
-
-export function inferDomain(hint?: string | null): CommandDomain {
-  if (!hint) return "mission_control";
-  if (DOMAIN_BY_OBJECT_TYPE[hint]) return DOMAIN_BY_OBJECT_TYPE[hint] as CommandDomain;
-  const prefix = hint.split(/[._:]/)[0] ?? "";
-  if (["recruiting", "onboarding", "support", "claims", "executive"].includes(prefix)) {
-    return prefix as CommandDomain;
-  }
-  return "mission_control";
-}
+export { inferDomain } from "./command-center-domain";
 
 const ACTION_STATUS: Record<string, CommandItemStatus> = {
   queued: "open",
