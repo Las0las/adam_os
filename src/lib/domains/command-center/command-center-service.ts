@@ -1,138 +1,209 @@
-// Phase 4 — cross-domain Command Center aggregation (Part G). Pulls open work
-// from every fabric and annotates each item with its domain, severity/status,
-// linked object, and next action so one governed surface shows all domains.
+// Phase 5 — Command Center aggregation service (Part A2). Normalizes every
+// fabric's open work into ranked CommandCenterItem queues, mode-aware.
 
 import { db } from "@/lib/lawrence-core/db";
 import { listAudit } from "@/lib/lawrence-core/audit/audit-service";
 import { listObjects } from "@/lib/dataops/ontology/object-service";
+import { now } from "@/lib/lawrence-core/utils/ids";
+import { availableActionsForObject } from "@/lib/domains/object-detail/available-actions";
+import { rankItems } from "./command-center-rankers";
+import { inferDomain } from "./command-center-domain";
 import type { ActorContext } from "@/types/platform";
-import type { CommandCenterItem } from "../domain-workflow-types";
-import type { ActionExecution, ReviewCase, Notification, RuntimeIncident } from "@/types/mission-control";
-import type { OntologyObject } from "@/types/dataops";
-import type { AuditEvent } from "@/types/platform";
+import type {
+  CommandCenterItem,
+  CommandCenterOverview,
+  CommandDomain,
+  CommandItemStatus,
+  CommandSeverity,
+  SurfaceMode,
+} from "./command-center-types";
 
-export interface CommandCenterOverview {
-  actionQueue: ActionExecution[];
-  reviewQueue: ReviewCase[];
-  riskSignals: OntologyObject[];
-  recommendations: OntologyObject[];
-  notifications: Notification[];
-  recentAuditEvents: AuditEvent[];
-  runtimeIncidents: RuntimeIncident[];
-  items: CommandCenterItem[];
-}
+export { inferDomain } from "./command-center-domain";
 
-const DOMAIN_BY_OBJECT_TYPE: Record<string, string> = {
-  Candidate: "recruiting",
-  Job: "recruiting",
-  Submission: "recruiting",
-  RecruiterNote: "recruiting",
-  OnboardingCase: "onboarding",
-  OnboardingTask: "onboarding",
-  SupportTicket: "support",
-  KnowledgeDocument: "support",
-  SupportDraftResponse: "support",
-  ValidationCase: "claims",
-  ValidationFinding: "claims",
-  ClaimDocument: "claims",
-  EmailMessage: "claims",
-  Account: "executive",
-  Opportunity: "executive",
-  RiskSignal: "executive",
-  DecisionMemo: "executive",
+const ACTION_STATUS: Record<string, CommandItemStatus> = {
+  queued: "open",
+  running: "in_progress",
+  completed: "completed",
+  failed: "failed",
+  blocked: "blocked",
+  awaiting_approval: "awaiting_approval",
 };
 
-/** Infer the owning domain from an object type or namespaced key. */
-export function inferDomain(hint?: string | null): string {
-  if (!hint) return "platform";
-  if (DOMAIN_BY_OBJECT_TYPE[hint]) return DOMAIN_BY_OBJECT_TYPE[hint] as string;
-  const prefix = hint.split(/[._:]/)[0];
-  if (["recruiting", "onboarding", "support", "claims", "executive"].includes(prefix ?? "")) {
-    return prefix as string;
-  }
-  return "platform";
+const REVIEW_STATUS: Record<string, CommandItemStatus> = {
+  open: "open",
+  in_review: "awaiting_review",
+  approved: "completed",
+  rejected: "completed",
+  resolved: "completed",
+};
+
+const INCIDENT_STATUS: Record<string, CommandItemStatus> = {
+  open: "open",
+  acknowledged: "in_progress",
+  resolved: "completed",
+};
+
+function asSeverity(value: unknown): CommandSeverity | null {
+  return value === "low" || value === "medium" || value === "high" || value === "critical" ? value : null;
 }
 
-export async function getCommandCenterOverview(ctx: ActorContext): Promise<CommandCenterOverview> {
-  const OPEN_ACTION = ["queued", "running", "awaiting_approval", "blocked"];
-  const OPEN_REVIEW = ["open", "in_review"];
+export interface OverviewOptions {
+  mode?: SurfaceMode;
+}
 
-  const actionQueue = (await db.actionExecutions.list(ctx.tenantId, (a) => OPEN_ACTION.includes(a.status)))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const reviewQueue = (await db.reviewCases.list(ctx.tenantId, (c) => OPEN_REVIEW.includes(c.status)))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const riskSignals = await listObjects(ctx, "RiskSignal");
-  const recommendations = (await listObjects(ctx)).filter((o) =>
-    ["DecisionMemo", "RecruiterNote", "SupportDraftResponse"].includes(o.objectType),
-  );
-  const notifications = (await db.notifications.list(ctx.tenantId)).slice(-25).reverse();
-  const recentAuditEvents = (await listAudit(ctx.tenantId)).slice(0, 25);
-  const runtimeIncidents = await db.runtimeIncidents.list(ctx.tenantId, (i) => i.status === "open");
+export async function getCommandCenterOverview(
+  ctx: ActorContext,
+  opts: OverviewOptions = {},
+): Promise<CommandCenterOverview> {
+  const mode: SurfaceMode = opts.mode ?? "executive";
+  const referenceTime = now();
+  const rank = (items: CommandCenterItem[]) => rankItems(items, { mode, referenceTime });
 
-  const items: CommandCenterItem[] = [];
-  for (const a of actionQueue) {
-    items.push({
+  // ── Actions ────────────────────────────────────────────────────────────
+  const actions = await db.actionExecutions.list(ctx.tenantId);
+  const actionItems: CommandCenterItem[] = actions
+    .filter((a) => ["queued", "running", "awaiting_approval", "blocked", "failed"].includes(a.status))
+    .map((a) => ({
+      id: a.id,
+      tenantId: a.tenantId,
       domain: inferDomain(a.objectType ?? a.actionId),
       kind: "action",
       title: a.actionId,
-      severity: null,
-      status: a.status,
-      linkedObjectType: a.objectType ?? null,
-      linkedObjectId: a.objectId ?? null,
-      nextAction: a.status === "awaiting_approval" ? "approve_or_reject" : "monitor",
+      summary: a.blockedReason ?? null,
+      status: ACTION_STATUS[a.status] ?? "open",
+      severity: a.status === "failed" ? "high" : null,
+      priorityScore: 0,
+      objectRef: a.objectType && a.objectId ? { objectType: a.objectType, objectId: a.objectId } : null,
+      actions: [],
       createdAt: a.createdAt,
-    });
-  }
-  for (const c of reviewQueue) {
-    items.push({
-      domain: inferDomain(c.subjectObjectType ?? c.caseType),
-      kind: "review",
-      title: c.summary ?? c.caseType,
-      severity: c.severity ?? null,
-      status: c.status,
-      linkedObjectType: c.subjectObjectType ?? null,
-      linkedObjectId: c.subjectObjectId ?? null,
-      nextAction: "resolve_review",
-      createdAt: c.createdAt,
-    });
-  }
-  for (const r of riskSignals) {
-    items.push({
-      domain: "executive",
-      kind: "risk",
-      title: String(r.properties.riskType ?? r.title ?? "Risk"),
-      severity: (r.properties.severity as CommandCenterItem["severity"]) ?? null,
-      status: r.status ?? null,
-      linkedObjectType: "RiskSignal",
-      linkedObjectId: r.id,
-      nextAction: "review_risk",
-      createdAt: r.createdAt,
-    });
-  }
-  for (const o of recommendations) {
-    items.push({
-      domain: inferDomain(o.objectType),
-      kind: "recommendation",
-      title: o.title ?? o.objectType,
-      severity: null,
-      status: o.status ?? null,
-      linkedObjectType: o.objectType,
-      linkedObjectId: o.id,
-      nextAction: "act_on_recommendation",
-      createdAt: o.createdAt,
-    });
-  }
+      metadata: { reviewCaseId: a.reviewCaseId ?? null },
+    }));
 
-  items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  // ── Reviews ────────────────────────────────────────────────────────────
+  const reviews = await db.reviewCases.list(ctx.tenantId, (c) =>
+    ["open", "in_review"].includes(c.status),
+  );
+  const reviewItems: CommandCenterItem[] = reviews.map((c) => ({
+    id: c.id,
+    tenantId: c.tenantId,
+    domain: inferDomain(c.subjectObjectType ?? c.caseType),
+    kind: "review",
+    title: c.summary ?? c.caseType,
+    summary: c.caseType,
+    status: REVIEW_STATUS[c.status] ?? "open",
+    severity: asSeverity(c.severity),
+    priorityScore: 0,
+    objectRef:
+      c.subjectObjectType && c.subjectObjectId
+        ? { objectType: c.subjectObjectType, objectId: c.subjectObjectId }
+        : null,
+    actions: availableActionsForObject("ReviewCase").map((act) => ({
+      ...act,
+      input: { ...act.input, reviewCaseId: c.id },
+    })),
+    createdAt: c.createdAt,
+  }));
+
+  // ── Risks + recommendations (ontology objects) ───────────────────────────
+  const riskObjects = await listObjects(ctx, "RiskSignal");
+  const riskItems: CommandCenterItem[] = riskObjects.map((r) => ({
+    id: r.id,
+    tenantId: r.tenantId,
+    domain: "executive",
+    kind: "risk",
+    title: String(r.properties.riskType ?? r.title ?? "Risk"),
+    summary: String(r.properties.rationale ?? ""),
+    status: r.status === "dismissed" ? "completed" : "open",
+    severity: asSeverity(r.properties.severity),
+    priorityScore: 0,
+    objectRef: { objectType: "RiskSignal", objectId: r.id, title: r.title },
+    actions: availableActionsForObject("RiskSignal"),
+    createdAt: r.createdAt,
+  }));
+
+  const recObjects = (await listObjects(ctx)).filter((o) =>
+    ["DecisionMemo", "RecruiterNote", "SupportDraftResponse"].includes(o.objectType),
+  );
+  const recItems: CommandCenterItem[] = recObjects.map((o) => ({
+    id: o.id,
+    tenantId: o.tenantId,
+    domain: inferDomain(o.objectType),
+    kind: "recommendation",
+    title: o.title ?? o.objectType,
+    summary: String(o.properties.summary ?? ""),
+    status: "open",
+    severity: null,
+    priorityScore: 0,
+    objectRef: { objectType: o.objectType, objectId: o.id, title: o.title },
+    actions: availableActionsForObject(o.objectType),
+    createdAt: o.createdAt,
+  }));
+
+  // ── Notifications + incidents + audit ────────────────────────────────────
+  const notifications = await db.notifications.list(ctx.tenantId);
+  const notifItems: CommandCenterItem[] = notifications.slice(-30).map((n) => ({
+    id: n.id,
+    tenantId: n.tenantId,
+    domain: inferDomain(n.title),
+    kind: "notification",
+    title: n.title,
+    summary: n.body,
+    status: n.state === "failed" ? "failed" : "completed",
+    severity: n.state === "failed" ? "medium" : null,
+    priorityScore: 0,
+    createdAt: n.createdAt,
+  }));
+
+  const incidents = await db.runtimeIncidents.list(ctx.tenantId, (i) => i.status !== "resolved");
+  const incidentItems: CommandCenterItem[] = incidents.map((i) => ({
+    id: i.id,
+    tenantId: i.tenantId,
+    domain: "mission_control",
+    kind: "incident",
+    title: i.title,
+    summary: i.detail ?? null,
+    status: INCIDENT_STATUS[i.status] ?? "open",
+    severity: asSeverity(i.severity),
+    priorityScore: 0,
+    createdAt: i.createdAt,
+  }));
+
+  const audit = (await listAudit(ctx.tenantId)).slice(0, 30);
+  const auditItems: CommandCenterItem[] = audit.map((e) => ({
+    id: e.id,
+    tenantId: e.tenantId,
+    domain: inferDomain(e.subjectType ?? e.action),
+    kind: "audit",
+    title: e.action,
+    summary: e.subjectType ? `${e.subjectType} ${e.subjectId ?? ""}`.trim() : null,
+    status: "completed",
+    severity: null,
+    priorityScore: 0,
+    objectRef: e.subjectType && e.subjectId ? { objectType: e.subjectType, objectId: e.subjectId } : null,
+    createdAt: e.createdAt,
+  }));
+
+  const metrics = {
+    openActions: actionItems.filter((i) => ["open", "in_progress"].includes(i.status)).length,
+    openReviews: reviewItems.length,
+    criticalRisks: riskItems.filter((i) => i.severity === "critical" && i.status !== "completed").length,
+    blockedWork: actionItems.filter((i) => i.status === "blocked").length,
+    pendingApprovals: actionItems.filter((i) => i.status === "awaiting_approval").length,
+    failedRuntimeItems:
+      actionItems.filter((i) => i.status === "failed").length +
+      notifItems.filter((i) => i.status === "failed").length,
+  };
 
   return {
-    actionQueue,
-    reviewQueue,
-    riskSignals,
-    recommendations,
-    notifications,
-    recentAuditEvents,
-    runtimeIncidents,
-    items,
+    generatedAt: referenceTime,
+    mode,
+    metrics,
+    actionQueue: rank(actionItems),
+    reviewQueue: rank(reviewItems),
+    riskQueue: rank(riskItems.filter((i) => i.status !== "completed")),
+    recommendationQueue: rank(recItems),
+    notificationQueue: rank(notifItems),
+    incidentQueue: rank(incidentItems),
+    recentActivity: auditItems,
   };
 }
