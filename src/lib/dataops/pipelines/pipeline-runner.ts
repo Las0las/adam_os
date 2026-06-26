@@ -19,6 +19,7 @@ import {
   countRecentFailures,
   maybeRaiseFailureIncident,
 } from "@/lib/mission-control/runtime/failure-threshold";
+import { createRuntimeTrace } from "@/lib/aiops/observability/runtime-trace-service";
 import type { CanonicalParseOutput } from "../parsers/parser-types";
 import type { ActorContext } from "@/types/platform";
 import type {
@@ -176,6 +177,14 @@ export async function runAssetPipeline(
       },
     });
     await emitAudit(ctx, "dataops.pipeline.run", { type: "pipeline_run", id: run.id }, finished.stats);
+    await createRuntimeTrace(ctx, {
+      traceType: "pipeline_run",
+      traceId: run.id,
+      componentType: "pipeline",
+      componentKey: pipelineKey,
+      status: "completed",
+      metrics: finished.stats as Record<string, unknown>,
+    });
 
     return { run: finished, document, records, ontologyObjectIds, chunkIds };
   } catch (err) {
@@ -186,6 +195,14 @@ export async function runAssetPipeline(
       error: message,
     });
     await emitAudit(ctx, "dataops.pipeline.run.failed", { type: "pipeline_run", id: run.id }, { error: message });
+    await createRuntimeTrace(ctx, {
+      traceType: "pipeline_run",
+      traceId: run.id,
+      componentType: "pipeline",
+      componentKey: pipelineKey,
+      status: "failed",
+      errors: [message],
+    });
     const runs = await db.pipelineRuns.list(ctx.tenantId, (r) => r.pipelineId === pipelineKey);
     const recentFailures = countRecentFailures(
       runs.map((r) => ({ status: r.status, createdAt: r.startedAt })),

@@ -11,6 +11,7 @@ import {
 } from "@/lib/mission-control/runtime/environment-repository";
 import { createReleaseBundle } from "@/lib/mission-control/deployments/release-bundle-service";
 import { validateReleaseBundle } from "@/lib/mission-control/deployments/release-validation-service";
+import { seedPassingEval } from "../helpers/mc-flow";
 
 async function fresh() {
   await resetDatabase();
@@ -36,6 +37,7 @@ test("empty bundle is blocked", async () => {
 
 test("valid bundle warns that prod requires approval", async () => {
   const ctx = await fresh();
+  await seedPassingEval(ctx, "function", "answer_with_citations"); // satisfy the eval gate
   const { release } = await createReleaseBundle(ctx, {
     key: "r-ok",
     name: "Ok",

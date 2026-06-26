@@ -57,6 +57,21 @@ import type {
   RollbackRecord,
 } from "@/lib/mission-control/runtime/mission-control-hardening-types";
 import type { ApprovalPolicy } from "@/lib/mission-control/approvals/approval-policy-types";
+import type {
+  RuntimeTrace,
+  AiUsageEvent,
+  RetrievalQualityRecord,
+  ObservabilityRollup,
+} from "@/lib/aiops/observability/observability-types";
+import type {
+  EvalSuite,
+  EvalCaseResultRecord,
+} from "@/lib/aiops/evals/eval-production-types";
+import type {
+  HumanFeedback,
+  RecommendationOutcome,
+  LearningSignal,
+} from "@/lib/aiops/learning/learning-types";
 
 // The tenants table is the one row-set without a foreign tenantId; it scopes to
 // itself, so we store tenantId === id to satisfy the Collection contract.
@@ -109,6 +124,16 @@ export interface Database {
   killSwitches: Collection<KillSwitch>;
   runtimeHealthChecks: Collection<RuntimeHealthCheck>;
   rollbackRecords: Collection<RollbackRecord>;
+  // aiops — Phase 7 observability / evals / learning
+  runtimeTraces: Collection<RuntimeTrace>;
+  aiUsageEvents: Collection<AiUsageEvent>;
+  retrievalQualityRecords: Collection<RetrievalQualityRecord>;
+  observabilityRollups: Collection<ObservabilityRollup>;
+  evalSuites: Collection<EvalSuite>;
+  evalCaseResults: Collection<EvalCaseResultRecord>;
+  humanFeedback: Collection<HumanFeedback>;
+  recommendationOutcomes: Collection<RecommendationOutcome>;
+  learningSignals: Collection<LearningSignal>;
 }
 
 function createDatabase(): Database {
@@ -154,6 +179,15 @@ function createDatabase(): Database {
     killSwitches: coll("kill_switches"),
     runtimeHealthChecks: coll("runtime_health_checks"),
     rollbackRecords: coll("rollback_records"),
+    runtimeTraces: coll("runtime_traces"),
+    aiUsageEvents: coll("ai_usage_events"),
+    retrievalQualityRecords: coll("retrieval_quality_records"),
+    observabilityRollups: coll("observability_rollups"),
+    evalSuites: coll("eval_suites"),
+    evalCaseResults: coll("eval_case_results"),
+    humanFeedback: coll("human_feedback"),
+    recommendationOutcomes: coll("recommendation_outcomes"),
+    learningSignals: coll("learning_signals"),
   };
 }
 

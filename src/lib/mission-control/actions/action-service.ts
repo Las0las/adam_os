@@ -15,6 +15,7 @@ import {
   maybeRaiseFailureIncident,
 } from "../runtime/failure-threshold";
 import { createApprovalForSubject } from "../approvals/approval-request-service";
+import { createRuntimeTrace } from "@/lib/aiops/observability/runtime-trace-service";
 import type { ActorContext, Permission } from "@/types/platform";
 import type { ActionDefinition, ActionExecution } from "@/types/mission-control";
 
@@ -210,11 +211,28 @@ async function runHandler(
     const result = await handler.run(ctx, actionInput);
     const completed = await db.actionExecutions.update(execId, { status: "completed", result });
     await emitAudit(ctx, "action.completed", { type: "action_execution", id: execId }, { actionKey: handler.key });
+    await createRuntimeTrace(ctx, {
+      traceType: "action_execution",
+      traceId: execId,
+      componentType: "action",
+      componentKey: handler.key,
+      status: "completed",
+      metrics: { approvalRequired: Boolean(handler.requiresApproval || handler.approvalPolicyKey), sideEffect: "applied" },
+    });
     return completed;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const failed = await db.actionExecutions.update(execId, { status: "failed", result: { error: message } });
     await emitAudit(ctx, "action.failed", { type: "action_execution", id: execId }, { error: message });
+    await createRuntimeTrace(ctx, {
+      traceType: "action_execution",
+      traceId: execId,
+      componentType: "action",
+      componentKey: handler.key,
+      status: "failed",
+      metrics: { sideEffect: "none" },
+      errors: [message],
+    });
     // Failure-threshold → incident (3 in 15m = high, 5 = critical).
     const execs = await db.actionExecutions.list(ctx.tenantId, (e) => e.actionId === handler.key);
     const recentFailures = countRecentFailures(execs, (e) => e.status === "failed");

@@ -18,7 +18,7 @@ async function fresh() {
 test("rollback requires a reason", async () => {
   const ctx = await fresh();
   const release = await createAndPromoteProdRelease(ctx, "r1", [
-    { itemType: "function", itemKey: "fn_a", changeType: "enable" },
+    { itemType: "function", itemKey: "answer_with_citations", changeType: "enable" },
   ]);
   await assert.rejects(
     () => requestRollback(ctx, { releaseBundleId: release.id, reason: "" }),
@@ -29,7 +29,7 @@ test("rollback requires a reason", async () => {
 test("rollback requires approval, then executes and marks the release rolled_back", async () => {
   const ctx = await fresh();
   const release = await createAndPromoteProdRelease(ctx, "r2", [
-    { itemType: "function", itemKey: "fn_b", changeType: "enable" },
+    { itemType: "function", itemKey: "answer_with_citations", changeType: "enable" },
   ]);
 
   const record = await requestRollback(ctx, { releaseBundleId: release.id, reason: "regression" });

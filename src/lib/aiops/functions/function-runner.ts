@@ -10,6 +10,9 @@ import {
   countRecentFailures,
   maybeRaiseFailureIncident,
 } from "@/lib/mission-control/runtime/failure-threshold";
+import { createRuntimeTrace } from "@/lib/aiops/observability/runtime-trace-service";
+import { recordAiUsage } from "@/lib/aiops/observability/ai-usage-service";
+import { getModelProvider } from "@/lib/aiops/models/model-provider";
 import { resolveFunction } from "./function-registry";
 import type { ActorContext } from "@/types/platform";
 import type { FunctionRun } from "@/types/aiops";
@@ -25,6 +28,7 @@ export async function runFunction(
 
   // Fail-closed: refuse to run a kill-switched function.
   await assertNotKilled({ tenantId: ctx.tenantId, componentType: "function", componentKey: functionKey });
+  const startedAt = now();
 
   const run = await db.functionRuns.insert({
     id: id("frun"),
@@ -48,14 +52,56 @@ export async function runFunction(
       traceId: (result.trace?.traceId as string | undefined) ?? null,
     });
     await emitAudit(ctx, "aiops.function.run", { type: "function_run", id: run.id }, { functionKey });
+    await emitFunctionObservability(ctx, fn.key, run.id, "completed", startedAt, {
+      retrievalHits: result.citations?.length ?? 0,
+    }, (result.citations ?? []).map((c) => ({ objectType: c.objectType, objectId: c.objectId, score: c.score })));
     return completed;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const failed = await db.functionRuns.update(run.id, { status: "failed", error: message });
     await emitAudit(ctx, "aiops.function.run.failed", { type: "function_run", id: run.id }, { functionKey, error: message });
+    await emitFunctionObservability(ctx, fn.key, run.id, "failed", startedAt, { error: message }, [], message);
     const runs = await db.functionRuns.list(ctx.tenantId, (r) => r.functionId === fn.key);
     const recentFailures = countRecentFailures(runs, (r) => r.status === "failed");
     await maybeRaiseFailureIncident(ctx, { componentType: "function", componentKey: fn.key, recentFailures });
     return failed;
   }
+}
+
+/** Emit the runtime trace + AI usage event for a function run (§43, Phase 7). */
+async function emitFunctionObservability(
+  ctx: ActorContext,
+  functionKey: string,
+  runId: string,
+  status: "completed" | "failed",
+  startedAt: string,
+  metrics: Record<string, unknown>,
+  citations: Array<Record<string, unknown>>,
+  error?: string,
+): Promise<void> {
+  const provider = getModelProvider();
+  const completedAt = now();
+  const latencyMs = Date.parse(completedAt) - Date.parse(startedAt);
+  await createRuntimeTrace(ctx, {
+    traceType: "function_run",
+    traceId: runId,
+    componentType: "function",
+    componentKey: functionKey,
+    status,
+    metrics: { ...metrics, latencyMs },
+    citations,
+    errors: error ? [error] : [],
+    startedAt,
+    completedAt,
+  });
+  await recordAiUsage(ctx, {
+    runType: "function_run",
+    runId,
+    provider: provider.provider,
+    modelKey: provider.modelKey,
+    purpose: "function",
+    latencyMs,
+    status,
+    errorMessage: error ?? null,
+  });
 }

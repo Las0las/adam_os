@@ -4,10 +4,15 @@
 // target components all block. Phase 7 extends this with eval gates.
 
 import { db } from "@/lib/lawrence-core/db";
+import { emitAudit } from "@/lib/lawrence-core/audit/audit-service";
 import { getReleaseBundle, listReleaseBundleItems } from "../runtime/release-repository";
 import { getEnvironmentById } from "../runtime/environment-repository";
 import { getApprovalPolicyByKey } from "../runtime/approval-repository";
 import { getKillSwitch } from "../runtime/kill-switch-repository";
+import {
+  getActiveSuiteForComponent,
+  getLatestRunForSuite,
+} from "@/lib/aiops/evals/eval-run-repository";
 import type { ActorContext } from "@/types/platform";
 import type {
   Environment,
@@ -114,6 +119,50 @@ export async function validateReleaseBundle(
   // surfaced here as a warning so operators see it pre-submit).
   if (targetEnv?.environmentType === "prod" && release.status !== "approved") {
     warnings.push("production target requires approval before promotion");
+  }
+
+  // ── Eval gate (Phase 7) ───────────────────────────────────────────────────
+  // Quality-sensitive items must pass an eval suite. dev: warn only; staging:
+  // warn if no eval, block if latest failed; prod: block if no eval or
+  // failed/regressed.
+  const envType = targetEnv?.environmentType ?? "dev";
+  const EVAL_GATED: ReleaseBundleItem["itemType"][] = ["function", "agent", "prompt", "model", "domain_pack"];
+  let blockedByEval = false;
+  for (const item of items) {
+    if (!EVAL_GATED.includes(item.itemType) || !item.itemKey) continue;
+    const suite = await getActiveSuiteForComponent(ctx.tenantId, item.itemType, item.itemKey);
+    const latest = suite ? await getLatestRunForSuite(ctx.tenantId, suite.id) : undefined;
+
+    if (!suite || !latest) {
+      const msg = `no eval suite/run for ${item.itemType} '${item.itemKey}'`;
+      if (envType === "prod") {
+        blockers.push(msg);
+        blockedByEval = true;
+      } else if (envType === "staging") {
+        warnings.push(msg);
+      } else {
+        warnings.push(msg);
+      }
+      continue;
+    }
+
+    const failed = latest.passed === false;
+    const regressed = latest.regressionDetected === true;
+    if (envType === "prod" && (failed || regressed)) {
+      blockers.push(`eval for ${item.itemType} '${item.itemKey}' ${regressed ? "regressed" : "failed"}`);
+      blockedByEval = true;
+    } else if (envType === "staging" && failed) {
+      blockers.push(`eval for ${item.itemType} '${item.itemKey}' failed`);
+      blockedByEval = true;
+    } else if (failed || regressed) {
+      warnings.push(`eval for ${item.itemType} '${item.itemKey}' ${regressed ? "regressed" : "failed"}`);
+    }
+  }
+
+  if (blockedByEval) {
+    await emitAudit(ctx, "mission.release.blocked_by_eval", { type: "release_bundle", id: release.id }, {
+      targetEnvironment: targetEnv?.key ?? null,
+    });
   }
 
   return { valid: blockers.length === 0, blockers, warnings };
