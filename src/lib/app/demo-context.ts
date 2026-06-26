@@ -10,6 +10,7 @@ import { auth } from "@clerk/nextjs/server";
 import { ensureBootstrapped, DEMO_TENANT_ID } from "@/lib/lawrence-core/bootstrap";
 import { systemActor } from "@/lib/lawrence-core/permissions/permissions";
 import { db } from "@/lib/lawrence-core/db";
+import { enterTenant } from "@/lib/lawrence-core/db/tenant-store";
 import type { ActorContext, Permission } from "@/types/platform";
 
 type Env = Record<string, string | undefined>;
@@ -111,8 +112,15 @@ async function resolveClerkActor(): Promise<ActorContext | null> {
 export async function appContext(): Promise<ActorContext> {
   await ensureBootstrapped();
   const actor = await resolveClerkActor();
-  if (actor) return actor;
-  if (shouldAllowDemoAuth()) return systemActor(resolveTenantId(null));
+  if (actor) {
+    enterTenant(actor.tenantId);
+    return actor;
+  }
+  if (shouldAllowDemoAuth()) {
+    const demo = systemActor(resolveTenantId(null));
+    enterTenant(demo.tenantId);
+    return demo;
+  }
   throw new Error("Unauthenticated: an active session is required (auth enforced in production).");
 }
 
@@ -123,5 +131,7 @@ export async function appContext(): Promise<ActorContext> {
  */
 export async function systemContext(): Promise<ActorContext> {
   await ensureBootstrapped();
-  return systemActor(resolveTenantId(null));
+  const ctx = systemActor(resolveTenantId(null));
+  enterTenant(ctx.tenantId);
+  return ctx;
 }

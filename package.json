@@ -12,7 +12,8 @@
     "test": "node --import tsx --test tests/unit/**/*.test.ts",
     "test:pg": "node --import tsx --test --test-concurrency=1 tests/unit/**/*.test.ts tests/integration/**/*.test.ts",
     "migrate": "tsx scripts/migrate.ts",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "setup:rls": "tsx scripts/setup-runtime-rls.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "6.39.5",
