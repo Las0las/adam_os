@@ -27,7 +27,10 @@ import type { OntologyObject } from "@/types/dataops";
 import type { ReviewCase } from "@/types/mission-control";
 
 const DRAFT_OBJECT_TYPE = "CandidateExtraction";
-const REVIEW_CASE_TYPE = "candidate_extraction";
+/** Review case type for extraction drafts. The review-cases resolve route keys
+ *  on this to project (approve) or discard (reject) the proposed Candidate. */
+export const CANDIDATE_EXTRACTION_CASE_TYPE = "candidate_extraction";
+const REVIEW_CASE_TYPE = CANDIDATE_EXTRACTION_CASE_TYPE;
 const DEFAULT_SOURCE = "pasted_profile";
 
 /** Schema the model extracts against. Kept flat to match a profile/CV's fields. */
