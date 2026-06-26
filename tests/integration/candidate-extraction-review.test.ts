@@ -174,3 +174,27 @@ test("extraction and confirmation are permission-gated", async () => {
     setModelProvider(new MockModelProvider());
   }
 });
+
+test("extraction honors a tenant's authorized extraction model (per-purpose routing)", async () => {
+  await resetDatabase();
+  resetClock();
+  setModelProvider(stubProvider(FULL)); // process default would succeed
+  try {
+    const ctx = systemActor("tnt_route");
+    // Authorize a provider with no adapter for the extraction purpose. If routing
+    // is live, resolveModelProvider consults this and fails closed (rather than
+    // quietly using the process-default stub).
+    await db.modelDefinitions.insert({
+      id: "md_route",
+      tenantId: ctx.tenantId,
+      provider: "other",
+      modelKey: "x",
+      purpose: "extraction",
+      config: {},
+      status: "active",
+    });
+    await assert.rejects(() => extractCandidateDraft(ctx, { text: PROFILE }), /adapter/i);
+  } finally {
+    setModelProvider(new MockModelProvider());
+  }
+});
