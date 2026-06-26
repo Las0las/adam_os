@@ -1,26 +1,29 @@
+import { z } from "zod";
 import { appContext } from "@/lib/app/demo-context";
-import { run, readJson } from "@/lib/app/route-helpers";
+import { run, parseBody } from "@/lib/app/route-helpers";
 import { checkObjectAccessForActor } from "@/lib/security/access-guard";
 import type { ObjectPermission } from "@/lib/security/access-control-types";
 
 export const dynamic = "force-dynamic";
 
+const AccessCheckSchema = z.object({
+  objectType: z.string().min(1),
+  objectId: z.string().min(1),
+  permission: z.string().min(1),
+  objectTenantId: z.string().nullable().optional(),
+});
+
 // POST /api/security/access/check
 // body: { objectType, objectId, permission, objectTenantId? }
 export async function POST(request: Request) {
   const ctx = await appContext();
-  const body = await readJson<{
-    objectType: string;
-    objectId: string;
-    permission: ObjectPermission;
-    objectTenantId?: string | null;
-  }>(request);
-  return run(() =>
-    checkObjectAccessForActor(ctx, {
+  return run(async () => {
+    const body = await parseBody(request, AccessCheckSchema);
+    return checkObjectAccessForActor(ctx, {
       objectType: body.objectType,
       objectId: body.objectId,
-      permission: body.permission,
+      permission: body.permission as ObjectPermission,
       objectTenantId: body.objectTenantId ?? ctx.tenantId,
-    }),
-  );
+    });
+  });
 }
