@@ -13,7 +13,10 @@ import { db } from "@/lib/lawrence-core/db";
 import { id, now } from "@/lib/lawrence-core/utils/ids";
 import { requirePermission } from "@/lib/lawrence-core/permissions/permissions";
 import { emitAudit } from "@/lib/lawrence-core/audit/audit-service";
-import { resolveModelProvider } from "@/lib/aiops/models/model-router";
+import {
+  extractCandidateFields,
+  CANDIDATE_STRING_FIELDS,
+} from "@/lib/aiops/functions/builtins/extract-candidate-fields";
 import { upsertObject, type AppendLedgerEntry } from "@/lib/dataops/ontology/object-service";
 import { openReviewCase, resolveReviewCase } from "@/lib/mission-control/review-queue/review-service";
 import {
@@ -32,37 +35,6 @@ const DRAFT_OBJECT_TYPE = "CandidateExtraction";
 export const CANDIDATE_EXTRACTION_CASE_TYPE = "candidate_extraction";
 const REVIEW_CASE_TYPE = CANDIDATE_EXTRACTION_CASE_TYPE;
 const DEFAULT_SOURCE = "pasted_profile";
-
-/** Schema the model extracts against. Kept flat to match a profile/CV's fields. */
-const CANDIDATE_SCHEMA: Record<string, unknown> = {
-  type: "object",
-  properties: {
-    fullName: { type: "string" },
-    email: { type: "string" },
-    phone: { type: "string" },
-    location: { type: "string" },
-    headline: { type: "string" },
-    currentTitle: { type: "string" },
-    currentCompany: { type: "string" },
-    profileUrl: { type: "string" },
-    educationDegree: { type: "string" },
-    educationInstitution: { type: "string" },
-    summary: { type: "string" },
-  },
-};
-
-const STRING_FIELDS = [
-  "fullName",
-  "email",
-  "phone",
-  "location",
-  "headline",
-  "currentTitle",
-  "currentCompany",
-  "profileUrl",
-  "educationDegree",
-  "educationInstitution",
-] as const;
 
 function str(value: unknown): string | null {
   if (value == null) return null;
@@ -101,18 +73,9 @@ export async function extractCandidateDraft(
   if (!text) throw new Error("no text provided to extract a candidate from");
   const source = input.source?.trim() || DEFAULT_SOURCE;
 
-  // Honor a tenant's authorized extraction model (per-purpose routing); falls
-  // back to the process-default provider, which is the deterministic mock until
-  // an operator sets a provider key.
-  const provider = await resolveModelProvider(ctx, "extraction");
-  const completion = await provider.complete({
-    prompt:
-      "Extract the candidate's contact and profile fields as JSON from the text " +
-      "below. Use only information present in the text; leave a field empty if it " +
-      `is not stated. Do not invent values.\n\n${text.slice(0, 6000)}`,
-    outputSchema: CANDIDATE_SCHEMA,
-  });
-  const fields = completion.json ?? {};
+  // Shared extraction step (same prompt/schema the eval suite measures). Honors
+  // per-tenant "extraction" routing; mock until a provider key is set.
+  const { fields, provider: modelProvider, modelKey } = await extractCandidateFields(ctx, text);
 
   const fullName = str(fields.fullName);
   const email = str(fields.email);
@@ -153,8 +116,8 @@ export async function extractCandidateDraft(
   };
 
   // Heuristic confidence: fraction of profile fields the model populated.
-  const filled = STRING_FIELDS.filter((f) => str(fields[f])).length;
-  const confidence = Number((filled / STRING_FIELDS.length).toFixed(2));
+  const filled = CANDIDATE_STRING_FIELDS.filter((f) => str(fields[f])).length;
+  const confidence = Number((filled / CANDIDATE_STRING_FIELDS.length).toFixed(2));
 
   const extraction = await upsertObject(ctx, {
     objectType: DRAFT_OBJECT_TYPE,
@@ -165,7 +128,7 @@ export async function extractCandidateDraft(
       proposed,
       confidence,
       source,
-      model: { provider: completion.provider, modelKey: completion.modelKey },
+      model: { provider: modelProvider, modelKey },
       sourceText: text.slice(0, 4000),
       provenance,
     },

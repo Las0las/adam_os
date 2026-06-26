@@ -6,6 +6,7 @@ import { answerWithCitations } from "./builtins/answer-with-citations";
 import { summarizeObject } from "./builtins/summarize-object";
 import { classifyDocument } from "./builtins/classify-document";
 import { extractStructuredFields } from "./builtins/extract-structured-fields";
+import { extractCandidateFieldsFunction } from "./builtins/extract-candidate-fields";
 import { generateDraftResponse } from "./builtins/generate-draft-response";
 import { recommendNextAction } from "./builtins/recommend-next-action";
 
@@ -28,6 +29,7 @@ for (const fn of [
   summarizeObject,
   classifyDocument,
   extractStructuredFields,
+  extractCandidateFieldsFunction,
   generateDraftResponse,
   recommendNextAction,
 ]) {
