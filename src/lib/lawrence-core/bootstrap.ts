@@ -16,6 +16,7 @@ import { createNotificationRule } from "@/lib/mission-control/notifications/noti
 import { installMissionControlGovernance } from "@/lib/mission-control/runtime/mission-control-seed";
 import { installEvalSuites } from "@/lib/aiops/evals/eval-seed";
 import "@/lib/mission-control/actions/builtins";
+import "@/lib/integrations/register-integrations";
 import {
   seedOnboarding,
   seedSupport,

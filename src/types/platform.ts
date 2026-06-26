@@ -33,7 +33,8 @@ export type Permission =
   | "review.reviewer"
   | "mission_control.admin"
   | "deploy.promote"
-  | "notifications.manage";
+  | "notifications.manage"
+  | "integrations.manage";
 
 /** The authenticated actor context threaded through every service call. */
 export interface ActorContext {
