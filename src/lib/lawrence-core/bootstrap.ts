@@ -9,6 +9,7 @@ import { id, now, resetClock } from "./utils/ids";
 import { systemActor } from "./permissions/permissions";
 import { setModelProvider } from "@/lib/aiops/models/model-provider";
 import { resolveDefaultProvider } from "@/lib/aiops/models/model-router";
+import { installExecutionObservability } from "@/lib/aiops/execution/observability/observability-bootstrap";
 import { registerSource, ingestAsset } from "@/lib/dataops/sources/source-service";
 import { runAssetPipeline } from "@/lib/dataops/pipelines/pipeline-runner";
 import { indexEvidence } from "@/lib/dataops/evidence/chunking-service";
@@ -81,6 +82,10 @@ export function ensureBootstrapped(): Promise<void> {
 
 async function initRuntime(): Promise<void> {
   assertPersistenceReady();
+  // Attach the passive observability stack to the execution pipeline so every
+  // inference automatically produces telemetry, metrics, audit, and health
+  // observations. Idempotent and observation-only — it changes no behavior.
+  installExecutionObservability();
   if (shouldAutoSeedDemo()) {
     await bootstrap();
     return;

@@ -17,6 +17,10 @@ export interface InferenceExecutionContext {
   tenantId: string | null;
   workloadType: string;
   startTime: number;
+  /** Stable, non-cryptographic digest of the request (Milestone 5.0). Lets the
+   *  audit middleware record request identity without retaining prompt text.
+   *  Additive and observation-only — nothing in execution/routing reads it. */
+  requestFingerprint: string;
 }
 
 export interface InferenceUsage {
@@ -40,11 +44,14 @@ export interface InferenceExecutionResult {
   error: NormalizedExecutionError | null;
 }
 
-/** Extension points (deliverable #3). Hooks perform no work in this milestone;
- *  future capabilities (telemetry, audit, firewall, caching, evaluation) attach
- *  here. Hooks run in registration order. */
+/** Extension points (deliverable #3). Capabilities (telemetry, audit, health,
+ *  and future firewall/caching/evaluation) attach here without modifying
+ *  providers or routing. Hooks run in priority order (lower first; Milestone
+ *  5.0), with registration order as a stable tie-break. */
 export interface ExecutionHook {
   name: string;
+  /** Lower runs earlier. Defaults to 0 when omitted (preserves prior ordering). */
+  priority?: number;
   beforeExecute?(ctx: InferenceExecutionContext): void | Promise<void>;
   afterExecute?(ctx: InferenceExecutionContext, result: InferenceExecutionResult): void | Promise<void>;
   executionFailed?(ctx: InferenceExecutionContext, error: ExecutionError): void | Promise<void>;
