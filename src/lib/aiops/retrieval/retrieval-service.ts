@@ -5,6 +5,8 @@
 
 import { db } from "@/lib/lawrence-core/db";
 import { cosine, embed, tokenize } from "@/lib/dataops/evidence/chunking-service";
+import { checkObjectAccessForActor } from "@/lib/security/access-guard";
+import { redactForPrompt } from "@/lib/security/redaction-service";
 import type { ActorContext } from "@/types/platform";
 import type {
   EvidenceChunk,
@@ -116,7 +118,7 @@ const dispatch: Record<RetrievalMethod, (r: RetrievalRequest, c: EvidenceChunk[]
   rank_fusion: rankFusion,
 };
 
-export async function retrieve(_ctx: ActorContext, req: RetrievalRequest): Promise<RetrievalResponse> {
+export async function retrieve(ctx: ActorContext, req: RetrievalRequest): Promise<RetrievalResponse> {
   const chunks = await candidateChunks(req);
   const limit = req.limit ?? 10;
   const merged = new Map<string, RetrievalHit>();
@@ -126,9 +128,42 @@ export async function retrieve(_ctx: ActorContext, req: RetrievalRequest): Promi
       merged.set(key, hit);
     }
   }
-  const hits = [...merged.values()].sort((a, b) => b.score - a.score).slice(0, limit);
+  const ranked = [...merged.values()].sort((a, b) => b.score - a.score);
+
+  // §D4 retrieval guard — enforce object read access per hit (no AI side door),
+  // redact excerpts before they ever reach prompt/trace context, and record the
+  // count of hits suppressed for lack of access. Fail closed: a denied or
+  // errored access check drops the hit.
+  const allowed: RetrievalHit[] = [];
+  let deniedHitCount = 0;
+  for (const hit of ranked) {
+    if (allowed.length >= limit) break;
+    let decision;
+    try {
+      decision = await checkObjectAccessForActor(ctx, {
+        objectType: hit.objectType,
+        objectId: hit.objectId,
+        permission: "read",
+        objectTenantId: req.tenantId,
+      });
+    } catch {
+      deniedHitCount += 1;
+      continue;
+    }
+    if (!decision.allowed) {
+      deniedHitCount += 1;
+      continue;
+    }
+    allowed.push({ ...hit, excerpt: redactForPrompt(hit.excerpt).text });
+  }
+
   return {
-    hits,
-    trace: { methods: req.methods, candidateCount: chunks.length, returned: hits.length },
+    hits: allowed,
+    trace: {
+      methods: req.methods,
+      candidateCount: chunks.length,
+      returned: allowed.length,
+      deniedHitCount,
+    },
   };
 }

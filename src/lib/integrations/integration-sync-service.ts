@@ -15,6 +15,8 @@ import {
   countRecentFailures,
   maybeRaiseFailureIncident,
 } from "@/lib/mission-control/runtime/failure-threshold";
+import { detectInObject } from "@/lib/security/sensitive-data-detector";
+import { recordDetectedClassification } from "@/lib/security/data-classification-service";
 import type { ActorContext } from "@/types/platform";
 import type { IntegrationSyncRun, SyncType } from "./integration-types";
 
@@ -62,6 +64,22 @@ export async function runSync(
         metadata: {},
         createdAt: now(),
       });
+
+      // §F classify-on-ingest — scan the mapped object's properties for sensitive
+      // patterns and record detector-sourced classifications. Never logs the raw
+      // value (detector returns masked samples only); never fails the sync.
+      const ingested = await db.ontologyObjects.get(ctx.tenantId, m.lawrenceObjectId);
+      if (ingested) {
+        for (const hit of detectInObject(ingested.properties as Record<string, unknown>)) {
+          await recordDetectedClassification(ctx.tenantId, {
+            objectType: m.lawrenceObjectType,
+            objectId: m.lawrenceObjectId,
+            fieldPath: hit.fieldPath,
+            classification: hit.classification,
+            confidence: hit.confidence,
+          });
+        }
+      }
     }
 
     const finished = await db.integrationSyncRuns.update(run.id, {

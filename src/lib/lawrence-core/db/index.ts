@@ -82,6 +82,24 @@ import type {
   IntegrationWebhookEvent,
   IntegrationObjectMapping,
 } from "@/lib/integrations/integration-types";
+import type { SecurityPolicy, SecurityFinding } from "@/lib/security/security-types";
+import type {
+  ObjectAccessPolicy,
+  ObjectAclEntry,
+  Group,
+  GroupMembership,
+  GroupRole,
+} from "@/lib/security/access-control-types";
+import type {
+  DataClassificationRecord,
+  RedactionRule,
+} from "@/lib/security/data-classification-types";
+import type {
+  ComplianceExport,
+  RetentionPolicy,
+  RetentionJob,
+} from "@/lib/security/compliance-types";
+import type { AuditIntegrityCheck } from "@/lib/security/audit-integrity-types";
 
 // The tenants table is the one row-set without a foreign tenantId; it scopes to
 // itself, so we store tenantId === id to satisfy the Collection contract.
@@ -152,6 +170,20 @@ export interface Database {
   integrationSyncRuns: Collection<IntegrationSyncRun>;
   integrationWebhookEvents: Collection<IntegrationWebhookEvent>;
   integrationObjectMappings: Collection<IntegrationObjectMapping>;
+  // security / compliance — Phase 10
+  securityPolicies: Collection<SecurityPolicy>;
+  objectAccessPolicies: Collection<ObjectAccessPolicy>;
+  objectAclEntries: Collection<ObjectAclEntry>;
+  groups: Collection<Group>;
+  groupMemberships: Collection<GroupMembership>;
+  groupRoles: Collection<GroupRole>;
+  dataClassifications: Collection<DataClassificationRecord>;
+  redactionRules: Collection<RedactionRule>;
+  retentionPolicies: Collection<RetentionPolicy>;
+  retentionJobs: Collection<RetentionJob>;
+  complianceExports: Collection<ComplianceExport>;
+  auditIntegrityChecks: Collection<AuditIntegrityCheck>;
+  securityFindings: Collection<SecurityFinding>;
 }
 
 function createDatabase(): Database {
@@ -212,6 +244,19 @@ function createDatabase(): Database {
     integrationSyncRuns: coll("integration_sync_runs"),
     integrationWebhookEvents: coll("integration_webhook_events"),
     integrationObjectMappings: coll("integration_object_mappings"),
+    securityPolicies: coll("security_policies"),
+    objectAccessPolicies: coll("object_access_policies"),
+    objectAclEntries: coll("object_acl_entries"),
+    groups: coll("groups"),
+    groupMemberships: coll("group_memberships"),
+    groupRoles: coll("group_roles"),
+    dataClassifications: coll("data_classifications"),
+    redactionRules: coll("redaction_rules"),
+    retentionPolicies: coll("retention_policies"),
+    retentionJobs: coll("retention_jobs"),
+    complianceExports: coll("compliance_exports"),
+    auditIntegrityChecks: coll("audit_integrity_checks"),
+    securityFindings: coll("security_findings"),
   };
 }
 

@@ -33,6 +33,14 @@ export function systemActor(tenantId: string): ActorContext {
       "deploy.promote",
       "notifications.manage",
       "integrations.manage",
+      "security.admin",
+      "security.access_manage",
+      "security.classification_manage",
+      "security.retention_manage",
+      "security.compliance_export",
+      "security.full_evidence_export",
+      "security.audit_verify",
+      "security.finding_resolve",
     ],
   };
 }

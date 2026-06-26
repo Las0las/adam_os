@@ -26,7 +26,7 @@ export interface ReadinessReport {
 
 export async function getProductionReadiness(ctx: ActorContext): Promise<ReadinessReport> {
   const t = ctx.tenantId;
-  const [environments, policies, users, models, evalSuites, evalRuns, incidents, killSwitches, packs, audit, integrations] =
+  const [environments, policies, users, models, evalSuites, evalRuns, incidents, killSwitches, packs, audit, integrations, securityFindings] =
     await Promise.all([
       listEnvironments(t),
       listApprovalPolicies(t),
@@ -39,7 +39,11 @@ export async function getProductionReadiness(ctx: ActorContext): Promise<Readine
       db.domainPackInstallations.list(t, (i) => i.status === "installed"),
       db.auditEvents.list(t),
       db.integrationConnections.list(t),
+      db.securityFindings.list(t, (f) => f.status === "open"),
     ]);
+
+  const openCriticalSecurity = securityFindings.filter((f) => f.severity === "critical");
+  const openHighSecurity = securityFindings.filter((f) => f.severity === "high");
 
   const latestEvalsPass = evalRuns.length === 0 || evalRuns.every((r) => r.passed !== false);
   const prodKillSwitches = killSwitches.length; // any active kill switch is a readiness risk
@@ -62,11 +66,21 @@ export async function getProductionReadiness(ctx: ActorContext): Promise<Readine
     def("integrations", "Integrations active or skipped", integrationsOk, "warning", "no failed/degraded integrations"),
     def("domain_packs", "Domain packs installed", packs.length > 0, "warning", `${packs.length} packs`),
     def("audit", "Audit events recording", audit.length > 0, "blocker", `${audit.length} audit events`),
+    def(
+      "no_critical_security_findings",
+      "No open critical security findings",
+      openCriticalSecurity.length === 0,
+      "blocker",
+      `${openCriticalSecurity.length} open critical, ${openHighSecurity.length} open high`,
+    ),
     def("notifications", "Notification channel available", true, "warning", "in-app channel always available"),
   ];
 
   const passed = checks.filter((c) => c.passed).length;
-  const score = Math.round((passed / checks.length) * 100);
+  let score = Math.round((passed / checks.length) * 100);
+  // §K security gate — any open critical security finding caps readiness below
+  // the prod-ready threshold, regardless of the other checks. Fail-closed.
+  if (openCriticalSecurity.length > 0) score = Math.min(score, 84);
   const blockers = checks.filter((c) => !c.passed && c.severity === "blocker");
 
   return {
