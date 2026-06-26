@@ -112,7 +112,7 @@ export interface PromptTemplate {
 export interface EvalCase {
   id: string;
   tenantId: string;
-  suiteType: "retrieval" | "extraction" | "response" | "recommendation";
+  suiteType: "retrieval" | "extraction" | "classification" | "response" | "recommendation" | "action";
   input: Record<string, unknown>;
   expected: Record<string, unknown>;
   metadata?: Record<string, unknown>;
@@ -125,6 +125,15 @@ export interface EvalRun {
   results: EvalCaseResult[];
   score: number;
   createdAt: string;
+  // Phase 7 productionization (optional; legacy runs omit these).
+  evalSuiteId?: string | null;
+  targetComponentType?: string | null;
+  targetComponentKey?: string | null;
+  config?: Record<string, unknown>;
+  metrics?: Record<string, unknown>;
+  passed?: boolean | null;
+  regressionDetected?: boolean;
+  createdBy?: string | null;
 }
 
 export interface EvalCaseResult {

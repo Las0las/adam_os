@@ -168,6 +168,56 @@ export async function getCommandCenterOverview(
     createdAt: i.createdAt,
   }));
 
+  // ── Learning signals (Phase 7) ───────────────────────────────────────────
+  // Open critical/high signals surface as risks; accepted signals as
+  // recommendations; repeated-failure signals into the mission-control queue.
+  const learningSignals = await db.learningSignals.list(ctx.tenantId);
+  const learningRiskItems: CommandCenterItem[] = learningSignals
+    .filter((s) => s.status === "open" && (s.severity === "critical" || s.severity === "high"))
+    .map((s) => ({
+      id: s.id,
+      tenantId: s.tenantId,
+      domain: (s.domain as CommandDomain) ?? "mission_control",
+      kind: "learning_signal",
+      title: `Learning signal: ${s.signalType}`,
+      summary: s.summary,
+      status: "open",
+      severity: s.severity,
+      priorityScore: 0,
+      createdAt: s.createdAt,
+      metadata: { signalType: s.signalType, signalStatus: s.status },
+    }));
+  const learningRecItems: CommandCenterItem[] = learningSignals
+    .filter((s) => s.status === "accepted")
+    .map((s) => ({
+      id: s.id,
+      tenantId: s.tenantId,
+      domain: (s.domain as CommandDomain) ?? "mission_control",
+      kind: "learning_signal",
+      title: `Accepted change: ${s.signalType}`,
+      summary: s.summary,
+      status: "in_progress",
+      severity: s.severity,
+      priorityScore: 0,
+      createdAt: s.createdAt,
+      metadata: { signalType: s.signalType, signalStatus: s.status },
+    }));
+  const learningIncidentItems: CommandCenterItem[] = learningSignals
+    .filter((s) => s.status === "open" && (s.signalType === "action_failure" || s.signalType === "action_success"))
+    .map((s) => ({
+      id: s.id,
+      tenantId: s.tenantId,
+      domain: "mission_control",
+      kind: "learning_signal",
+      title: `Runtime learning: ${s.signalType}`,
+      summary: s.summary,
+      status: "open",
+      severity: s.severity,
+      priorityScore: 0,
+      createdAt: s.createdAt,
+      metadata: { signalType: s.signalType },
+    }));
+
   const audit = (await listAudit(ctx.tenantId)).slice(0, 30);
   const auditItems: CommandCenterItem[] = audit.map((e) => ({
     id: e.id,
@@ -200,10 +250,10 @@ export async function getCommandCenterOverview(
     metrics,
     actionQueue: rank(actionItems),
     reviewQueue: rank(reviewItems),
-    riskQueue: rank(riskItems.filter((i) => i.status !== "completed")),
-    recommendationQueue: rank(recItems),
+    riskQueue: rank([...riskItems.filter((i) => i.status !== "completed"), ...learningRiskItems]),
+    recommendationQueue: rank([...recItems, ...learningRecItems]),
     notificationQueue: rank(notifItems),
-    incidentQueue: rank(incidentItems),
+    incidentQueue: rank([...incidentItems, ...learningIncidentItems]),
     recentActivity: auditItems,
   };
 }

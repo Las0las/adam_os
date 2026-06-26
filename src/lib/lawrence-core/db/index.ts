@@ -46,6 +46,32 @@ import type {
   ReleaseBundle,
   RuntimeIncident,
 } from "@/types/mission-control";
+import type {
+  Environment,
+  ReleaseBundle as HardenedReleaseBundle,
+  ReleaseBundleItem,
+  ApprovalRequest,
+  RuntimeComponent,
+  KillSwitch,
+  RuntimeHealthCheck,
+  RollbackRecord,
+} from "@/lib/mission-control/runtime/mission-control-hardening-types";
+import type { ApprovalPolicy } from "@/lib/mission-control/approvals/approval-policy-types";
+import type {
+  RuntimeTrace,
+  AiUsageEvent,
+  RetrievalQualityRecord,
+  ObservabilityRollup,
+} from "@/lib/aiops/observability/observability-types";
+import type {
+  EvalSuite,
+  EvalCaseResultRecord,
+} from "@/lib/aiops/evals/eval-production-types";
+import type {
+  HumanFeedback,
+  RecommendationOutcome,
+  LearningSignal,
+} from "@/lib/aiops/learning/learning-types";
 
 // The tenants table is the one row-set without a foreign tenantId; it scopes to
 // itself, so we store tenantId === id to satisfy the Collection contract.
@@ -88,6 +114,26 @@ export interface Database {
   notifications: Collection<Notification>;
   releaseBundles: Collection<ReleaseBundle>;
   runtimeIncidents: Collection<RuntimeIncident>;
+  // mission control — Phase 6 hardening (governance / deployment control plane)
+  environments: Collection<Environment>;
+  hardenedReleases: Collection<HardenedReleaseBundle>;
+  releaseBundleItems: Collection<ReleaseBundleItem>;
+  approvalRequests: Collection<ApprovalRequest>;
+  approvalPolicies: Collection<ApprovalPolicy>;
+  runtimeComponents: Collection<RuntimeComponent>;
+  killSwitches: Collection<KillSwitch>;
+  runtimeHealthChecks: Collection<RuntimeHealthCheck>;
+  rollbackRecords: Collection<RollbackRecord>;
+  // aiops — Phase 7 observability / evals / learning
+  runtimeTraces: Collection<RuntimeTrace>;
+  aiUsageEvents: Collection<AiUsageEvent>;
+  retrievalQualityRecords: Collection<RetrievalQualityRecord>;
+  observabilityRollups: Collection<ObservabilityRollup>;
+  evalSuites: Collection<EvalSuite>;
+  evalCaseResults: Collection<EvalCaseResultRecord>;
+  humanFeedback: Collection<HumanFeedback>;
+  recommendationOutcomes: Collection<RecommendationOutcome>;
+  learningSignals: Collection<LearningSignal>;
 }
 
 function createDatabase(): Database {
@@ -124,6 +170,24 @@ function createDatabase(): Database {
     notifications: coll("notifications"),
     releaseBundles: coll("deployment_releases"),
     runtimeIncidents: coll("runtime_incidents"),
+    environments: coll("environments"),
+    hardenedReleases: coll("release_bundles"),
+    releaseBundleItems: coll("release_bundle_items"),
+    approvalRequests: coll("approval_requests"),
+    approvalPolicies: coll("approval_policies"),
+    runtimeComponents: coll("runtime_components"),
+    killSwitches: coll("kill_switches"),
+    runtimeHealthChecks: coll("runtime_health_checks"),
+    rollbackRecords: coll("rollback_records"),
+    runtimeTraces: coll("runtime_traces"),
+    aiUsageEvents: coll("ai_usage_events"),
+    retrievalQualityRecords: coll("retrieval_quality_records"),
+    observabilityRollups: coll("observability_rollups"),
+    evalSuites: coll("eval_suites"),
+    evalCaseResults: coll("eval_case_results"),
+    humanFeedback: coll("human_feedback"),
+    recommendationOutcomes: coll("recommendation_outcomes"),
+    learningSignals: coll("learning_signals"),
   };
 }
 

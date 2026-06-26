@@ -9,6 +9,13 @@ import { id, now } from "@/lib/lawrence-core/utils/ids";
 import { emitAudit } from "@/lib/lawrence-core/audit/audit-service";
 import { hasPermission } from "@/lib/lawrence-core/permissions/permissions";
 import { openReviewCase } from "../review-queue/review-service";
+import { isKilled } from "../runtime/kill-switch-guard";
+import {
+  countRecentFailures,
+  maybeRaiseFailureIncident,
+} from "../runtime/failure-threshold";
+import { createApprovalForSubject } from "../approvals/approval-request-service";
+import { createRuntimeTrace } from "@/lib/aiops/observability/runtime-trace-service";
 import type { ActorContext, Permission } from "@/types/platform";
 import type { ActionDefinition, ActionExecution } from "@/types/mission-control";
 
@@ -18,9 +25,25 @@ export interface ActionHandler {
   requiredPermission?: Permission;
   /** If true, executions are gated by a review case unless exempted. */
   requiresApproval?: boolean;
+  /**
+   * Policy-engine approval key (Phase 6 hardened path). When set, the action is
+   * gated by an approval request evaluated against this policy before any side
+   * effect. Fail-closed: a missing policy still requires approval.
+   */
+  approvalPolicyKey?: string;
+  /** Marks a customer-affecting / external / destructive action (§56 #5). */
+  dangerous?: boolean;
   /** Returns null if preconditions pass, otherwise a block reason. */
   precondition?(ctx: ActorContext, input: Record<string, unknown>): string | null;
   run(ctx: ActorContext, input: Record<string, unknown>): Promise<Record<string, unknown>>;
+}
+
+/** Stable hash of an input payload for derived idempotency keys. */
+function hashInput(input: Record<string, unknown>): string {
+  const json = JSON.stringify(input ?? {});
+  let h = 5381;
+  for (let i = 0; i < json.length; i += 1) h = ((h << 5) + h + json.charCodeAt(i)) >>> 0;
+  return h.toString(36);
 }
 
 const handlers = new Map<string, ActionHandler>();
@@ -40,6 +63,8 @@ export interface ExecuteActionInput {
   idempotencyKey?: string;
   /** Explicit policy exemption from approval (§56 #5). */
   approvalExempt?: boolean;
+  /** Force re-execution despite a matching prior in-progress/completed run. */
+  force?: boolean;
 }
 
 export async function executeAction(
@@ -49,11 +74,19 @@ export async function executeAction(
   const handler = handlers.get(input.actionKey);
   if (!handler) throw new Error(`Unknown action: ${input.actionKey}`);
 
-  // Idempotency: return prior execution for the same key.
-  if (input.idempotencyKey) {
+  // Idempotency: an explicit key, or a key derived from
+  // action + object + hash(input). A matching in-progress/completed run is
+  // returned instead of re-executing (unless force=true). Failed/blocked runs
+  // do not dedupe, so retries are allowed.
+  const effectiveKey =
+    input.idempotencyKey ??
+    `${input.actionKey}:${input.object?.type ?? ""}:${input.object?.id ?? ""}:${hashInput(input.input)}`;
+  if (!input.force) {
     const prior = await db.actionExecutions.find(
       ctx.tenantId,
-      (e) => e.idempotencyKey === input.idempotencyKey,
+      (e) =>
+        e.idempotencyKey === effectiveKey &&
+        ["queued", "running", "completed", "awaiting_approval"].includes(e.status),
     );
     if (prior) return prior;
   }
@@ -67,11 +100,16 @@ export async function executeAction(
     input: input.input,
     result: null,
     status: "queued",
-    idempotencyKey: input.idempotencyKey ?? null,
+    idempotencyKey: effectiveKey,
     blockedReason: null,
     reviewCaseId: null,
     createdAt: now(),
   });
+
+  // Kill switch: fail-closed refuse to run a disabled action.
+  if (await isKilled({ tenantId: ctx.tenantId, componentType: "action", componentKey: input.actionKey })) {
+    return await block(ctx, exec.id, `action ${input.actionKey} is disabled by kill switch`);
+  }
 
   // Permission check.
   if (handler.requiredPermission && !hasPermission(ctx, handler.requiredPermission)) {
@@ -82,8 +120,33 @@ export async function executeAction(
   const reason = handler.precondition?.(ctx, input.input) ?? null;
   if (reason) return await block(ctx, exec.id, reason);
 
-  // Approval routing: open a review case and pause in awaiting_approval until
-  // approved. This is a human gate, NOT a failure — distinct from "blocked".
+  // Hardened approval path (policy engine). Dangerous actions with a policy key
+  // create an approval request and pause until approved — fail-closed.
+  if (handler.approvalPolicyKey && !input.approvalExempt) {
+    const decision = await createApprovalForSubject(ctx, {
+      subjectType: "action_execution",
+      subjectId: exec.id,
+      policyKey: handler.approvalPolicyKey,
+      subjectPayload: { actionKey: input.actionKey, ...input.input },
+      reason: `Approval required for action ${input.actionKey}`,
+    });
+    if (decision.approvalRequired) {
+      const awaiting = await db.actionExecutions.update(exec.id, {
+        status: "awaiting_approval",
+        blockedReason: null,
+      });
+      await emitAudit(
+        ctx,
+        "action.awaiting_approval",
+        { type: "action_execution", id: exec.id },
+        { approvalRequestId: decision.request?.id ?? null },
+      );
+      return awaiting;
+    }
+  }
+
+  // Legacy review-case approval routing: open a review case and pause in
+  // awaiting_approval until approved. A human gate, NOT a failure.
   if (handler.requiresApproval && !input.approvalExempt) {
     const rc = await openReviewCase(ctx, {
       caseType: `action:${input.actionKey}`,
@@ -121,6 +184,22 @@ export async function releaseApprovedAction(
   return await runHandler(ctx, handler, exec.id, exec.input);
 }
 
+/**
+ * Continue an action execution that was gated by the hardened approval-request
+ * path, once its approval has been granted. Called by the approval decision
+ * service. No-op (returns null) if the execution isn't awaiting approval.
+ */
+export async function continueApprovedAction(
+  ctx: ActorContext,
+  executionId: string,
+): Promise<ActionExecution | null> {
+  const exec = await db.actionExecutions.get(ctx.tenantId, executionId);
+  if (!exec || exec.status !== "awaiting_approval") return null;
+  const handler = handlers.get(exec.actionId);
+  if (!handler) return null;
+  return await runHandler(ctx, handler, exec.id, exec.input);
+}
+
 async function runHandler(
   ctx: ActorContext,
   handler: ActionHandler,
@@ -132,11 +211,36 @@ async function runHandler(
     const result = await handler.run(ctx, actionInput);
     const completed = await db.actionExecutions.update(execId, { status: "completed", result });
     await emitAudit(ctx, "action.completed", { type: "action_execution", id: execId }, { actionKey: handler.key });
+    await createRuntimeTrace(ctx, {
+      traceType: "action_execution",
+      traceId: execId,
+      componentType: "action",
+      componentKey: handler.key,
+      status: "completed",
+      metrics: { approvalRequired: Boolean(handler.requiresApproval || handler.approvalPolicyKey), sideEffect: "applied" },
+    });
     return completed;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const failed = await db.actionExecutions.update(execId, { status: "failed", result: { error: message } });
     await emitAudit(ctx, "action.failed", { type: "action_execution", id: execId }, { error: message });
+    await createRuntimeTrace(ctx, {
+      traceType: "action_execution",
+      traceId: execId,
+      componentType: "action",
+      componentKey: handler.key,
+      status: "failed",
+      metrics: { sideEffect: "none" },
+      errors: [message],
+    });
+    // Failure-threshold → incident (3 in 15m = high, 5 = critical).
+    const execs = await db.actionExecutions.list(ctx.tenantId, (e) => e.actionId === handler.key);
+    const recentFailures = countRecentFailures(execs, (e) => e.status === "failed");
+    await maybeRaiseFailureIncident(ctx, {
+      componentType: "action",
+      componentKey: handler.key,
+      recentFailures,
+    });
     return failed;
   }
 }

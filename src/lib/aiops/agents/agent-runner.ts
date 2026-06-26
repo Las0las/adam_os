@@ -12,6 +12,12 @@ import { runFunction } from "../functions/function-runner";
 import { executeAction } from "@/lib/mission-control/actions/action-service";
 import { openReviewCase } from "@/lib/mission-control/review-queue/review-service";
 import { emitEvent } from "@/lib/mission-control/notifications/notification-service";
+import { assertNotKilled } from "@/lib/mission-control/runtime/kill-switch-guard";
+import {
+  countRecentFailures,
+  maybeRaiseFailureIncident,
+} from "@/lib/mission-control/runtime/failure-threshold";
+import { createRuntimeTrace } from "@/lib/aiops/observability/runtime-trace-service";
 import type { ActorContext } from "@/types/platform";
 import type { AgentDefinition, AgentNode, AgentRun, AgentRunStep } from "@/types/aiops";
 
@@ -23,6 +29,8 @@ export async function runAgent(
   input: Record<string, unknown>,
 ): Promise<AgentRun> {
   requirePermission(ctx, "aiops.agent_admin");
+  // Fail-closed: refuse to run a kill-switched agent.
+  await assertNotKilled({ tenantId: ctx.tenantId, componentType: "agent", componentKey: agent.key });
   const run = await db.agentRuns.insert({
     id: id("arun"),
     tenantId: ctx.tenantId,
@@ -69,11 +77,32 @@ export async function runAgent(
       output: blackboard,
     });
     await emitAudit(ctx, "aiops.agent.run", { type: "agent_run", id: run.id }, { agentKey: agent.key });
+    await createRuntimeTrace(ctx, {
+      traceType: "agent_run",
+      traceId: run.id,
+      componentType: "agent",
+      componentKey: agent.key,
+      status: "completed",
+      metrics: { nodeCount: steps.length, failedNodeCount: 0 },
+      outputSummary: { keys: Object.keys(blackboard).slice(0, 12) },
+    });
     return completed;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const failed = await db.agentRuns.update(run.id, { status: "failed", steps, error: message });
     await emitAudit(ctx, "aiops.agent.run.failed", { type: "agent_run", id: run.id }, { error: message });
+    await createRuntimeTrace(ctx, {
+      traceType: "agent_run",
+      traceId: run.id,
+      componentType: "agent",
+      componentKey: agent.key,
+      status: "failed",
+      metrics: { nodeCount: steps.length },
+      errors: [message],
+    });
+    const runs = await db.agentRuns.list(ctx.tenantId, (r) => r.agentId === agent.key);
+    const recentFailures = countRecentFailures(runs, (r) => r.status === "failed");
+    await maybeRaiseFailureIncident(ctx, { componentType: "agent", componentKey: agent.key, recentFailures });
     return failed;
   }
 }

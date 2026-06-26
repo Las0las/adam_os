@@ -6,6 +6,9 @@ import { id, now } from "@/lib/lawrence-core/utils/ids";
 import { requirePermission } from "@/lib/lawrence-core/permissions/permissions";
 import { emitAudit } from "@/lib/lawrence-core/audit/audit-service";
 import { renderTemplate } from "@/lib/aiops/prompts/prompt-service";
+import { getChannelAdapter } from "./channels/channel-registry";
+import { isKilled } from "../runtime/kill-switch-guard";
+import { createRuntimeTrace } from "@/lib/aiops/observability/runtime-trace-service";
 import type { ActorContext } from "@/types/platform";
 import type { Notification, NotificationChannel, NotificationRule } from "@/types/mission-control";
 
@@ -14,6 +17,53 @@ const allowlist = new Set<string>();
 
 export function allowDestination(destination: string): void {
   allowlist.add(destination);
+}
+
+interface DispatchInput {
+  title: string;
+  body: string;
+  destination: string | null;
+  deepLink: string | null;
+}
+
+/**
+ * Route one rule's notification to its channel and return the resulting state.
+ *
+ *  - in_app:            always delivered (the stored row is the delivery).
+ *  - external channels: transmitted only when the destination is allowlisted
+ *                       (§47) AND a channel adapter is configured. Otherwise we
+ *                       record an internal notification only (state "queued") —
+ *                       never silently dropping or failing the event.
+ *  - external send:     "sent" on success, "failed" with the transport error.
+ */
+async function dispatch(
+  rule: NotificationRule,
+  input: DispatchInput,
+): Promise<{ state: Notification["state"]; error: string | null }> {
+  if (rule.channel === "in_app") return { state: "sent", error: null };
+
+  const adapter = getChannelAdapter(rule.channel);
+  const destinationOk = Boolean(input.destination) && allowlist.has(input.destination ?? "");
+
+  if (!destinationOk) {
+    return { state: "queued", error: "destination not allowlisted — queued internally only" };
+  }
+  if (!adapter.isConfigured()) {
+    return {
+      state: "queued",
+      error: `${rule.channel} adapter not configured — queued internally only`,
+    };
+  }
+
+  const result = await adapter.send({
+    title: input.title,
+    body: input.body,
+    destination: input.destination as string,
+    deepLink: input.deepLink,
+  });
+  return result.ok
+    ? { state: "sent", error: null }
+    : { state: "failed", error: result.error ?? "external delivery failed" };
 }
 
 export async function createNotificationRule(
@@ -69,27 +119,50 @@ export async function emitEvent(
       continue;
     }
 
-    const blocked =
-      rule.channel !== "in_app" && (!rule.destination || !allowlist.has(rule.destination));
+    const title = `${eventKey}`;
+
+    // Kill switch on the notification rule suppresses delivery — the record is
+    // kept internally (queued) so nothing is silently dropped.
+    const killed = await isKilled({
+      tenantId: ctx.tenantId,
+      componentType: "notification_rule",
+      componentKey: rule.name,
+    });
+    const { state, error } = killed
+      ? { state: "queued" as const, error: "notification rule disabled by kill switch" }
+      : await dispatch(rule, {
+          title,
+          body,
+          destination: rule.destination ?? null,
+          deepLink: deepLink ?? null,
+        });
 
     const notification = await db.notifications.insert({
       id: id("notif"),
       tenantId: ctx.tenantId,
       ruleId: rule.id,
       recipientUserId,
-      title: `${eventKey}`,
+      title,
       body,
       channel: rule.channel,
-      state: blocked ? "failed" : "sent",
+      state,
       deepLink: deepLink ?? null,
       dedupeKey,
-      error: blocked ? "destination not allowlisted" : null,
+      error,
       createdAt: now(),
     });
     await emitAudit(ctx, "notifications.deliver", { type: "notification", id: notification.id }, {
       eventKey,
       channel: rule.channel,
       state: notification.state,
+    });
+    await createRuntimeTrace(ctx, {
+      traceType: "notification",
+      traceId: notification.id,
+      componentType: "notification_rule",
+      componentKey: rule.name,
+      status: state === "failed" ? "failed" : "completed",
+      metrics: { channel: rule.channel, deliveryState: state },
     });
     out.push(notification);
   }

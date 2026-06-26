@@ -14,6 +14,11 @@ import {
   emitEvent,
   allowDestination,
 } from "@/lib/mission-control/notifications/notification-service";
+import {
+  setChannelAdapter,
+  resetChannelAdapters,
+} from "@/lib/mission-control/notifications/channels/channel-registry";
+import type { ChannelMessage } from "@/lib/mission-control/notifications/channels/channel-types";
 import { promoteRelease, createRelease } from "@/lib/mission-control/runtime/deployment-service";
 import "@/lib/domains/recruiting/recruiting-pack";
 
@@ -71,21 +76,71 @@ test("idempotency returns the same execution", async () => {
   assert.equal(a.id, b.id);
 });
 
-test("notification: external channel blocked unless allowlisted", async () => {
+test("notification: external channel queues internally unless allowlisted AND configured", async () => {
   const ctx = await ctxFresh();
+  const hook = "https://hooks.slack.com/x";
   await createNotificationRule(ctx, {
     name: "slack ping",
     eventKey: "test.event",
     channel: "slack",
-    destination: "https://hooks.slack.com/x",
+    destination: hook,
     template: "hi {{name}}",
   });
-  let notes = await emitEvent(ctx, "test.event", "usr_1", { name: "Ada" });
-  assert.equal(notes[0]!.state, "failed");
 
-  allowDestination("https://hooks.slack.com/x");
+  // Not allowlisted, no transport: internal queue only — never sent externally.
+  let notes = await emitEvent(ctx, "test.event", "usr_1", { name: "Ada" });
+  assert.equal(notes[0]!.state, "queued");
+
+  // Allowlisted but still no configured adapter: still internal queue only.
+  allowDestination(hook);
   notes = await emitEvent(ctx, "test.event", "usr_2", { name: "Ada" });
-  assert.equal(notes[0]!.state, "sent");
+  assert.equal(notes[0]!.state, "queued");
+
+  // Allowlisted AND a configured transport installed: real send path → sent.
+  const sent: ChannelMessage[] = [];
+  setChannelAdapter("slack", {
+    channel: "slack",
+    isConfigured: () => true,
+    async send(message) {
+      sent.push(message);
+      return { ok: true };
+    },
+  });
+  try {
+    notes = await emitEvent(ctx, "test.event", "usr_3", { name: "Ada" });
+    assert.equal(notes[0]!.state, "sent");
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0]!.destination, hook);
+  } finally {
+    resetChannelAdapters();
+  }
+});
+
+test("notification: configured transport that errors is recorded as failed", async () => {
+  const ctx = await ctxFresh();
+  const hook = "https://hooks.slack.com/y";
+  await createNotificationRule(ctx, {
+    name: "slack ping",
+    eventKey: "test.fail",
+    channel: "slack",
+    destination: hook,
+    template: "hi",
+  });
+  allowDestination(hook);
+  setChannelAdapter("slack", {
+    channel: "slack",
+    isConfigured: () => true,
+    async send() {
+      return { ok: false, error: "boom" };
+    },
+  });
+  try {
+    const notes = await emitEvent(ctx, "test.fail", "usr_1", {});
+    assert.equal(notes[0]!.state, "failed");
+    assert.match(notes[0]!.error ?? "", /boom/);
+  } finally {
+    resetChannelAdapters();
+  }
 });
 
 test("release promotes draft -> staging -> production", async () => {
