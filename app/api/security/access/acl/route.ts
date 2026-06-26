@@ -1,21 +1,25 @@
+import { z } from "zod";
 import { appContext } from "@/lib/app/demo-context";
-import { run, readJson } from "@/lib/app/route-helpers";
+import { run, parseBody } from "@/lib/app/route-helpers";
 import { setObjectAcl } from "@/lib/security/object-acl-service";
-import type { AclEffect, ObjectPermission } from "@/lib/security/access-control-types";
 
 export const dynamic = "force-dynamic";
+
+const AclSchema = z.object({
+  objectType: z.string().min(1),
+  objectId: z.string().min(1),
+  principalType: z.enum(["user", "group", "role"]),
+  principalId: z.string().min(1),
+  permission: z.string().min(1),
+  effect: z.string().optional(),
+});
 
 // POST /api/security/access/acl
 // body: { objectType, objectId, principalType, principalId, permission, effect? }
 export async function POST(request: Request) {
   const ctx = await appContext();
-  const body = await readJson<{
-    objectType: string;
-    objectId: string;
-    principalType: "user" | "group" | "role";
-    principalId: string;
-    permission: ObjectPermission;
-    effect?: AclEffect;
-  }>(request);
-  return run(() => setObjectAcl(ctx, body));
+  return run(async () => {
+    const body = await parseBody(request, AclSchema);
+    return setObjectAcl(ctx, body as Parameters<typeof setObjectAcl>[1]);
+  });
 }
