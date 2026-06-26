@@ -11,7 +11,17 @@ interface TenantContext {
   tenantId: string;
 }
 
-const storage = new AsyncLocalStorage<TenantContext>();
+// Pin the store to globalThis: module-resolution can evaluate this file more than
+// once (the `@/` alias vs a relative import, Next.js route-chunk duplication), and
+// two AsyncLocalStorage instances would mean a tenant set on one is invisible to
+// the other — silently dropping the RLS GUC. A process-wide singleton guarantees
+// runWithTenant() and currentTenantId() share one store. (Same pattern as `db`.)
+const globalRef = globalThis as unknown as {
+  __lawrenceTenantStore?: AsyncLocalStorage<TenantContext>;
+};
+const storage: AsyncLocalStorage<TenantContext> =
+  globalRef.__lawrenceTenantStore ??
+  (globalRef.__lawrenceTenantStore = new AsyncLocalStorage<TenantContext>());
 
 /** Run `fn` with the tenant bound for its entire async subtree. */
 export function runWithTenant<R>(tenantId: string, fn: () => R): R {
