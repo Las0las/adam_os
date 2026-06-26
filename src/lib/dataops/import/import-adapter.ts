@@ -79,3 +79,56 @@ export function normHeader(value: unknown): string {
     .replace(/\s+/g, " ")
     .toLowerCase();
 }
+
+/** Index of the first non-empty row (the header row); -1 if the sheet is blank. */
+export function headerRowIndex(rows: unknown[][]): number {
+  for (let i = 0; i < rows.length; i += 1) {
+    const r = rows[i];
+    if (Array.isArray(r) && r.some((c) => c != null && String(c).trim() !== "")) return i;
+  }
+  return -1;
+}
+
+/** camelCase fallback key for an unrecognized header so no column is dropped. */
+export function fallbackKey(label: string): string {
+  const parts = label.split(/[^a-z0-9]+/i).filter(Boolean);
+  if (parts.length === 0) return "field";
+  return parts
+    .map((p, i) => (i === 0 ? p.toLowerCase() : p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()))
+    .join("");
+}
+
+/** The normalized header labels present in a sheet (for detection). */
+export function sheetHeaders(sheet: ImportSheet): Set<string> {
+  const hi = headerRowIndex(sheet.rows);
+  if (hi === -1) return new Set();
+  return new Set((sheet.rows[hi] ?? []).map((c) => normHeader(c)));
+}
+
+/** Project a sheet's data rows to canonical-keyed objects. Columns resolve to a
+ *  known key via `columnMap` (matched on the normalized label) or a camelCase
+ *  fallback; the first column with a given key wins. `rowNumber` is 1-based for
+ *  human-facing provenance. Fully-empty rows are skipped. */
+export function mapDataRows(
+  sheet: ImportSheet,
+  columnMap: Record<string, string>,
+): Array<{ row: Record<string, unknown>; rowNumber: number }> {
+  const hi = headerRowIndex(sheet.rows);
+  if (hi === -1) return [];
+  const rawHeader = (sheet.rows[hi] ?? []).map((c) => String(c ?? ""));
+  const keys = rawHeader.map((h) => columnMap[normHeader(h)] ?? fallbackKey(h || "col"));
+
+  const out: Array<{ row: Record<string, unknown>; rowNumber: number }> = [];
+  for (let i = hi + 1; i < sheet.rows.length; i += 1) {
+    const cells = sheet.rows[i];
+    if (!Array.isArray(cells)) continue;
+    if (!cells.some((c) => c != null && String(c).trim() !== "")) continue;
+    const row: Record<string, unknown> = {};
+    keys.forEach((k, idx) => {
+      if (k in row) return;
+      row[k] = cells[idx] ?? null;
+    });
+    out.push({ row, rowNumber: i + 1 });
+  }
+  return out;
+}

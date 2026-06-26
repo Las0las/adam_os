@@ -18,6 +18,8 @@ import {
   cellStr,
   cellNum,
   normHeader,
+  mapDataRows,
+  sheetHeaders,
 } from "../import-adapter";
 import {
   type IRCandidate,
@@ -70,24 +72,6 @@ function findSheet(probe: ImportProbe, normName: string): ImportSheet | undefine
   return probe.sheets.find((s) => normHeader(s.name) === normName);
 }
 
-/** Index of the first non-empty row (the header row) in a sheet. */
-function headerRowIndex(rows: unknown[][]): number {
-  for (let i = 0; i < rows.length; i += 1) {
-    const r = rows[i];
-    if (Array.isArray(r) && r.some((c) => c != null && String(c).trim() !== "")) return i;
-  }
-  return -1;
-}
-
-/** camelCase fallback key for an unrecognized header so nothing is dropped. */
-function fallbackKey(label: string): string {
-  const parts = label.split(/[^a-z0-9]+/i).filter(Boolean);
-  if (parts.length === 0) return "field";
-  return parts
-    .map((p, i) => (i === 0 ? p.toLowerCase() : p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()))
-    .join("");
-}
-
 export const linkedinRecruiterAdapter: ImportAdapter = {
   key: SOURCE,
   source: SOURCE,
@@ -95,23 +79,13 @@ export const linkedinRecruiterAdapter: ImportAdapter = {
   detect(probe: ImportProbe): boolean {
     const sheet = findSheet(probe, APPLICANTS_SHEET);
     if (!sheet) return false;
-    const hi = headerRowIndex(sheet.rows);
-    if (hi === -1) return false;
-    const headers = new Set((sheet.rows[hi] ?? []).map((c) => normHeader(c)));
+    const headers = sheetHeaders(sheet);
     // Require the signature columns that make this unambiguously the export.
     return headers.has("first name") && headers.has("email address") && headers.has("job id");
   },
 
   extract(probe: ImportProbe, base: ImportProvenanceBase): RecruitingImportIR {
     const sheet = findSheet(probe, APPLICANTS_SHEET)!;
-    const hi = headerRowIndex(sheet.rows);
-    const rawHeader = (sheet.rows[hi] ?? []).map((c) => String(c ?? ""));
-    // Resolve each column index to a canonical key (known or camelCase fallback).
-    const keys = rawHeader.map((h) => {
-      const norm = normHeader(h);
-      return COLUMN_MAP[norm] ?? fallbackKey(h || "col");
-    });
-
     const overview = readOverview(findSheet(probe, OVERVIEW_SHEET));
 
     const prov = (rowNumber: number | null): ImportProvenance => ({
@@ -130,23 +104,11 @@ export const linkedinRecruiterAdapter: ImportAdapter = {
     const candidates = new Map<string, IRCandidate>();
     const submissions: IRSubmission[] = [];
 
-    for (let i = hi + 1; i < sheet.rows.length; i += 1) {
-      const cells = sheet.rows[i];
-      if (!Array.isArray(cells)) continue;
-      if (!cells.some((c) => c != null && String(c).trim() !== "")) continue;
-
-      const row: Record<string, unknown> = {};
-      keys.forEach((k, idx) => {
-        if (k in row) return; // first column with a given key wins
-        row[k] = cells[idx] ?? null;
-      });
-      const rowNumber = i + 1; // 1-based for human-facing provenance
+    for (const { row, rowNumber } of mapDataRows(sheet, COLUMN_MAP)) {
       const provenance = prov(rowNumber);
-
       const job = buildJob(row, provenance, overview, jobs);
       const candidate = buildCandidate(row, provenance, candidates);
       if (!job || !candidate) continue; // need both to form a submission
-
       submissions.push(buildSubmission(row, provenance, job.externalKey, candidate.externalKey));
     }
 

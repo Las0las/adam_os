@@ -1,19 +1,9 @@
-import { createHash } from "node:crypto";
 import * as XLSX from "xlsx";
 import type { ParserHandler, CanonicalParseOutput } from "./parser-types";
 import type { RawAsset } from "@/types/dataops";
 import { loadAssetBytes } from "./load-bytes";
-import { id, now } from "@/lib/lawrence-core/utils/ids";
-import {
-  detectImportAdapter,
-  type ImportProbe,
-  type ImportSheet,
-} from "@/lib/dataops/import/import-adapter";
-import {
-  RECRUITING_SUBMISSION_RECORD_TYPE,
-  type IRCandidate,
-  type IRJob,
-} from "@/lib/dataops/import/recruiting-ir";
+import { type ImportProbe, type ImportSheet } from "@/lib/dataops/import/import-adapter";
+import { runRecruitingImport } from "@/lib/dataops/import/import-runner";
 // Side-effect: registers the recruiting import adapters with the registry.
 import "@/lib/dataops/import/import-bootstrap";
 
@@ -75,54 +65,12 @@ export const xlsxParser: ParserHandler = {
     // Format detection: a recruiting import adapter (LinkedIn Recruiter, future
     // ATS exports) takes precedence over the generic spreadsheet projection.
     const probe: ImportProbe = { fileName: asset.fileName, sheets };
-    const adapter = detectImportAdapter(probe);
-    if (adapter) {
-      const workbookHash = createHash("sha256").update(bytes).digest("hex");
-      const ir = adapter.extract(probe, {
-        importRunId: id("import"),
-        importedAt: now(),
-        originalFilename: asset.fileName,
-        workbookHash,
-      });
-
-      const jobsByKey = new Map<string, IRJob>(ir.jobs.map((j) => [j.externalKey, j]));
-      const candidatesByKey = new Map<string, IRCandidate>(
-        ir.candidates.map((c) => [c.externalKey, c]),
-      );
-
-      const records: NonNullable<CanonicalParseOutput["records"]> = [];
-      for (const submission of ir.submissions) {
-        const job = jobsByKey.get(submission.jobKey);
-        const candidate = candidatesByKey.get(submission.candidateKey);
-        if (!job || !candidate) continue;
-        records.push({
-          recordType: RECRUITING_SUBMISSION_RECORD_TYPE,
-          payload: { job, candidate, submission } as unknown as Record<string, unknown>,
-          sourcePath: `sheet:${submission.provenance.sheetName};row:${submission.provenance.rowNumber}`,
-        });
-      }
-
-      const overview = (ir.jobs[0]?.metadata.overview ?? {}) as Record<string, unknown>;
-      return {
-        document: {
-          documentType: `${adapter.source}_export`,
-          title: asset.fileName,
-          metadata: {
-            sheets: sheetNames,
-            source: adapter.source,
-            importRunId: ir.provenance.importRunId,
-            workbookHash,
-            overview,
-            counts: {
-              jobs: ir.jobs.length,
-              candidates: ir.candidates.length,
-              submissions: ir.submissions.length,
-            },
-          },
-        },
-        records,
-      };
-    }
+    const imported = runRecruitingImport(probe, {
+      fileName: asset.fileName,
+      sheetNames,
+      hashInput: bytes,
+    });
+    if (imported) return imported;
 
     return {
       document: {
