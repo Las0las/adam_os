@@ -1,23 +1,19 @@
-// Execution Observability (Milestone 5.0, deliverable #5) — passive health.
+// Execution Observability (Milestone 5.0, deliverable #5; reworked in 5.5).
 //
 // Observes execution outcomes and maintains a per-provider ProviderHealth view:
 // latency, timeouts, provider-unavailable, authentication failures, rate limits.
-// It is PASSIVE — nothing here influences routing, and there are NO circuit
-// breakers, failover, or retries. It only updates the health map that future
-// governance/observability surfaces will read. Observation only.
+// Since Milestone 5.5 it is a BUS SUBSCRIBER, driven by canonical events. It is
+// PASSIVE — nothing here influences routing, and there are NO circuit breakers,
+// failover, or retries. Observation only.
 
 import type {
   ProviderHealth,
   ProviderHealthStatus,
 } from "@/lib/aiops/providers/provider-registry-types";
-import type { InferenceExecutionContext, InferenceExecutionResult } from "../execution-types";
-import type { ExecutionError, ExecutionErrorKind } from "../execution-errors";
+import type { ExecutionErrorKind } from "../execution-errors";
+import type { ExecutionEvent } from "./execution-events";
+import type { ExecutionEventSubscriber } from "./execution-event-bus";
 import { observedNowIso } from "./observability-clock";
-import {
-  guard,
-  MIDDLEWARE_PRIORITY,
-  type ExecutionMiddleware,
-} from "./execution-middleware";
 
 /** Rolling per-provider observation state. */
 interface ProviderStat {
@@ -43,9 +39,9 @@ function p50(values: number[]): number | null {
 /** Map the most recent outcome onto a health status. Auth/unavailable failures
  *  are treated as "unavailable" (the provider cannot serve), transient failures
  *  (timeout/rate-limit) as "degraded", and a clean success as "healthy". */
-function deriveStatus(stat: ProviderStat, lastWasSuccess: boolean): ProviderHealthStatus {
+function deriveStatus(lastErrorKind: ExecutionErrorKind | null, lastWasSuccess: boolean): ProviderHealthStatus {
   if (lastWasSuccess) return "healthy";
-  switch (stat.lastErrorKind) {
+  switch (lastErrorKind) {
     case "authentication":
     case "provider_unavailable":
       return "unavailable";
@@ -57,9 +53,8 @@ function deriveStatus(stat: ProviderStat, lastWasSuccess: boolean): ProviderHeal
   }
 }
 
-export class PassiveHealthCollector implements ExecutionMiddleware {
+export class PassiveHealthCollector implements ExecutionEventSubscriber {
   readonly name = "health";
-  readonly priority = MIDDLEWARE_PRIORITY.health;
 
   private readonly stats = new Map<string, ProviderStat>();
 
@@ -79,6 +74,23 @@ export class PassiveHealthCollector implements ExecutionMiddleware {
     return s;
   }
 
+  onEvent(event: ExecutionEvent): void {
+    if (event.type === "execution.completed") {
+      const s = this.stat(event.provider);
+      s.successes += 1;
+      s.lastErrorKind = null;
+      s.checkedAt = observedNowIso();
+      s.latencies.push(event.latency);
+      if (s.latencies.length > SAMPLE_LIMIT) s.latencies.shift();
+    } else if (event.type === "execution.failed") {
+      const s = this.stat(event.provider);
+      s.failures += 1;
+      s.lastErrorKind = event.error.kind;
+      s.byErrorKind.set(event.error.kind, (s.byErrorKind.get(event.error.kind) ?? 0) + 1);
+      s.checkedAt = observedNowIso();
+    }
+  }
+
   /** Current health for one provider, or an unknown-status default. */
   health(provider: string): ProviderHealth {
     const s = this.stats.get(provider);
@@ -86,9 +98,9 @@ export class PassiveHealthCollector implements ExecutionMiddleware {
       return { provider, status: "unknown", checkedAt: null, latencyMsP50: null, detail: null };
     }
     // `lastErrorKind === null` exactly when the most recent terminal outcome was
-    // a success (afterExecute clears it; executionFailed sets it).
+    // a success (a completion clears it; a failure sets it).
     const lastWasSuccess = s.lastErrorKind === null;
-    const status = deriveStatus(s, lastWasSuccess);
+    const status = deriveStatus(s.lastErrorKind, lastWasSuccess);
     const detail = lastWasSuccess
       ? `${s.successes} ok / ${s.failures} failed`
       : `last error: ${s.lastErrorKind}`;
@@ -108,26 +120,5 @@ export class PassiveHealthCollector implements ExecutionMiddleware {
 
   reset(): void {
     this.stats.clear();
-  }
-
-  afterExecute(ctx: InferenceExecutionContext, result: InferenceExecutionResult): void {
-    guard(() => {
-      const s = this.stat(ctx.provider);
-      s.successes += 1;
-      s.lastErrorKind = null;
-      s.checkedAt = observedNowIso();
-      s.latencies.push(result.latency);
-      if (s.latencies.length > SAMPLE_LIMIT) s.latencies.shift();
-    });
-  }
-
-  executionFailed(ctx: InferenceExecutionContext, error: ExecutionError): void {
-    guard(() => {
-      const s = this.stat(ctx.provider);
-      s.failures += 1;
-      s.lastErrorKind = error.kind;
-      s.byErrorKind.set(error.kind, (s.byErrorKind.get(error.kind) ?? 0) + 1);
-      s.checkedAt = observedNowIso();
-    });
   }
 }
