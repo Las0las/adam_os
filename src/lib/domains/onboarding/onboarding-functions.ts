@@ -10,6 +10,7 @@ import { now } from "@/lib/lawrence-core/utils/ids";
 import { listObjects } from "@/lib/dataops/ontology/object-service";
 import { retrieve } from "@/lib/aiops/retrieval/retrieval-service";
 import { getModelProvider } from "@/lib/aiops/models/model-provider";
+import { runModelCompletion } from "@/lib/aiops/execution/inference-pipeline";
 import { registerFunction } from "@/lib/aiops/functions/function-registry";
 import { validateOutput } from "@/lib/domains/domain-workflow-types";
 import type {
@@ -203,20 +204,24 @@ export const onboardingReadinessSummary: LawrenceFunction<
       .map((b) => `- [${b.severity}] ${b.reason}`)
       .join("\n");
     const provider = getModelProvider();
-    const completion = await provider.complete({
-      prompt: [
-        `Onboarding case: ${onboardingCase.title ?? onboardingCaseId}`,
-        `Status: ${onboardingCase.status ?? "unknown"}`,
-        `Tasks: ${doneTasks}/${totalTasks} done. Readiness score: ${readinessScore.toFixed(2)}.`,
-        `Ready for Day 1: ${ready ? "yes" : "no"}.`,
-        blockers.length
-          ? `Detected blockers:\n${blockerLines}`
-          : "No blockers detected.",
-        evidenceText ? `Evidence: ${evidenceText}` : "",
-        "Write a short readiness summary for the onboarding owner.",
-      ]
-        .filter(Boolean)
-        .join("\n"),
+    const completion = await runModelCompletion({
+      provider,
+      request: {
+        prompt: [
+          `Onboarding case: ${onboardingCase.title ?? onboardingCaseId}`,
+          `Status: ${onboardingCase.status ?? "unknown"}`,
+          `Tasks: ${doneTasks}/${totalTasks} done. Readiness score: ${readinessScore.toFixed(2)}.`,
+          `Ready for Day 1: ${ready ? "yes" : "no"}.`,
+          blockers.length
+            ? `Detected blockers:\n${blockerLines}`
+            : "No blockers detected.",
+          evidenceText ? `Evidence: ${evidenceText}` : "",
+          "Write a short readiness summary for the onboarding owner.",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      },
+      workloadType: "onboarding.readiness_summary",
     });
 
     const summary =

@@ -9,7 +9,9 @@ import type { ExecutionError, NormalizedExecutionError } from "./execution-error
 export interface InferenceExecutionContext {
   executionId: string;
   requestId: string;
-  routingDecision: RoutingDecision;
+  /** The routing decision that produced this execution, or null for executions
+   *  driven by an already-resolved provider (legacy resolution paths). */
+  routingDecision: RoutingDecision | null;
   provider: string;
   model: string;
   tenantId: string | null;

@@ -1,6 +1,7 @@
 // classify-document (§26). Schema-constrained classification over text.
 
 import { getModelProvider } from "../../models/model-provider";
+import { runModelCompletion } from "../../execution/inference-pipeline";
 import { recordTrace } from "../../observability/trace-service";
 import { id } from "@/lib/lawrence-core/utils/ids";
 import type { LawrenceFunction, FunctionExecutionResult } from "../function-types";
@@ -37,9 +38,13 @@ export const classifyDocument: LawrenceFunction<ClassifyInput, ClassifyOutput> =
     const top = scored[0] ?? { label: input.labels[0] ?? "unknown", score: 0 };
     const total = scored.reduce((s, x) => s + x.score, 0) || 1;
 
-    const completion = await getModelProvider().complete({
-      prompt: `Classify into [${input.labels.join(", ")}]: ${input.text.slice(0, 400)}`,
-      outputSchema: classifyDocument.outputSchema,
+    const completion = await runModelCompletion({
+      provider: getModelProvider(),
+      request: {
+        prompt: `Classify into [${input.labels.join(", ")}]: ${input.text.slice(0, 400)}`,
+        outputSchema: classifyDocument.outputSchema,
+      },
+      workloadType: "classify",
     });
     const traceId = id("trace");
     await recordTrace(ctx, "function_run", traceId, completion);

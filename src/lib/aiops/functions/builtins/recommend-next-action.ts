@@ -3,6 +3,7 @@
 
 import { db } from "@/lib/lawrence-core/db";
 import { getModelProvider } from "../../models/model-provider";
+import { runModelCompletion } from "../../execution/inference-pipeline";
 import { recordTrace } from "../../observability/trace-service";
 import { id } from "@/lib/lawrence-core/utils/ids";
 import type { LawrenceFunction, FunctionExecutionResult } from "../function-types";
@@ -40,9 +41,13 @@ export const recommendNextAction: LawrenceFunction<RecommendInput, RecommendOutp
     // the current status; a real provider reasons over evidence here.
     const recommended =
       input.candidateActions.find((a) => a !== status) ?? input.candidateActions[0] ?? "no_action";
-    const completion = await getModelProvider().complete({
-      prompt: `Object ${input.objectType} status=${status}. Choose from [${input.candidateActions.join(", ")}].`,
-      outputSchema: recommendNextAction.outputSchema,
+    const completion = await runModelCompletion({
+      provider: getModelProvider(),
+      request: {
+        prompt: `Object ${input.objectType} status=${status}. Choose from [${input.candidateActions.join(", ")}].`,
+        outputSchema: recommendNextAction.outputSchema,
+      },
+      workloadType: "reason",
     });
     const traceId = id("trace");
     await recordTrace(ctx, "function_run", traceId, completion);
