@@ -9,10 +9,27 @@
 // workbook merges rather than duplicates. Provenance is stamped onto every
 // object, and every upsert/link also emits an immutable audit event.
 
-import { upsertObject, linkObjects } from "@/lib/dataops/ontology/object-service";
+import {
+  upsertObject,
+  linkObjects,
+  type AppendLedgerEntry,
+} from "@/lib/dataops/ontology/object-service";
 import type { ActorContext } from "@/types/platform";
 import type { OntologyObject } from "@/types/dataops";
-import type { RecruitingSubmissionRecord } from "./recruiting-ir";
+import type { ImportProvenance, RecruitingSubmissionRecord } from "./recruiting-ir";
+
+/** One immutable `imports` ledger entry per object per import run. Deduped by
+ *  importRunId so the job/candidate (upserted once per applicant row) records a
+ *  single entry per import, and re-importing later appends a new entry. */
+function importsLedger(provenance: ImportProvenance): AppendLedgerEntry[] {
+  return [
+    {
+      prop: "imports",
+      entry: provenance as unknown as Record<string, unknown>,
+      dedupeKey: "importRunId",
+    },
+  ];
+}
 
 export async function projectSubmissionRecord(
   ctx: ActorContext,
@@ -37,6 +54,7 @@ export async function projectSubmissionRecord(
       contract: job.contract,
       provenance: job.provenance,
     },
+    appendLedger: importsLedger(job.provenance),
   });
 
   const candidateObj = await upsertObject(ctx, {
@@ -57,6 +75,7 @@ export async function projectSubmissionRecord(
       education: candidate.education,
       provenance: candidate.provenance,
     },
+    appendLedger: importsLedger(candidate.provenance),
   });
 
   const submissionObj = await upsertObject(ctx, {
@@ -74,6 +93,7 @@ export async function projectSubmissionRecord(
       screeningAnswers: submission.screeningAnswers,
       provenance: submission.provenance,
     },
+    appendLedger: importsLedger(submission.provenance),
   });
 
   // Graph edges: Candidate ──submitted──► Submission ──targets──► Job.

@@ -8,12 +8,48 @@ import { emitAudit } from "@/lib/lawrence-core/audit/audit-service";
 import type { ActorContext } from "@/types/platform";
 import type { OntologyObject, OntologyLink } from "@/types/dataops";
 
+/** An append-only ledger entry to merge into a property. The entry is appended
+ *  to the array at `properties[prop]`, preserving every prior entry — existing
+ *  entries are never mutated or dropped. `dedupeKey` makes the append idempotent:
+ *  if an entry with the same value at `entry[dedupeKey]` already exists, nothing
+ *  is appended (so re-running one import, which upserts the same object many
+ *  times, records exactly one ledger entry per import run). */
+export interface AppendLedgerEntry {
+  prop: string;
+  entry: Record<string, unknown>;
+  dedupeKey: string;
+}
+
 export interface UpsertObjectInput {
   objectType: string;
   externalKey?: string | null;
   title?: string | null;
   status?: string | null;
   properties?: Record<string, unknown>;
+  /** Immutable append-only ledgers (e.g. ingestion provenance history). Applied
+   *  after the scalar `properties` merge, reading prior entries from the existing
+   *  object so the ledger only ever grows. */
+  appendLedger?: AppendLedgerEntry[];
+}
+
+/** Append ledger entries onto `base`, reading prior arrays from `prior` so the
+ *  scalar property merge cannot clobber an existing ledger. */
+function applyLedgers(
+  base: Record<string, unknown>,
+  prior: Record<string, unknown>,
+  ledgers: AppendLedgerEntry[] | undefined,
+): Record<string, unknown> {
+  if (!ledgers || ledgers.length === 0) return base;
+  const out = { ...base };
+  for (const { prop, entry, dedupeKey } of ledgers) {
+    const existingArr = Array.isArray(prior[prop]) ? (prior[prop] as unknown[]) : [];
+    const key = entry[dedupeKey];
+    const present = existingArr.some(
+      (e) => e != null && typeof e === "object" && (e as Record<string, unknown>)[dedupeKey] === key,
+    );
+    out[prop] = present ? existingArr : [...existingArr, entry];
+  }
+  return out;
 }
 
 export async function upsertObject(ctx: ActorContext, input: UpsertObjectInput): Promise<OntologyObject> {
@@ -29,7 +65,11 @@ export async function upsertObject(ctx: ActorContext, input: UpsertObjectInput):
     const merged = await db.ontologyObjects.update(existing.id, {
       title: input.title ?? existing.title,
       status: input.status ?? existing.status,
-      properties: { ...existing.properties, ...(input.properties ?? {}) },
+      properties: applyLedgers(
+        { ...existing.properties, ...(input.properties ?? {}) },
+        existing.properties,
+        input.appendLedger,
+      ),
       updatedAt: now(),
     });
     await recordHistory(ctx, merged, "update");
@@ -44,7 +84,7 @@ export async function upsertObject(ctx: ActorContext, input: UpsertObjectInput):
     externalKey: input.externalKey ?? null,
     title: input.title ?? null,
     status: input.status ?? null,
-    properties: input.properties ?? {},
+    properties: applyLedgers(input.properties ?? {}, {}, input.appendLedger),
     createdAt: ts,
     updatedAt: ts,
   });
