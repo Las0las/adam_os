@@ -20,6 +20,13 @@ export interface CachePolicy {
   maxEntries: number;
   /** Workload types eligible for caching. Empty = all workloads. */
   cacheableWorkloads: string[];
+  /** Providers eligible for caching (by registry id). Empty = all (Milestone 7.5). */
+  providerFilters: string[];
+  /** Models eligible for caching (by model key). Empty = all (Milestone 7.5). */
+  modelFilters: string[];
+  /** Cache store names to consult, in this order. Empty = all registered stores
+   *  in registration order (Milestone 7.5). */
+  cacheStores: string[];
   /** When true, skip the cache entirely for this execution (no read, no write). */
   bypass: boolean;
 }
@@ -31,6 +38,9 @@ export function defaultCachePolicy(): CachePolicy {
     ttlMs: 5 * 60 * 1000,
     maxEntries: 1000,
     cacheableWorkloads: [],
+    providerFilters: [],
+    modelFilters: [],
+    cacheStores: [],
     bypass: false,
   };
 }

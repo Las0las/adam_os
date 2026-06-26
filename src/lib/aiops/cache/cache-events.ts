@@ -1,9 +1,11 @@
-// Prompt Cache Middleware (Milestone 7.0) — canonical cache events.
+// Unified Cache Platform (Milestone 7.5, deliverable #7) — canonical cache events.
 //
-// Published onto the shared Execution Event Bus so cache activity is observable
-// through the existing telemetry/audit subscribers, and counted by the passive
-// cache metrics collector. Events carry the execution identity fields plus a
-// short, non-reversible key digest (never the prompt) and timing/size facts.
+// Published by the CacheManager onto the shared Execution Event Bus so cache
+// activity is observable through the existing telemetry/audit subscribers and
+// counted by the passive cache metrics collector. Milestone 7.0's hit/miss/store/
+// expired events are retained (now carrying a `store` attribution), and three
+// orchestration events are added: store-selected, lookup-started, lookup-completed.
+// Events never carry prompt or response text — only a key digest and facts.
 
 import { deepFreeze } from "@/lib/aiops/routing/routing-types";
 import type { InferenceExecutionContext } from "@/lib/aiops/execution/execution-types";
@@ -13,7 +15,10 @@ export type CacheEventType =
   | "cache.hit"
   | "cache.miss"
   | "cache.store"
-  | "cache.expired";
+  | "cache.expired"
+  | "cache.store_selected"
+  | "cache.lookup_started"
+  | "cache.lookup_completed";
 
 export interface CacheEventBase {
   type: CacheEventType;
@@ -24,34 +29,67 @@ export interface CacheEventBase {
   model: string;
   workloadType: string;
   timestamp: number;
-  /** Short digest of the cache key — correlates events without leaking prompts. */
+  /** Short digest of the cache key ("" for whole-lookup orchestration events). */
   keyDigest: string;
 }
 
 export interface CacheHitEvent extends CacheEventBase {
   type: "cache.hit";
-  /** Lookup time in milliseconds. */
+  store: string;
   lookupMs: number;
   hitCount: number;
 }
 
 export interface CacheMissEvent extends CacheEventBase {
   type: "cache.miss";
+  store: string;
   lookupMs: number;
 }
 
 export interface CacheStoreEvent extends CacheEventBase {
   type: "cache.store";
+  store: string;
   entryCount: number;
+  storeMs: number;
+  capacity: number;
 }
 
 export interface CacheExpiredEvent extends CacheEventBase {
   type: "cache.expired";
+  store: string;
   reason: "ttl" | "capacity";
   entryCount: number;
+  capacity: number;
 }
 
-export type CacheEvent = CacheHitEvent | CacheMissEvent | CacheStoreEvent | CacheExpiredEvent;
+export interface CacheStoreSelectedEvent extends CacheEventBase {
+  type: "cache.store_selected";
+  store: string;
+  operation: "lookup" | "store";
+}
+
+export interface CacheLookupStartedEvent extends CacheEventBase {
+  type: "cache.lookup_started";
+  /** Number of eligible stores that will be consulted. */
+  storeCount: number;
+}
+
+export interface CacheLookupCompletedEvent extends CacheEventBase {
+  type: "cache.lookup_completed";
+  hit: boolean;
+  lookupMs: number;
+  /** The store that served the hit, or null on a miss. */
+  store: string | null;
+}
+
+export type CacheEvent =
+  | CacheHitEvent
+  | CacheMissEvent
+  | CacheStoreEvent
+  | CacheExpiredEvent
+  | CacheStoreSelectedEvent
+  | CacheLookupStartedEvent
+  | CacheLookupCompletedEvent;
 
 export function isCacheEvent(event: { type: string }): event is CacheEvent {
   return event.type.startsWith("cache.");
@@ -71,23 +109,30 @@ function base(type: CacheEventType, ctx: InferenceExecutionContext, keyDigest: s
   };
 }
 
-export function cacheHit(ctx: InferenceExecutionContext, keyDigest: string, lookupMs: number, hitCount: number): CacheHitEvent {
-  return deepFreeze({ ...base("cache.hit", ctx, keyDigest), type: "cache.hit" as const, lookupMs, hitCount });
+export function cacheHit(ctx: InferenceExecutionContext, store: string, keyDigest: string, lookupMs: number, hitCount: number): CacheHitEvent {
+  return deepFreeze({ ...base("cache.hit", ctx, keyDigest), type: "cache.hit" as const, store, lookupMs, hitCount });
 }
 
-export function cacheMiss(ctx: InferenceExecutionContext, keyDigest: string, lookupMs: number): CacheMissEvent {
-  return deepFreeze({ ...base("cache.miss", ctx, keyDigest), type: "cache.miss" as const, lookupMs });
+export function cacheMiss(ctx: InferenceExecutionContext, store: string, keyDigest: string, lookupMs: number): CacheMissEvent {
+  return deepFreeze({ ...base("cache.miss", ctx, keyDigest), type: "cache.miss" as const, store, lookupMs });
 }
 
-export function cacheStore(ctx: InferenceExecutionContext, keyDigest: string, entryCount: number): CacheStoreEvent {
-  return deepFreeze({ ...base("cache.store", ctx, keyDigest), type: "cache.store" as const, entryCount });
+export function cacheStore(ctx: InferenceExecutionContext, store: string, keyDigest: string, entryCount: number, storeMs: number, capacity: number): CacheStoreEvent {
+  return deepFreeze({ ...base("cache.store", ctx, keyDigest), type: "cache.store" as const, store, entryCount, storeMs, capacity });
 }
 
-export function cacheExpired(
-  ctx: InferenceExecutionContext,
-  keyDigest: string,
-  reason: "ttl" | "capacity",
-  entryCount: number,
-): CacheExpiredEvent {
-  return deepFreeze({ ...base("cache.expired", ctx, keyDigest), type: "cache.expired" as const, reason, entryCount });
+export function cacheExpired(ctx: InferenceExecutionContext, store: string, keyDigest: string, reason: "ttl" | "capacity", entryCount: number, capacity: number): CacheExpiredEvent {
+  return deepFreeze({ ...base("cache.expired", ctx, keyDigest), type: "cache.expired" as const, store, reason, entryCount, capacity });
+}
+
+export function cacheStoreSelected(ctx: InferenceExecutionContext, store: string, operation: "lookup" | "store"): CacheStoreSelectedEvent {
+  return deepFreeze({ ...base("cache.store_selected", ctx, ""), type: "cache.store_selected" as const, store, operation });
+}
+
+export function cacheLookupStarted(ctx: InferenceExecutionContext, storeCount: number): CacheLookupStartedEvent {
+  return deepFreeze({ ...base("cache.lookup_started", ctx, ""), type: "cache.lookup_started" as const, storeCount });
+}
+
+export function cacheLookupCompleted(ctx: InferenceExecutionContext, hit: boolean, lookupMs: number, store: string | null): CacheLookupCompletedEvent {
+  return deepFreeze({ ...base("cache.lookup_completed", ctx, ""), type: "cache.lookup_completed" as const, hit, lookupMs, store });
 }
