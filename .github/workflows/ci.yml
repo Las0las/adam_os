@@ -1,0 +1,44 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci || npm install
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        # next lint prompts interactively when no ESLint config is present, which
+        # fails in CI. Run it only when a config exists; otherwise skip cleanly.
+        run: |
+          if [ -f .eslintrc.json ] || [ -f .eslintrc.js ] || [ -f .eslintrc ] || [ -f eslint.config.js ] || [ -f eslint.config.mjs ]; then
+            npx next lint
+          else
+            echo "No ESLint config present — skipping lint."
+          fi
+      - name: Unit tests
+        shell: bash
+        run: |
+          shopt -s globstar
+          node --import tsx --test tests/unit/**/*.test.ts
+      - name: Integration tests (memory backend)
+        shell: bash
+        run: |
+          shopt -s globstar
+          node --import tsx --test --test-concurrency=1 tests/integration/**/*.test.ts
+      - name: Preflight (mock model allowed)
+        run: npx tsx scripts/preflight.ts
+        env:
+          APP_BASE_URL: http://localhost:3000
+          ENCRYPTION_KEY: ci-only
+          LAWRENCE_ALLOW_MOCK_MODEL: "1"
+      - name: Build
+        run: npm run build

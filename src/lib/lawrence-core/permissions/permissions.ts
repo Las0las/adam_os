@@ -32,6 +32,7 @@ export function systemActor(tenantId: string): ActorContext {
       "mission_control.admin",
       "deploy.promote",
       "notifications.manage",
+      "integrations.manage",
     ],
   };
 }

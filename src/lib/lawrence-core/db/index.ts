@@ -76,6 +76,12 @@ import type {
   DomainPackInstallation,
   DomainPackDemoRun,
 } from "@/lib/domain-packs/domain-pack-types";
+import type {
+  IntegrationConnection,
+  IntegrationSyncRun,
+  IntegrationWebhookEvent,
+  IntegrationObjectMapping,
+} from "@/lib/integrations/integration-types";
 
 // The tenants table is the one row-set without a foreign tenantId; it scopes to
 // itself, so we store tenantId === id to satisfy the Collection contract.
@@ -141,6 +147,11 @@ export interface Database {
   // domain packs — Phase 8
   domainPackInstallations: Collection<DomainPackInstallation>;
   domainPackDemoRuns: Collection<DomainPackDemoRun>;
+  // integrations — Phase 9
+  integrationConnections: Collection<IntegrationConnection>;
+  integrationSyncRuns: Collection<IntegrationSyncRun>;
+  integrationWebhookEvents: Collection<IntegrationWebhookEvent>;
+  integrationObjectMappings: Collection<IntegrationObjectMapping>;
 }
 
 function createDatabase(): Database {
@@ -197,6 +208,10 @@ function createDatabase(): Database {
     learningSignals: coll("learning_signals"),
     domainPackInstallations: coll("domain_pack_installations"),
     domainPackDemoRuns: coll("domain_pack_demo_runs"),
+    integrationConnections: coll("integration_connections"),
+    integrationSyncRuns: coll("integration_sync_runs"),
+    integrationWebhookEvents: coll("integration_webhook_events"),
+    integrationObjectMappings: coll("integration_object_mappings"),
   };
 }
 

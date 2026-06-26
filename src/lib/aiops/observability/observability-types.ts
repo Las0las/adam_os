@@ -12,7 +12,8 @@ export type TraceType =
   | "action_execution"
   | "retrieval"
   | "notification"
-  | "release";
+  | "release"
+  | "integration";
 
 export type TraceStatus = "running" | "completed" | "failed" | "blocked" | "unknown";
 

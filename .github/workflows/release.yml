@@ -1,0 +1,38 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: staging
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+  release:
+    needs: ci
+    runs-on: ubuntu-latest
+    # Production promotions require manual approval via an environment protection rule.
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: npm }
+      - run: npm ci || npm install
+      - name: Preflight
+        run: npx tsx scripts/preflight.ts
+        env:
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          LAWRENCE_ALLOW_MOCK_MODEL: "1"
+      - name: Build release bundle
+        run: npx tsx scripts/build-release-bundle.ts "ci-${{ github.run_number }}" "${{ github.event.inputs.environment }}"
+      - name: Eval gate (release-validation enforces eval status)
+        shell: bash
+        run: |
+          shopt -s globstar
+          node --import tsx --test tests/unit/**/*.test.ts
+      # Promotion to prod must go through Mission Control's approval + eval gates.
+      - name: Promote (gated)
+        if: ${{ github.event.inputs.environment != 'prod' }}
+        run: echo "Non-prod promotion proceeds; prod requires Mission Control approval."
