@@ -49,8 +49,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/dependency-review-action@v4
         with:
-          fail-on-severity: high
-          comment-summary-in-pr: on-failure
+          # Block only newly-introduced CRITICAL advisories. High+ is reported but
+          # not blocking: the repo carries an unfixable high backlog (xlsx has no
+          # npm fix; fast-xml-parser/next/nodemailer highs have no clean upgrade),
+          # so a high gate would block legitimate dependency work. Matches the
+          # npm-audit gate (critical-only).
+          fail-on-severity: critical
+          comment-summary-in-pr: always
 
   # Dependency audit. Blocks on CRITICAL production vulnerabilities; the full
   # audit runs report-only so the moderate/high backlog stays visible.
