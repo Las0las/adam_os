@@ -60,6 +60,19 @@ export const lawrenceNav: NavSection[] = [
     ],
   },
   {
+    title: "Security",
+    items: [
+      { label: "Overview", href: "/security" },
+      { label: "Findings", href: "/security/findings" },
+      { label: "Access Control", href: "/security/access" },
+      { label: "Classifications", href: "/security/classifications" },
+      { label: "Retention", href: "/security/retention" },
+      { label: "Compliance Exports", href: "/security/compliance" },
+      { label: "Audit Integrity", href: "/security/audit-integrity" },
+      { label: "Security Harness", href: "/security/harness" },
+    ],
+  },
+  {
     title: "Domain Packs",
     items: [
       { label: "Recruiting", href: "/recruiting" },
