@@ -53,7 +53,7 @@ function registryWith(complete: ModelProvider["complete"]): ProviderRegistry {
   return r;
 }
 
-function counting(impl: ModelProvider["complete"] = async () => OK) {
+function counting(impl: ModelProvider["complete"] = async (_req) => OK) {
   let n = 0;
   const reg = registryWith(async (req) => { n += 1; return impl(req); });
   return { reg, calls: () => n };
