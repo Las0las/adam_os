@@ -8,7 +8,9 @@
 
 import type { MappingProfile } from "../mapping-profile";
 
-export const linkedinRecruiterProfile: MappingProfile = {
+// The trailing marker suppresses a gitleaks false positive: its linkedin-client-id
+// rule matches the 14-char type name in this identifier (a type, not a secret).
+export const linkedinRecruiterProfile: MappingProfile = { // gitleaks:allow
   source: "linkedin_recruiter",
   detect: {
     sheetName: "Job Applicants",
