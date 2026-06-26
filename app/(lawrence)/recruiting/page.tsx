@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { appContext } from "@/lib/app/demo-context";
 import { listObjects } from "@/lib/dataops/ontology/object-service";
 import { PageHeader, StatusBadge } from "@/components/lawrence/shared/widgets";
@@ -14,6 +15,14 @@ export default async function RecruitingPage() {
         title="Recruiting"
         sub="Seed domain pack — Candidate objects projected from ingested data."
       />
+      <div className="row" style={{ gap: 8, marginBottom: 16 }}>
+        <Link className="btn" href="/recruiting/assistant">
+          Open assistant — command or paste a profile
+        </Link>
+        <Link className="btn secondary" href="/recruiting/duplicates">
+          Review duplicates
+        </Link>
+      </div>
       <div className="card">
         <h3>Candidates</h3>
         <table>

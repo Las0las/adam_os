@@ -1,0 +1,16 @@
+# gitleaks config for the Security workflow secret scan. Uses the full default
+# ruleset, with an allowlist for placeholder/fake credentials that legitimately
+# live in example env files and test fixtures (e.g. fake Clerk keys, a sample
+# Sentry DSN). Real source files are still scanned by the default rules.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholder/test credentials in examples and tests"
+paths = [
+  '''\.env\.example''',
+  '''\.env\.production\.example''',
+  '''tests/.*''',
+  '''\.next/.*''',
+  '''node_modules/.*''',
+]

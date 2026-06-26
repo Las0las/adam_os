@@ -59,4 +59,66 @@ export async function installEvalSuites(ctx: ActorContext): Promise<void> {
       expected: s.expected,
     });
   }
+  await installCandidateExtractionEval(ctx);
+}
+
+// Labeled cases for the paste-a-profile extraction (synthetic data only). Each
+// runs `extract_candidate_fields` and scores the fields against `expected`.
+const CANDIDATE_EXTRACTION_CASES: Array<{ text: string; fields: Record<string, unknown> }> = [
+  {
+    text: "Dana Diaz — Staff Engineer at Acme (Remote). Email dana@example.test, phone +1-555-0100.",
+    fields: {
+      fullName: "Dana Diaz",
+      email: "dana@example.test",
+      phone: "+1-555-0100",
+      location: "Remote",
+      currentTitle: "Staff Engineer",
+      currentCompany: "Acme",
+    },
+  },
+  {
+    text: "Sam Roe\nProduct Manager, Globex — New York, NY\nsam.roe@example.test",
+    fields: {
+      fullName: "Sam Roe",
+      email: "sam.roe@example.test",
+      location: "New York, NY",
+      currentTitle: "Product Manager",
+      currentCompany: "Globex",
+    },
+  },
+  {
+    text: "Mia Cole, BS Computer Science, State University. Backend engineer. linkedin.com/in/miacole",
+    fields: {
+      fullName: "Mia Cole",
+      educationDegree: "BS Computer Science",
+      educationInstitution: "State University",
+      profileUrl: "linkedin.com/in/miacole",
+    },
+  },
+];
+
+/** Seed the recruiting candidate-extraction eval suite + its labeled cases. The
+ *  baseline reflects a real model; the deterministic mock scores ~0, which the
+ *  eval surfaces (extraction needs a configured provider to be accurate). */
+async function installCandidateExtractionEval(ctx: ActorContext): Promise<void> {
+  const key = "recruiting_candidate_extraction";
+  if (await db.evalSuites.find(ctx.tenantId, (x) => x.key === key)) return;
+  const suite = await createEvalSuite({
+    tenantId: ctx.tenantId,
+    key,
+    name: "Recruiting candidate extraction",
+    suiteType: "extraction",
+    targetComponentType: "function",
+    targetComponentKey: "extract_candidate_fields",
+    baselineConfig: { averageScore: 0.7 },
+  });
+  for (const c of CANDIDATE_EXTRACTION_CASES) {
+    await createEvalCase({
+      tenantId: ctx.tenantId,
+      suiteType: "extraction",
+      suiteKey: suite.key,
+      input: { functionKey: "extract_candidate_fields", text: c.text },
+      expected: { fields: c.fields },
+    });
+  }
 }

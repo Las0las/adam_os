@@ -3,6 +3,8 @@
 // deterministic mock so the platform is runnable end-to-end without API keys;
 // real OpenAI/Anthropic/etc. providers implement the same interface.
 
+import { recordModelCost } from "./cost-meter";
+
 export interface CompletionRequest {
   prompt: string;
   /** When set, the provider must return JSON parseable to this shape. */
@@ -98,8 +100,22 @@ function skeletonFromSchema(schema: Record<string, unknown>): Record<string, unk
 
 let activeProvider: ModelProvider = new MockModelProvider();
 
+/** Wrap a provider so each completion records its USD cost into the active cost
+ *  meter (drives the agent dollar budget). No-op when no meter is in scope. */
+function metered(inner: ModelProvider): ModelProvider {
+  return {
+    provider: inner.provider,
+    modelKey: inner.modelKey,
+    async complete(request: CompletionRequest): Promise<CompletionResponse> {
+      const response = await inner.complete(request);
+      recordModelCost(response.costUsd);
+      return response;
+    },
+  };
+}
+
 export function getModelProvider(): ModelProvider {
-  return activeProvider;
+  return metered(activeProvider);
 }
 
 export function setModelProvider(provider: ModelProvider): void {

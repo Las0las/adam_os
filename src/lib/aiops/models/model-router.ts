@@ -23,13 +23,16 @@ import {
 } from "./model-provider";
 import { AnthropicModelProvider } from "@/lib/integrations/anthropic/anthropic-client";
 import { OpenAIModelProvider } from "@/lib/integrations/openai/openai-client";
+import { GoogleModelProvider } from "@/lib/integrations/google/google-client";
+import { AzureOpenAIModelProvider } from "@/lib/integrations/azure/azure-openai-client";
+import { GitHubModelsProvider } from "@/lib/integrations/github/github-models-client";
 import type { ActorContext } from "@/types/platform";
 import type { ModelDefinition } from "@/types/aiops";
 
 /**
  * Choose the process default provider from the environment. Preference order:
- * Anthropic → OpenAI → deterministic mock. The mock default keeps the platform
- * fully runnable with no keys (tests, local, CI).
+ * Anthropic → OpenAI → Google → deterministic mock. The mock default keeps the
+ * platform fully runnable with no keys (tests, local, CI).
  */
 export function resolveDefaultProvider(): ModelProvider {
   if (process.env.ANTHROPIC_API_KEY) {
@@ -37,6 +40,23 @@ export function resolveDefaultProvider(): ModelProvider {
   }
   if (process.env.OPENAI_API_KEY) {
     return new OpenAIModelProvider({ modelKey: process.env.LAWRENCE_DEFAULT_MODEL });
+  }
+  if (process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY) {
+    return new GoogleModelProvider({ modelKey: process.env.LAWRENCE_DEFAULT_MODEL });
+  }
+  if (
+    process.env.AZURE_OPENAI_API_KEY &&
+    process.env.AZURE_OPENAI_ENDPOINT &&
+    (process.env.AZURE_OPENAI_DEPLOYMENT || process.env.LAWRENCE_DEFAULT_MODEL)
+  ) {
+    return new AzureOpenAIModelProvider({
+      deployment: process.env.AZURE_OPENAI_DEPLOYMENT || process.env.LAWRENCE_DEFAULT_MODEL,
+    });
+  }
+  // Keyed on the DEDICATED GITHUB_MODELS_TOKEN (never the ubiquitous GITHUB_TOKEN)
+  // so it can't activate by accident in CI/Actions.
+  if (process.env.GITHUB_MODELS_TOKEN) {
+    return new GitHubModelsProvider({ modelKey: process.env.LAWRENCE_DEFAULT_MODEL });
   }
   return new MockModelProvider();
 }
@@ -58,7 +78,6 @@ export function providerFromDefinition(def: ModelDefinition): ModelProvider {
       }
       return new AnthropicModelProvider({ modelKey: def.modelKey });
     case "openai":
-    case "azure_openai":
       if (!process.env.OPENAI_API_KEY) {
         throw new Error(
           `Tenant '${def.tenantId}' authorized OpenAI model '${def.modelKey}' for ` +
@@ -67,6 +86,34 @@ export function providerFromDefinition(def: ModelDefinition): ModelProvider {
         );
       }
       return new OpenAIModelProvider({ modelKey: def.modelKey });
+    case "azure_openai":
+      // The deployment name is def.modelKey; Azure has its own endpoint + auth.
+      if (!process.env.AZURE_OPENAI_API_KEY || !process.env.AZURE_OPENAI_ENDPOINT) {
+        throw new Error(
+          `Tenant '${def.tenantId}' authorized Azure OpenAI deployment '${def.modelKey}' for ` +
+            `'${def.purpose}', but AZURE_OPENAI_API_KEY / AZURE_OPENAI_ENDPOINT are not set. ` +
+            `Refusing to substitute another model.`,
+        );
+      }
+      return new AzureOpenAIModelProvider({ deployment: def.modelKey });
+    case "google":
+      if (!process.env.GOOGLE_API_KEY && !process.env.GEMINI_API_KEY) {
+        throw new Error(
+          `Tenant '${def.tenantId}' authorized Google model '${def.modelKey}' for ` +
+            `'${def.purpose}', but GOOGLE_API_KEY (or GEMINI_API_KEY) is not set. Refusing ` +
+            `to substitute another model.`,
+        );
+      }
+      return new GoogleModelProvider({ modelKey: def.modelKey });
+    case "github_models":
+      if (!process.env.GITHUB_MODELS_TOKEN) {
+        throw new Error(
+          `Tenant '${def.tenantId}' authorized GitHub Models '${def.modelKey}' for ` +
+            `'${def.purpose}', but GITHUB_MODELS_TOKEN is not set. Refusing to substitute ` +
+            `another model.`,
+        );
+      }
+      return new GitHubModelsProvider({ modelKey: def.modelKey });
     default:
       throw new Error(
         `No adapter for provider '${def.provider}' (model '${def.modelKey}'). ` +

@@ -18,6 +18,11 @@ import type { ModelDefinition } from "@/types/aiops";
 function clearProviderKeys() {
   delete process.env.ANTHROPIC_API_KEY;
   delete process.env.OPENAI_API_KEY;
+  delete process.env.GOOGLE_API_KEY;
+  delete process.env.GEMINI_API_KEY;
+  delete process.env.AZURE_OPENAI_API_KEY;
+  delete process.env.AZURE_OPENAI_ENDPOINT;
+  delete process.env.GITHUB_MODELS_TOKEN;
   delete process.env.LAWRENCE_DEFAULT_MODEL;
 }
 
@@ -89,7 +94,63 @@ test("resolveModelProvider builds the authorized provider when the key is presen
 test("providerFromDefinition refuses unknown providers", async () => {
   await fresh();
   assert.throws(
-    () => providerFromDefinition(def({ provider: "google", modelKey: "gemini-x" })),
+    () => providerFromDefinition(def({ provider: "other", modelKey: "mystery-x" })),
     /No adapter for provider/,
   );
+});
+
+test("providerFromDefinition builds Google but fails closed without a key", async () => {
+  await fresh();
+  assert.throws(
+    () => providerFromDefinition(def({ provider: "google", modelKey: "gemini-2.0-flash" })),
+    /GOOGLE_API_KEY/,
+  );
+});
+
+test("providerFromDefinition fails closed for Azure without key/endpoint", async () => {
+  await fresh();
+  assert.throws(
+    () => providerFromDefinition(def({ provider: "azure_openai", modelKey: "my-deploy" })),
+    /AZURE_OPENAI/,
+  );
+});
+
+test("providerFromDefinition builds a real Azure provider when configured", async () => {
+  await fresh();
+  process.env.AZURE_OPENAI_API_KEY = "k";
+  process.env.AZURE_OPENAI_ENDPOINT = "https://r.openai.azure.com";
+  try {
+    const provider = providerFromDefinition(def({ provider: "azure_openai", modelKey: "my-deploy" }));
+    assert.equal(provider.provider, "azure_openai");
+    assert.equal(provider.modelKey, "my-deploy"); // deployment routing, not public OpenAI
+  } finally {
+    delete process.env.AZURE_OPENAI_API_KEY;
+    delete process.env.AZURE_OPENAI_ENDPOINT;
+  }
+});
+
+test("providerFromDefinition handles GitHub Models (fail-closed, then builds)", async () => {
+  await fresh();
+  assert.throws(
+    () => providerFromDefinition(def({ provider: "github_models", modelKey: "openai/gpt-4o-mini" })),
+    /GITHUB_MODELS_TOKEN/,
+  );
+  process.env.GITHUB_MODELS_TOKEN = "ghm";
+  try {
+    const provider = providerFromDefinition(def({ provider: "github_models", modelKey: "openai/gpt-4o-mini" }));
+    assert.equal(provider.provider, "github_models");
+    assert.equal(provider.modelKey, "openai/gpt-4o-mini");
+  } finally {
+    delete process.env.GITHUB_MODELS_TOKEN;
+  }
+});
+
+test("resolveDefaultProvider selects GitHub Models from its dedicated token", async () => {
+  await fresh();
+  process.env.GITHUB_MODELS_TOKEN = "ghm";
+  try {
+    assert.equal(resolveDefaultProvider().provider, "github_models");
+  } finally {
+    delete process.env.GITHUB_MODELS_TOKEN;
+  }
 });
