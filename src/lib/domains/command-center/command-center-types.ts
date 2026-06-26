@@ -53,7 +53,7 @@ export interface CommandCenterItem {
   id: string;
   tenantId: string;
   domain: CommandDomain;
-  kind: "action" | "review" | "risk" | "recommendation" | "notification" | "incident" | "audit";
+  kind: "action" | "review" | "risk" | "recommendation" | "notification" | "incident" | "audit" | "learning_signal";
   title: string;
   summary?: string | null;
   status: CommandItemStatus;

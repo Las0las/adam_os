@@ -60,6 +60,7 @@ export async function generateFromFeedback(
       signalType: "policy_gap",
       severity: "high",
       summary: `Citation issue reported on ${feedback.subjectType} ${feedback.subjectId}`,
+      componentKey: feedback.objectType ?? null,
       objectType: feedback.objectType ?? null,
       objectId: feedback.objectId ?? null,
       evidence: [{ feedbackId: feedback.id, comment: feedback.comment ?? null }],
@@ -80,6 +81,7 @@ export async function generateFromFeedback(
       signalType: "extraction_gap",
       severity: "medium",
       summary: `Repeated extraction corrections (${repeats}) for ${feedback.objectType ?? "object"}`,
+      componentKey: feedback.objectType ?? null,
       objectType: feedback.objectType ?? null,
       evidence: all
         .filter((f) => f.feedbackType === "extraction_correction")
@@ -125,6 +127,7 @@ export async function generateFromRecommendationOverrides(
     signalType: "ranking_signal",
     severity: "medium",
     summary: `Recommendations for ${objectType ?? "object"} overridden ${overrides.length} times`,
+    componentKey: objectType,
     objectType,
     evidence: overrides.map((o) => ({ outcomeId: o.id, decision: o.decision })),
     recommendedChange: { kind: "retune_recommendation_ranking" },

@@ -14,6 +14,7 @@ import { indexEvidence } from "@/lib/dataops/evidence/chunking-service";
 import { listObjects } from "@/lib/dataops/ontology/object-service";
 import { createNotificationRule } from "@/lib/mission-control/notifications/notification-service";
 import { installMissionControlGovernance } from "@/lib/mission-control/runtime/mission-control-seed";
+import { installEvalSuites } from "@/lib/aiops/evals/eval-seed";
 import "@/lib/mission-control/actions/builtins";
 import {
   seedOnboarding,
@@ -123,6 +124,10 @@ export async function bootstrap(): Promise<void> {
   // Phase 6: install the Mission Control governance control plane (environments,
   // approval policies, runtime components) for the demo tenant.
   await installMissionControlGovernance(ctx);
+
+  // Phase 7: seed default eval suites so the evals + observability surfaces have
+  // live data for the demo tenant.
+  await installEvalSuites(ctx);
 
   // A draft release bundle for the recruiting pack.
   await db.releaseBundles.insert({
