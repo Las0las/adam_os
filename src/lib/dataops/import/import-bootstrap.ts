@@ -4,5 +4,7 @@
 
 import { registerImportAdapter } from "./import-adapter";
 import { linkedinRecruiterAdapter } from "./adapters/linkedin-recruiter-adapter";
+import { greenhouseAdapter } from "./adapters/greenhouse-adapter";
 
 registerImportAdapter(linkedinRecruiterAdapter);
+registerImportAdapter(greenhouseAdapter);
