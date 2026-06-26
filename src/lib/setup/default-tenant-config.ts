@@ -14,6 +14,11 @@ export const DEFAULT_ADMIN_PERMISSIONS: Permission[] = [
   "integrations.manage",
 ];
 
+// Least-privilege baseline for non-admin organization members. Mirrors the prior
+// org-role fallback in actor resolution; non-admins can act on the review queue
+// but hold no administrative authority.
+export const DEFAULT_MEMBER_PERMISSIONS: Permission[] = ["review.reviewer"];
+
 export const DEFAULT_ENVIRONMENTS = ["dev", "staging", "prod"] as const;
 
 export const DEFAULT_APPROVAL_POLICY_KEYS = [

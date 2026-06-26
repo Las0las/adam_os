@@ -9,8 +9,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { ensureBootstrapped, DEMO_TENANT_ID } from "@/lib/lawrence-core/bootstrap";
 import { systemActor } from "@/lib/lawrence-core/permissions/permissions";
-import { db } from "@/lib/lawrence-core/db";
 import { enterTenant } from "@/lib/lawrence-core/db/tenant-store";
+import { ensureTenant, ensureUser, resolveUserPermissions } from "@/lib/setup/tenant-provisioning-service";
 import type { ActorContext, Permission } from "@/types/platform";
 
 type Env = Record<string, string | undefined>;
@@ -35,8 +35,7 @@ export function shouldAllowDemoAuth(env: Env = process.env): boolean {
 /**
  * Resolve the operating tenant. A Clerk organization maps to a tenant; a
  * single-tenant deployment (no org) maps every user to LAWRENCE_DEFAULT_TENANT_ID
- * (default: the seeded demo tenant) so existing data stays reachable. Cross-org
- * → tenant mapping is owned by the tenancy slice.
+ * (default: the seeded demo tenant) so existing data stays reachable.
  */
 export function resolveTenantId(orgId: string | null | undefined, env: Env = process.env): string {
   return orgId || env.LAWRENCE_DEFAULT_TENANT_ID || DEMO_TENANT_ID;
@@ -55,10 +54,10 @@ const ALL_PERMISSIONS: Permission[] = [
 ];
 
 /**
- * Fallback permission grant from the Clerk org role, used when a user is not yet
- * provisioned with app roles. Admins receive full platform authority; everyone
- * else receives the least-privilege reviewer baseline. DB-backed role resolution
- * (below) takes precedence; richer provisioning arrives with the tenancy slice.
+ * Fallback permission grant from the Clerk org role, used when a user somehow has
+ * no provisioned app roles. Admins receive full platform authority; everyone else
+ * receives the least-privilege reviewer baseline. DB-backed role resolution (via
+ * provisioning) takes precedence.
  */
 export function permissionsForOrgRole(orgRole: string | null | undefined): Permission[] {
   if (orgRole === "org:admin" || orgRole === "admin") return [...ALL_PERMISSIONS];
@@ -66,28 +65,11 @@ export function permissionsForOrgRole(orgRole: string | null | undefined): Permi
 }
 
 /**
- * Resolve permissions from the existing user/role model first (reuse, not
- * reinvent): app user (by email, tenant-scoped) → roleIds → roles → permissions.
- * Falls back to the org-role grant when the user has no provisioned app roles.
+ * Build an ActorContext from the active Clerk session, or null if none/unconfigured.
+ * Provisions the tenant + app user just-in-time so permissions resolve from the
+ * existing user/role model (the app user id is the Clerk user id). The org-role
+ * grant remains a fallback if a user somehow has no roles.
  */
-async function resolvePermissions(
-  tenantId: string,
-  email: string | null,
-  orgRole: string | null | undefined,
-): Promise<Permission[]> {
-  if (email) {
-    const user = await db.users.find(tenantId, (u) => u.email === email);
-    if (user && user.roleIds.length > 0) {
-      const roles = await db.roles.list(tenantId, (r) => user.roleIds.includes(r.id));
-      const perms = new Set<Permission>();
-      for (const role of roles) for (const p of role.permissions) perms.add(p);
-      if (perms.size > 0) return [...perms];
-    }
-  }
-  return permissionsForOrgRole(orgRole);
-}
-
-/** Build an ActorContext from the active Clerk session, or null if none/unconfigured. */
 async function resolveClerkActor(): Promise<ActorContext | null> {
   if (!isClerkConfigured()) return null;
   try {
@@ -95,9 +77,18 @@ async function resolveClerkActor(): Promise<ActorContext | null> {
     const userId = session.userId;
     if (!userId) return null;
     const tenantId = resolveTenantId(session.orgId);
+    // Bind the tenant before provisioning so the writes satisfy row-level security.
+    enterTenant(tenantId);
     const email = (session.sessionClaims?.email as string | undefined) ?? null;
-    const permissions = await resolvePermissions(tenantId, email, session.orgRole);
-    return { tenantId, actorUserId: userId, permissions };
+    const displayName = (session.sessionClaims?.name as string | undefined) ?? null;
+    await ensureTenant(tenantId);
+    const user = await ensureUser(tenantId, { userId, email, displayName, orgRole: session.orgRole });
+    const permissions = await resolveUserPermissions(tenantId, user);
+    return {
+      tenantId,
+      actorUserId: userId,
+      permissions: permissions.length > 0 ? permissions : permissionsForOrgRole(session.orgRole),
+    };
   } catch {
     // Not inside a Clerk request context (e.g. tests/jobs) — defer to fallback.
     return null;

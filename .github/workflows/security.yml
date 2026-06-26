@@ -1,0 +1,75 @@
+name: Security
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # Static analysis (SAST). Findings surface in the repo's Security tab.
+  codeql:
+    name: CodeQL (SAST)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@v3
+
+  # Secret scanning. Pinned gitleaks binary (no third-party action / license),
+  # filesystem mode so it scans the working tree, not historical commits.
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install gitleaks
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz \
+            | tar -xz gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+      - name: Scan working tree for secrets
+        run: gitleaks detect --no-git --source . --redact --exit-code 1
+
+  # Block PRs that INTRODUCE a vulnerable dependency (does not fail on the
+  # pre-existing backlog — only on newly added high+ advisories in the diff).
+  dependency-review:
+    name: Dependency review (new vulnerabilities)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          # Block only newly-introduced CRITICAL advisories. High+ is reported but
+          # not blocking: the repo carries an unfixable high backlog (xlsx has no
+          # npm fix; fast-xml-parser/next/nodemailer highs have no clean upgrade),
+          # so a high gate would block legitimate dependency work. Matches the
+          # npm-audit gate (critical-only).
+          fail-on-severity: critical
+          comment-summary-in-pr: always
+
+  # Dependency audit. Blocks on CRITICAL production vulnerabilities; the full
+  # audit runs report-only so the moderate/high backlog stays visible.
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci || npm install
+      - name: Block on critical production vulnerabilities
+        run: npm audit --omit=dev --audit-level=critical
+      - name: Full audit (report-only)
+        run: npm audit || true

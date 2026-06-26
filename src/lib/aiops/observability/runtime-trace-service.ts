@@ -6,6 +6,7 @@
 import { db } from "@/lib/lawrence-core/db";
 import { id, now } from "@/lib/lawrence-core/utils/ids";
 import { emitAudit } from "@/lib/lawrence-core/audit/audit-service";
+import { captureException } from "@/lib/observability/telemetry";
 import {
   countRecentFailures,
   maybeRaiseFailureIncident,
@@ -70,6 +71,15 @@ export async function createRuntimeTrace(
       traceType: input.traceType,
       componentKey: input.componentKey,
       status: "failed",
+    });
+    // Export the runtime failure to the telemetry sink (structured log + Sentry).
+    void captureException(new Error(input.errors?.[0] ?? `${input.componentKey} failed`), {
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      component: input.componentType,
+      traceId: input.traceId,
+      tags: { traceType: input.traceType, componentKey: input.componentKey },
+      extra: { errors: input.errors ?? [] },
     });
     if (RUNTIME_COMPONENT_TYPES.has(input.componentType as RuntimeComponentType)) {
       const failures = await db.runtimeTraces.list(

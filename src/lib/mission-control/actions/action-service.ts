@@ -8,6 +8,7 @@ import { db } from "@/lib/lawrence-core/db";
 import { id, now } from "@/lib/lawrence-core/utils/ids";
 import { emitAudit } from "@/lib/lawrence-core/audit/audit-service";
 import { hasPermission } from "@/lib/lawrence-core/permissions/permissions";
+import { NotFoundError } from "@/lib/app/errors";
 import { openReviewCase } from "../review-queue/review-service";
 import { isKilled } from "../runtime/kill-switch-guard";
 import {
@@ -73,7 +74,7 @@ export async function executeAction(
   input: ExecuteActionInput,
 ): Promise<ActionExecution> {
   const handler = handlers.get(input.actionKey);
-  if (!handler) throw new Error(`Unknown action: ${input.actionKey}`);
+  if (!handler) throw new NotFoundError(`Unknown action: ${input.actionKey}`);
 
   // Idempotency: an explicit key, or a key derived from
   // action + object + hash(input). A matching in-progress/completed run is
