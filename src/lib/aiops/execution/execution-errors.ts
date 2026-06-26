@@ -95,3 +95,16 @@ export function normalizeError(err: unknown): ExecutionError {
 export function toNormalized(err: ExecutionError): NormalizedExecutionError {
   return { kind: err.kind, name: err.name, message: err.message };
 }
+
+/** Transient kinds that a future retry/failover layer could safely re-attempt.
+ *  Pure classification — no retry is performed here (out of scope until later). */
+const RETRYABLE_KINDS: ReadonlySet<ExecutionErrorKind> = new Set([
+  "timeout",
+  "rate_limit",
+  "provider_unavailable",
+]);
+
+/** Whether a normalized error kind is transient (retryable in principle). */
+export function isRetryable(kind: ExecutionErrorKind): boolean {
+  return RETRYABLE_KINDS.has(kind);
+}

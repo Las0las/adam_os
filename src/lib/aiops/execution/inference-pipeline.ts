@@ -17,6 +17,7 @@
 
 import { id } from "@/lib/lawrence-core/utils/ids";
 import { deepFreeze } from "@/lib/aiops/routing/routing-types";
+import { fingerprint } from "./observability/fingerprint";
 import type { CompletionRequest, CompletionResponse, ModelProvider } from "@/lib/aiops/models/model-provider";
 import {
   ExecutionFailedError,
@@ -120,6 +121,7 @@ export async function executeInference(
     tenantId: params.tenantId ?? null,
     workloadType: params.workloadType ?? "inference",
     startTime: nowMs(),
+    requestFingerprint: fingerprint(params.request),
   });
 
   if (!routingDecision.selectedProvider || !routingDecision.selectedModel) {
@@ -168,6 +170,7 @@ export async function runModelCompletion(
     tenantId: opts.tenantId ?? null,
     workloadType: opts.workloadType ?? "inference",
     startTime: nowMs(),
+    requestFingerprint: fingerprint(opts.request),
   });
 
   const { completion, error } = await runLifecycle(ctx, hooks, () => opts.provider.complete(opts.request));
