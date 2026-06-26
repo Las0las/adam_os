@@ -21,10 +21,30 @@ function normalizeConnectionString(url: string): string {
   return url.replace(/sslmode=(prefer|require|verify-ca)/g, "sslmode=verify-full");
 }
 
+function intEnv(key: string, fallback: number): number {
+  const raw = process.env[key];
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 export function getDb(): Pool {
   if (!pool) {
     const url = process.env.DATABASE_URL ?? "";
-    pool = new Pool({ connectionString: url ? normalizeConnectionString(url) : url });
+    pool = new Pool({
+      connectionString: url ? normalizeConnectionString(url) : url,
+      // Production pool sizing / timeouts. Defaults are conservative and suit a
+      // single serverless instance; tune per deployment via env.
+      max: intEnv("DATABASE_POOL_MAX", 10),
+      idleTimeoutMillis: intEnv("DATABASE_POOL_IDLE_MS", 30_000),
+      connectionTimeoutMillis: intEnv("DATABASE_POOL_CONNECT_MS", 10_000),
+    });
+    // An idle client emitting 'error' (server-side disconnect, network drop)
+    // terminates the process by default. Log and let the pool evict and
+    // recreate the client instead of crashing the runtime.
+    pool.on("error", (err) => {
+      // eslint-disable-next-line no-console
+      console.error(`[pg] idle client error: ${err instanceof Error ? err.message : String(err)}`);
+    });
   }
   return pool;
 }
