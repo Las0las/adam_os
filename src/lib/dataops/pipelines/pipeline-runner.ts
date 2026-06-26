@@ -14,6 +14,11 @@ import { indexEvidence } from "../evidence/chunking-service";
 import { emitLineage } from "../lineage/lineage-service";
 import { resolveObjectMapper } from "../ontology/object-mapper-registry";
 import { writeBytes } from "../ingestion/storage-service";
+import { assertNotKilled } from "@/lib/mission-control/runtime/kill-switch-guard";
+import {
+  countRecentFailures,
+  maybeRaiseFailureIncident,
+} from "@/lib/mission-control/runtime/failure-threshold";
 import type { CanonicalParseOutput } from "../parsers/parser-types";
 import type { ActorContext } from "@/types/platform";
 import type {
@@ -48,10 +53,14 @@ export async function runAssetPipeline(
 ): Promise<PipelineRunResult> {
   requirePermission(ctx, "dataops.admin");
 
+  const pipelineKey = options.pipelineId ?? "ad_hoc";
+  // Fail-closed: refuse to run a kill-switched pipeline.
+  await assertNotKilled({ tenantId: ctx.tenantId, componentType: "pipeline", componentKey: pipelineKey });
+
   const run = await db.pipelineRuns.insert({
     id: id("run"),
     tenantId: ctx.tenantId,
-    pipelineId: options.pipelineId ?? "ad_hoc",
+    pipelineId: pipelineKey,
     status: "running",
     startedAt: now(),
     finishedAt: null,
@@ -177,6 +186,12 @@ export async function runAssetPipeline(
       error: message,
     });
     await emitAudit(ctx, "dataops.pipeline.run.failed", { type: "pipeline_run", id: run.id }, { error: message });
+    const runs = await db.pipelineRuns.list(ctx.tenantId, (r) => r.pipelineId === pipelineKey);
+    const recentFailures = countRecentFailures(
+      runs.map((r) => ({ status: r.status, createdAt: r.startedAt })),
+      (r) => r.status === "failed",
+    );
+    await maybeRaiseFailureIncident(ctx, { componentType: "pipeline", componentKey: pipelineKey, recentFailures });
     return { run: failed, records: [], ontologyObjectIds: [], chunkIds: [] };
   }
 }

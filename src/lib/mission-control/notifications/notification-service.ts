@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/lawrence-core/permissions/permissions";
 import { emitAudit } from "@/lib/lawrence-core/audit/audit-service";
 import { renderTemplate } from "@/lib/aiops/prompts/prompt-service";
 import { getChannelAdapter } from "./channels/channel-registry";
+import { isKilled } from "../runtime/kill-switch-guard";
 import type { ActorContext } from "@/types/platform";
 import type { Notification, NotificationChannel, NotificationRule } from "@/types/mission-control";
 
@@ -118,12 +119,22 @@ export async function emitEvent(
     }
 
     const title = `${eventKey}`;
-    const { state, error } = await dispatch(rule, {
-      title,
-      body,
-      destination: rule.destination ?? null,
-      deepLink: deepLink ?? null,
+
+    // Kill switch on the notification rule suppresses delivery — the record is
+    // kept internally (queued) so nothing is silently dropped.
+    const killed = await isKilled({
+      tenantId: ctx.tenantId,
+      componentType: "notification_rule",
+      componentKey: rule.name,
     });
+    const { state, error } = killed
+      ? { state: "queued" as const, error: "notification rule disabled by kill switch" }
+      : await dispatch(rule, {
+          title,
+          body,
+          destination: rule.destination ?? null,
+          deepLink: deepLink ?? null,
+        });
 
     const notification = await db.notifications.insert({
       id: id("notif"),

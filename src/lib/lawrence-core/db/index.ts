@@ -46,6 +46,17 @@ import type {
   ReleaseBundle,
   RuntimeIncident,
 } from "@/types/mission-control";
+import type {
+  Environment,
+  ReleaseBundle as HardenedReleaseBundle,
+  ReleaseBundleItem,
+  ApprovalRequest,
+  RuntimeComponent,
+  KillSwitch,
+  RuntimeHealthCheck,
+  RollbackRecord,
+} from "@/lib/mission-control/runtime/mission-control-hardening-types";
+import type { ApprovalPolicy } from "@/lib/mission-control/approvals/approval-policy-types";
 
 // The tenants table is the one row-set without a foreign tenantId; it scopes to
 // itself, so we store tenantId === id to satisfy the Collection contract.
@@ -88,6 +99,16 @@ export interface Database {
   notifications: Collection<Notification>;
   releaseBundles: Collection<ReleaseBundle>;
   runtimeIncidents: Collection<RuntimeIncident>;
+  // mission control — Phase 6 hardening (governance / deployment control plane)
+  environments: Collection<Environment>;
+  hardenedReleases: Collection<HardenedReleaseBundle>;
+  releaseBundleItems: Collection<ReleaseBundleItem>;
+  approvalRequests: Collection<ApprovalRequest>;
+  approvalPolicies: Collection<ApprovalPolicy>;
+  runtimeComponents: Collection<RuntimeComponent>;
+  killSwitches: Collection<KillSwitch>;
+  runtimeHealthChecks: Collection<RuntimeHealthCheck>;
+  rollbackRecords: Collection<RollbackRecord>;
 }
 
 function createDatabase(): Database {
@@ -124,6 +145,15 @@ function createDatabase(): Database {
     notifications: coll("notifications"),
     releaseBundles: coll("deployment_releases"),
     runtimeIncidents: coll("runtime_incidents"),
+    environments: coll("environments"),
+    hardenedReleases: coll("release_bundles"),
+    releaseBundleItems: coll("release_bundle_items"),
+    approvalRequests: coll("approval_requests"),
+    approvalPolicies: coll("approval_policies"),
+    runtimeComponents: coll("runtime_components"),
+    killSwitches: coll("kill_switches"),
+    runtimeHealthChecks: coll("runtime_health_checks"),
+    rollbackRecords: coll("rollback_records"),
   };
 }
 
