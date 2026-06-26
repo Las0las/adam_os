@@ -35,10 +35,58 @@ export const DEMO_TENANT_ID = "tnt_demo";
 // store. A process-wide memo guarantees bootstrap runs exactly once per process.
 const globalRef = globalThis as unknown as { __lawrenceBootstrap?: Promise<void> };
 
-/** Idempotent: safe to call from any API route to ensure demo data exists. */
+/**
+ * Fail-closed persistence guard. A production process MUST run against a durable
+ * store: the in-memory backend loses all data per process and is never a valid
+ * production target. Throws on the request path (not at build time — `next build`
+ * sets NODE_ENV=production but issues no requests) unless durable Postgres is
+ * configured or the operator explicitly opts into the ephemeral store.
+ */
+export function assertPersistenceReady(env: Record<string, string | undefined> = process.env): void {
+  const isProduction = env.NODE_ENV === "production";
+  const hasDurableStore = Boolean(env.DATABASE_URL); // mirrors isPostgresConfigured()
+  if (isProduction && !hasDurableStore && env.LAWRENCE_ALLOW_MEMORY_STORE !== "1") {
+    throw new Error(
+      "Production persistence not configured: set DATABASE_URL (durable Postgres) " +
+        "or set LAWRENCE_ALLOW_MEMORY_STORE=1 to explicitly accept the ephemeral in-memory store.",
+    );
+  }
+}
+
+/**
+ * Whether `ensureBootstrapped()` should run the destructive demo seed
+ * (`resetDatabase()` + sample data). This is demo scaffolding: it is only ever
+ * appropriate against the ephemeral in-memory backend (local/dev/test/demo).
+ * Against a configured Postgres it must NEVER run on the request path — doing so
+ * would wipe real data on every cold start. Production data is provisioned
+ * explicitly via `npm run seed` / `bootstrap()`.
+ */
+export function shouldAutoSeedDemo(env: Record<string, string | undefined> = process.env): boolean {
+  if (env.LAWRENCE_DISABLE_DEMO_SEED === "1") return false;
+  return !env.DATABASE_URL; // in-memory backend only
+}
+
+/**
+ * Idempotent runtime initialization, safe to call from any API route. On the
+ * ephemeral in-memory backend it runs the demo bootstrap so the surfaces have
+ * live data (unchanged dev/test/demo behavior). On a configured Postgres it is
+ * NON-DESTRUCTIVE: it never resets/reseeds; it only installs the process-wide
+ * model-provider singleton so functions/agents can run against persisted data.
+ */
 export function ensureBootstrapped(): Promise<void> {
-  if (!globalRef.__lawrenceBootstrap) globalRef.__lawrenceBootstrap = bootstrap();
+  if (!globalRef.__lawrenceBootstrap) globalRef.__lawrenceBootstrap = initRuntime();
   return globalRef.__lawrenceBootstrap;
+}
+
+async function initRuntime(): Promise<void> {
+  assertPersistenceReady();
+  if (shouldAutoSeedDemo()) {
+    await bootstrap();
+    return;
+  }
+  // Postgres path: data already lives in the durable store. Do not touch it —
+  // just ensure the model provider is installed (idempotent).
+  setModelProvider(resolveDefaultProvider());
 }
 
 export async function bootstrap(): Promise<void> {
