@@ -42,3 +42,48 @@ jobs:
           LAWRENCE_ALLOW_MOCK_MODEL: "1"
       - name: Build
         run: npm run build
+
+  # Postgres-backed verification: the runtime against real Postgres, plus the
+  # two-role row-level-security model (privileged setup + non-superuser app role).
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: lawrence_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PGPASSWORD: postgres
+      LAWRENCE_ALLOW_MOCK_MODEL: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci || npm install
+      - name: Create non-superuser app role
+        run: |
+          psql -h localhost -U postgres -d lawrence_ci \
+            -c "create role lawrence_app login password 'app' nosuperuser nobypassrls;" \
+            -c "grant usage on schema public to lawrence_app;"
+      - name: Provision runtime schema + RLS (privileged owner)
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/lawrence_ci
+          LAWRENCE_DB_APP_ROLE: lawrence_app
+        run: npx tsx scripts/setup-runtime-rls.ts
+      - name: PG-backed runtime test (owner)
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/lawrence_ci
+        run: node --import tsx --test tests/integration/pg-store.test.ts
+      - name: RLS tenant-isolation test (non-superuser app role)
+        env:
+          DATABASE_URL: postgres://lawrence_app:app@localhost:5432/lawrence_ci
+          LAWRENCE_DB_MANAGED_SCHEMA: "1"
+          RLS_TEST: "1"
+        run: node --import tsx --test tests/integration/rls-tenant-isolation.test.ts

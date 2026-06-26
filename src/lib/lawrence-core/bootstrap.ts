@@ -4,6 +4,7 @@
 //   action (approval-gated) -> review -> notification -> release.
 
 import { db, resetDatabase } from "./db";
+import { runWithTenant } from "./db/tenant-store";
 import { id, now, resetClock } from "./utils/ids";
 import { systemActor } from "./permissions/permissions";
 import { setModelProvider } from "@/lib/aiops/models/model-provider";
@@ -90,6 +91,12 @@ async function initRuntime(): Promise<void> {
 }
 
 export async function bootstrap(): Promise<void> {
+  // Bind the demo tenant for the whole seed so the Postgres backend sets the
+  // RLS GUC for every write (including update/getById) under one tenant.
+  return runWithTenant(DEMO_TENANT_ID, bootstrapInner);
+}
+
+async function bootstrapInner(): Promise<void> {
   await resetDatabase();
   resetClock();
 

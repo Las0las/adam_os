@@ -4,7 +4,7 @@
 // in-memory Collection store (../index.ts) so the platform is runnable with no
 // external services. Selection is by presence of DATABASE_URL.
 
-import { Pool } from "pg";
+import { Pool, type PoolClient, type QueryResult } from "pg";
 
 let pool: Pool | null = null;
 
@@ -48,3 +48,36 @@ export function getDb(): Pool {
   }
   return pool;
 }
+
+/**
+ * Run `fn` inside a transaction on a single pinned connection with the
+ * transaction-local `app.tenant_id` GUC set. This is the seam that drives
+ * row-level security: every runtime read/write is scoped to one tenant for the
+ * life of the transaction, and the setting resets on commit/rollback so it can
+ * never leak across pooled checkouts. A null/empty tenant sets an empty GUC,
+ * under which RLS-enabled tables expose no rows (fail closed).
+ */
+export async function withTenantTx<R>(
+  tenantId: string | null,
+  fn: (client: PoolClient) => Promise<R>,
+): Promise<R> {
+  const client = await getDb().connect();
+  try {
+    await client.query("begin");
+    await client.query("select set_config('app.tenant_id', $1, true)", [tenantId ?? ""]);
+    const result = await fn(client);
+    await client.query("commit");
+    return result;
+  } catch (err) {
+    try {
+      await client.query("rollback");
+    } catch {
+      /* ignore rollback failure; surface the original error */
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export type { PoolClient, QueryResult };
