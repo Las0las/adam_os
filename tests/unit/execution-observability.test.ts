@@ -19,9 +19,9 @@ import {
   clearExecutionHooks,
 } from "@/lib/aiops/execution/execution-hooks";
 import type { ExecutionHook, InferenceExecutionContext } from "@/lib/aiops/execution/execution-types";
-import { ExecutionEventBus, type ExecutionEventSubscriber } from "@/lib/aiops/execution/observability/execution-event-bus";
+import { ExecutionEventBus, type BusEvent, type ExecutionEventSubscriber } from "@/lib/aiops/execution/observability/execution-event-bus";
 import { ExecutionEventPublisher } from "@/lib/aiops/execution/observability/event-bus-publisher";
-import type { ExecutionEvent } from "@/lib/aiops/execution/observability/execution-events";
+import { isExecutionEvent, type ExecutionEvent } from "@/lib/aiops/execution/observability/execution-events";
 import { ExecutionTelemetryEngine } from "@/lib/aiops/execution/observability/telemetry-engine";
 import { MetricsCollector } from "@/lib/aiops/execution/observability/metrics-collector";
 import { ExecutionAuditEngine } from "@/lib/aiops/execution/observability/audit-engine";
@@ -136,8 +136,8 @@ function fakeEvent(): ExecutionEvent {
 
 test("the bus delivers synchronously to every subscriber", () => {
   const bus = new ExecutionEventBus();
-  const seenA: ExecutionEvent[] = [];
-  const seenB: ExecutionEvent[] = [];
+  const seenA: BusEvent[] = [];
+  const seenB: BusEvent[] = [];
   bus.subscribe({ name: "a", onEvent: (e) => seenA.push(e) });
   bus.subscribe({ name: "b", onEvent: (e) => seenB.push(e) });
   bus.publish(fakeEvent());
@@ -175,7 +175,7 @@ test("telemetry captures started + completed events from the bus", async () => {
   assert.equal(events.length, 2);
   assert.equal(events[0]?.type, "execution.started");
   const completed = events[1];
-  assert.ok(completed && completed.type === "execution.completed");
+  assert.ok(completed && isExecutionEvent(completed) && completed.type === "execution.completed");
   assert.equal(completed.provider, "p");
   assert.equal(completed.model, "m");
   assert.equal(completed.workloadType, "chat");
@@ -190,14 +190,14 @@ test("telemetry marks a transient failure retryable and an auth failure not", as
   const a = wired();
   await executeInference(params(registryWith(fail("429 rate limit exceeded"))), [a.publisher]);
   const e1 = a.telemetry.last();
-  assert.ok(e1 && e1.type === "execution.failed");
+  assert.ok(e1 && isExecutionEvent(e1) && e1.type === "execution.failed");
   assert.equal(e1.error.kind, "rate_limit");
   assert.equal(e1.retryable, true);
 
   const b = wired();
   await executeInference(params(registryWith(fail("401 unauthorized: api key invalid"))), [b.publisher]);
   const e2 = b.telemetry.last();
-  assert.ok(e2 && e2.type === "execution.failed");
+  assert.ok(e2 && isExecutionEvent(e2) && e2.type === "execution.failed");
   assert.equal(e2.error.kind, "authentication");
   assert.equal(e2.retryable, false);
 });

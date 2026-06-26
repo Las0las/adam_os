@@ -10,6 +10,7 @@ import { systemActor } from "./permissions/permissions";
 import { setModelProvider } from "@/lib/aiops/models/model-provider";
 import { resolveDefaultProvider } from "@/lib/aiops/models/model-router";
 import { installExecutionObservability } from "@/lib/aiops/execution/observability/observability-bootstrap";
+import { installSecurityMiddleware } from "@/lib/aiops/security/security-bootstrap";
 import { registerSource, ingestAsset } from "@/lib/dataops/sources/source-service";
 import { runAssetPipeline } from "@/lib/dataops/pipelines/pipeline-runner";
 import { indexEvidence } from "@/lib/dataops/evidence/chunking-service";
@@ -86,6 +87,11 @@ async function initRuntime(): Promise<void> {
   // inference automatically produces telemetry, metrics, audit, and health
   // observations. Idempotent and observation-only — it changes no behavior.
   installExecutionObservability();
+  // Attach the security middleware (prompt firewall → PII redaction →
+  // provider → response validator). Idempotent; the default policy is
+  // non-disruptive (blocks only malicious prompts, detect-only PII, permissive
+  // validation), so legitimate traffic is unaffected.
+  installSecurityMiddleware();
   if (shouldAutoSeedDemo()) {
     await bootstrap();
     return;

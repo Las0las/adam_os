@@ -18,12 +18,30 @@
 //     break a peer subscriber nor affect execution.
 
 import { guard } from "./execution-middleware";
-import type { ExecutionEvent } from "./execution-events";
 
-/** A named consumer of execution events. */
+/**
+ * The minimal shape every event on the bus shares (Milestone 5.5; broadened in
+ * 6.0). Both the execution events (telemetry/audit/health) and the security
+ * events ride the same bus, so the bus is typed to this structural base — it
+ * stays decoupled from any specific event family. Subscribers narrow by `type`
+ * (e.g. `isExecutionEvent` / `isSecurityEvent`) to read family-specific fields.
+ */
+export interface BusEvent {
+  type: string;
+  executionId: string;
+  requestId: string;
+  tenantId: string | null;
+  provider: string;
+  model: string;
+  workloadType: string;
+  /** Epoch milliseconds (wall clock). */
+  timestamp: number;
+}
+
+/** A named consumer of bus events. */
 export interface ExecutionEventSubscriber {
   name: string;
-  onEvent(event: ExecutionEvent): void;
+  onEvent(event: BusEvent): void;
 }
 
 export class ExecutionEventBus {
@@ -42,7 +60,7 @@ export class ExecutionEventBus {
   /** Synchronously deliver an event to every subscriber. Order is not part of
    *  the contract; each delivery is isolated so one failure cannot affect
    *  another subscriber or the caller. Never throws. */
-  publish(event: ExecutionEvent): void {
+  publish(event: BusEvent): void {
     for (const subscriber of this.subscribers_) {
       guard(() => subscriber.onEvent(event));
     }

@@ -1,6 +1,6 @@
 // Inference Execution Pipeline — canonical types (Milestone 4.0).
 
-import type { CompletionRequest } from "@/lib/aiops/models/model-provider";
+import type { CompletionRequest, CompletionResponse } from "@/lib/aiops/models/model-provider";
 import type { ProviderRegistry } from "@/lib/aiops/providers/provider-registry";
 import type { RoutingDecision } from "@/lib/aiops/routing/routing-types";
 import type { ExecutionError, NormalizedExecutionError } from "./execution-errors";
@@ -55,6 +55,24 @@ export interface ExecutionHook {
   beforeExecute?(ctx: InferenceExecutionContext): void | Promise<void>;
   afterExecute?(ctx: InferenceExecutionContext, result: InferenceExecutionResult): void | Promise<void>;
   executionFailed?(ctx: InferenceExecutionContext, error: ExecutionError): void | Promise<void>;
+  /**
+   * Request interceptor (Milestone 6.0 — security middleware). Runs after the
+   * BeforeExecute observation hooks and BEFORE the provider is invoked, in
+   * priority order. It returns the request the provider should receive — either
+   * the same request, or a transformed copy (e.g. PII-redacted). Throwing
+   * rejects the execution (e.g. prompt firewall block) and no provider call is
+   * made. Observation hooks (the event publisher) do NOT implement this — only
+   * security middleware transform the request. It must never mutate the input
+   * request object; return a new one to change it.
+   */
+  interceptRequest?(request: CompletionRequest, ctx: InferenceExecutionContext): CompletionRequest | Promise<CompletionRequest>;
+  /**
+   * Response interceptor (Milestone 6.0 — response validation). Runs after the
+   * provider returns and BEFORE the AfterExecute observation hooks, in priority
+   * order. It inspects/validates the response; throwing rejects the execution
+   * (the result becomes a normalized failure). It must not mutate the response.
+   */
+  interceptResponse?(response: CompletionResponse, ctx: InferenceExecutionContext): void | Promise<void>;
 }
 
 export interface InferenceExecutionParams {
