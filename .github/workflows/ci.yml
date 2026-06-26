@@ -16,7 +16,14 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
-        run: npm run lint --if-present
+        # next lint prompts interactively when no ESLint config is present, which
+        # fails in CI. Run it only when a config exists; otherwise skip cleanly.
+        run: |
+          if [ -f .eslintrc.json ] || [ -f .eslintrc.js ] || [ -f .eslintrc ] || [ -f eslint.config.js ] || [ -f eslint.config.mjs ]; then
+            npx next lint
+          else
+            echo "No ESLint config present — skipping lint."
+          fi
       - name: Unit tests
         run: npm test
       - name: Integration tests (memory backend)
