@@ -25,12 +25,20 @@ export function runPreflight(env: Record<string, string | undefined> = process.e
     checks.push({ key, ok: Boolean(env[key]), required: true, detail: env[key] ? "present" : "missing" });
   }
 
-  // DATABASE_URL is optional (in-memory fallback) but recommended for prod.
+  // DATABASE_URL is optional in dev (in-memory fallback) but REQUIRED in
+  // production — the in-memory store is not durable. An explicit override
+  // (LAWRENCE_ALLOW_MEMORY_STORE=1) accepts the ephemeral store knowingly.
+  const isProduction = env.NODE_ENV === "production";
+  const dbRequired = isProduction && env.LAWRENCE_ALLOW_MEMORY_STORE !== "1";
   checks.push({
     key: "DATABASE_URL",
-    ok: true,
-    required: false,
-    detail: env.DATABASE_URL ? "postgres configured" : "in-memory (dev only)",
+    ok: Boolean(env.DATABASE_URL) || !dbRequired,
+    required: dbRequired,
+    detail: env.DATABASE_URL
+      ? "postgres configured"
+      : isProduction
+        ? "MISSING — required in production (or set LAWRENCE_ALLOW_MEMORY_STORE=1)"
+        : "in-memory (dev only)",
   });
 
   // At least one model provider key OR explicit mock acceptance.
