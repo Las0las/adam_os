@@ -18,6 +18,8 @@ import type { ModelDefinition } from "@/types/aiops";
 function clearProviderKeys() {
   delete process.env.ANTHROPIC_API_KEY;
   delete process.env.OPENAI_API_KEY;
+  delete process.env.GOOGLE_API_KEY;
+  delete process.env.GEMINI_API_KEY;
   delete process.env.LAWRENCE_DEFAULT_MODEL;
 }
 
@@ -89,7 +91,15 @@ test("resolveModelProvider builds the authorized provider when the key is presen
 test("providerFromDefinition refuses unknown providers", async () => {
   await fresh();
   assert.throws(
-    () => providerFromDefinition(def({ provider: "google", modelKey: "gemini-x" })),
+    () => providerFromDefinition(def({ provider: "other", modelKey: "mystery-x" })),
     /No adapter for provider/,
+  );
+});
+
+test("providerFromDefinition builds Google but fails closed without a key", async () => {
+  await fresh();
+  assert.throws(
+    () => providerFromDefinition(def({ provider: "google", modelKey: "gemini-2.0-flash" })),
+    /GOOGLE_API_KEY/,
   );
 });
