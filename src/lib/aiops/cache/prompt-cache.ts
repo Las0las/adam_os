@@ -20,7 +20,9 @@ export class PromptCache implements ExecutionHook {
   readonly name = "prompt-cache";
   readonly priority = CACHE_PRIORITY;
 
-  private readonly manager: CacheManager;
+  /** The CacheManager this middleware delegates to (exposed so the platform and
+   *  future cache stores share the same manager/registry). */
+  readonly manager: CacheManager;
   private readonly exact: ExactMatchCacheStore;
 
   constructor(bus: ExecutionEventBus, policyStore: CachePolicyStore, now: () => number = observedNowMs) {
@@ -28,6 +30,11 @@ export class PromptCache implements ExecutionHook {
     const registry = new CacheRegistry();
     registry.register(this.exact);
     this.manager = new CacheManager({ bus, policyStore, registry, name: "prompt-cache" });
+  }
+
+  /** The shared cache registry — future CacheStore implementations register here. */
+  get registry(): CacheRegistry {
+    return this.manager.registry;
   }
 
   resolveCompletion(request: CompletionRequest, ctx: InferenceExecutionContext): Promise<CompletionResponse | null> {
