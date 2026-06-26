@@ -81,6 +81,16 @@ export type ExecutionEvent =
   | ExecutionCompletedEvent
   | ExecutionFailedEvent;
 
+/** Narrow a bus event to the execution-event family (Milestone 6.0 — the bus
+ *  also carries security events). */
+export function isExecutionEvent(event: { type: string }): event is ExecutionEvent {
+  return (
+    event.type === "execution.started" ||
+    event.type === "execution.completed" ||
+    event.type === "execution.failed"
+  );
+}
+
 function base(
   type: ExecutionEventType,
   ctx: InferenceExecutionContext,

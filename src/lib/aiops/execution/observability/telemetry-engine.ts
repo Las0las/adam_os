@@ -6,32 +6,32 @@
 // only in-memory capture, bounded so a long-lived process cannot grow without
 // limit. Observation only.
 
-import type { ExecutionEvent } from "./execution-events";
-import type { ExecutionEventSubscriber } from "./execution-event-bus";
+import type { BusEvent, ExecutionEventSubscriber } from "./execution-event-bus";
 
-/** In-memory telemetry engine. Captures canonical events from the bus. */
+/** In-memory telemetry engine. Captures every canonical event from the bus —
+ *  execution events and security events alike (it is the general sink). */
 export class ExecutionTelemetryEngine implements ExecutionEventSubscriber {
   readonly name = "telemetry";
 
-  private readonly events_: ExecutionEvent[] = [];
+  private readonly events_: BusEvent[] = [];
   private readonly capacity: number;
 
   constructor(capacity = 1000) {
     this.capacity = Math.max(1, capacity);
   }
 
-  onEvent(event: ExecutionEvent): void {
+  onEvent(event: BusEvent): void {
     this.events_.push(event);
     if (this.events_.length > this.capacity) this.events_.shift();
   }
 
   /** Captured events, oldest first (a copy). */
-  events(): ExecutionEvent[] {
+  events(): BusEvent[] {
     return [...this.events_];
   }
 
   /** Most recently captured event, or null. */
-  last(): ExecutionEvent | null {
+  last(): BusEvent | null {
     return this.events_[this.events_.length - 1] ?? null;
   }
 

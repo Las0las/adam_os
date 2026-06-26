@@ -11,8 +11,8 @@ import type {
   ProviderHealthStatus,
 } from "@/lib/aiops/providers/provider-registry-types";
 import type { ExecutionErrorKind } from "../execution-errors";
-import type { ExecutionEvent } from "./execution-events";
-import type { ExecutionEventSubscriber } from "./execution-event-bus";
+import { isExecutionEvent } from "./execution-events";
+import type { BusEvent, ExecutionEventSubscriber } from "./execution-event-bus";
 import { observedNowIso } from "./observability-clock";
 
 /** Rolling per-provider observation state. */
@@ -27,6 +27,16 @@ interface ProviderStat {
 }
 
 const SAMPLE_LIMIT = 50;
+
+/** Failure kinds that reflect on PROVIDER health. Security/validation rejections
+ *  happen before or after the provider call and are not provider faults, so they
+ *  never degrade provider health. */
+const PROVIDER_FAULT_KINDS: ReadonlySet<ExecutionErrorKind> = new Set([
+  "authentication",
+  "timeout",
+  "rate_limit",
+  "provider_unavailable",
+]);
 
 /** Median of a numeric sample (lower-middle for even counts). Deterministic. */
 function p50(values: number[]): number | null {
@@ -74,7 +84,8 @@ export class PassiveHealthCollector implements ExecutionEventSubscriber {
     return s;
   }
 
-  onEvent(event: ExecutionEvent): void {
+  onEvent(event: BusEvent): void {
+    if (!isExecutionEvent(event)) return;
     if (event.type === "execution.completed") {
       const s = this.stat(event.provider);
       s.successes += 1;
@@ -83,6 +94,9 @@ export class PassiveHealthCollector implements ExecutionEventSubscriber {
       s.latencies.push(event.latency);
       if (s.latencies.length > SAMPLE_LIMIT) s.latencies.shift();
     } else if (event.type === "execution.failed") {
+      // Only genuine provider faults reflect on provider health. A security or
+      // validation rejection is not the provider's fault — ignore it here.
+      if (!PROVIDER_FAULT_KINDS.has(event.error.kind)) return;
       const s = this.stat(event.provider);
       s.failures += 1;
       s.lastErrorKind = event.error.kind;

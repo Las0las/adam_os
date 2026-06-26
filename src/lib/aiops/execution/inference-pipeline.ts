@@ -79,16 +79,35 @@ interface LifecycleOutcome {
   error?: ExecutionError;
 }
 
-/** Run the before-hooks → invoke → after/failed-hooks lifecycle. `invoke`
- *  performs the single permitted provider call and returns a CompletionResponse. */
+/**
+ * Run the standard lifecycle:
+ *   BeforeExecute (observe) → interceptRequest (security: inspect/redact/reject)
+ *     → provider → interceptResponse (validate/reject) → AfterExecute (observe)
+ *
+ * Interceptors run in the same priority order as the hooks. `interceptRequest`
+ * folds the request (each returns the request the next sees), so a security
+ * middleware can hand the provider a transformed (e.g. PII-redacted) request;
+ * the caller's original request object is never mutated. A throwing interceptor
+ * rejects the execution — it is normalized like any other failure. When no hook
+ * implements an interceptor (the common case), the request reaches `invoke`
+ * unchanged and behavior is identical to before Milestone 6.0.
+ */
 async function runLifecycle(
   ctx: InferenceExecutionContext,
   hooks: ExecutionHook[],
-  invoke: () => Promise<CompletionResponse>,
+  request: CompletionRequest,
+  invoke: (request: CompletionRequest) => Promise<CompletionResponse>,
 ): Promise<LifecycleOutcome> {
   try {
     for (const h of hooks) await h.beforeExecute?.(ctx);
-    const completion = await invoke();
+    let effectiveRequest = request;
+    for (const h of hooks) {
+      if (h.interceptRequest) effectiveRequest = await h.interceptRequest(effectiveRequest, ctx);
+    }
+    const completion = await invoke(effectiveRequest);
+    for (const h of hooks) {
+      if (h.interceptResponse) await h.interceptResponse(completion, ctx);
+    }
     const result = deepFreeze(successResult(ctx, completion));
     for (const h of hooks) await h.afterExecute?.(ctx, result);
     return { result, completion };
@@ -130,13 +149,13 @@ export async function executeInference(
     return deepFreeze(failure(ctx, error));
   }
 
-  const { result } = await runLifecycle(ctx, hooks, async () => {
+  const { result } = await runLifecycle(ctx, hooks, params.request, async (req) => {
     const entry = params.registry.get(provider);
     if (!entry) throw new ProviderUnavailableError(`provider not registered: ${provider}`);
     if (!entry.isConfigured()) {
       throw new AuthenticationError(`provider '${provider}' is not configured (credentials missing)`);
     }
-    return entry.create(model).complete(params.request);
+    return entry.create(model).complete(req);
   });
   return result;
 }
@@ -173,7 +192,7 @@ export async function runModelCompletion(
     requestFingerprint: fingerprint(opts.request),
   });
 
-  const { completion, error } = await runLifecycle(ctx, hooks, () => opts.provider.complete(opts.request));
+  const { completion, error } = await runLifecycle(ctx, hooks, opts.request, (req) => opts.provider.complete(req));
   if (completion) return completion;
   throw error ?? new ExecutionFailedError("inference failed");
 }

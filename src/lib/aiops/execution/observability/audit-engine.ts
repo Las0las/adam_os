@@ -11,12 +11,12 @@
 import { deepFreeze } from "@/lib/aiops/routing/routing-types";
 import type { RoutingDecision } from "@/lib/aiops/routing/routing-types";
 import type { NormalizedExecutionError } from "../execution-errors";
-import type {
-  ExecutionEvent,
-  ExecutionCompletedEvent,
-  ExecutionFailedEvent,
+import {
+  isExecutionEvent,
+  type ExecutionCompletedEvent,
+  type ExecutionFailedEvent,
 } from "./execution-events";
-import type { ExecutionEventSubscriber } from "./execution-event-bus";
+import type { BusEvent, ExecutionEventSubscriber } from "./execution-event-bus";
 import { observedNowMs } from "./observability-clock";
 
 /** Normalized, serializable outcome embedded in the audit record. */
@@ -88,9 +88,10 @@ export class ExecutionAuditEngine implements ExecutionEventSubscriber {
     this.capacity = Math.max(1, capacity);
   }
 
-  onEvent(event: ExecutionEvent): void {
-    // Audit every terminal outcome; `started` carries no result to audit.
-    if (event.type === "execution.started") return;
+  onEvent(event: BusEvent): void {
+    // Audit every terminal execution outcome; ignore non-execution (security)
+    // events and `started` (which carries no result to audit).
+    if (!isExecutionEvent(event) || event.type === "execution.started") return;
     const record: AuditRecord = deepFreeze({
       executionId: event.executionId,
       requestId: event.requestId,

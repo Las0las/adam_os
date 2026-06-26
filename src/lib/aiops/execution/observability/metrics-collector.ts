@@ -14,8 +14,8 @@
 // Since Milestone 5.5 the collector is a BUS SUBSCRIBER: `onEvent` is the
 // subscription entry point and folds each event into the running totals.
 
-import type { ExecutionEvent } from "./execution-events";
-import type { ExecutionEventSubscriber } from "./execution-event-bus";
+import { isExecutionEvent, type ExecutionEvent } from "./execution-events";
+import type { BusEvent, ExecutionEventSubscriber } from "./execution-event-bus";
 
 /** Per-key usage tally (provider id or model key). */
 export interface UsageTally {
@@ -70,9 +70,10 @@ export class MetricsCollector implements ExecutionEventSubscriber {
     map.set(key, t);
   }
 
-  /** Bus subscription entry point — folds the event into the running totals. */
-  onEvent(event: ExecutionEvent): void {
-    this.record(event);
+  /** Bus subscription entry point — folds execution events into the running
+   *  totals. Non-execution events (e.g. security events) are ignored. */
+  onEvent(event: BusEvent): void {
+    if (isExecutionEvent(event)) this.record(event);
   }
 
   /** Fold one canonical event into the running totals. `started` is ignored —

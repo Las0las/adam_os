@@ -9,7 +9,10 @@ export type ExecutionErrorKind =
   | "rate_limit"
   | "provider_unavailable"
   | "cancelled"
-  | "execution_failed";
+  | "execution_failed"
+  // Milestone 6.0 — security middleware rejections (not provider faults).
+  | "security_violation"
+  | "validation_failed";
 
 export class ExecutionError extends Error {
   constructor(
@@ -56,6 +59,21 @@ export class ExecutionFailedError extends ExecutionError {
   constructor(message: string, cause?: unknown) {
     super("execution_failed", message, cause);
     this.name = "ExecutionFailedError";
+  }
+}
+/** A security middleware rejected the request (prompt firewall / PII reject).
+ *  Raised before the provider is invoked — it is NOT a provider fault. */
+export class SecurityViolationError extends ExecutionError {
+  constructor(message: string, cause?: unknown) {
+    super("security_violation", message, cause);
+    this.name = "SecurityViolationError";
+  }
+}
+/** The response validator rejected a provider response. */
+export class ResponseValidationError extends ExecutionError {
+  constructor(message: string, cause?: unknown) {
+    super("validation_failed", message, cause);
+    this.name = "ResponseValidationError";
   }
 }
 
