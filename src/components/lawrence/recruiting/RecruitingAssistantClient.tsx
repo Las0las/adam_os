@@ -23,7 +23,7 @@ interface ExtractData {
   extractionId: string;
   status: string;
   confidence: number;
-  proposed: { fullName?: string | null; email?: string | null };
+  proposed: { fullName?: string | null; email?: string | null; title?: string | null };
 }
 
 type Result =
@@ -81,6 +81,12 @@ export function RecruitingAssistantClient() {
     if (data) setResult({ kind: "extract", data });
   }
 
+  async function createJobFromJd() {
+    if (!text.trim()) return;
+    const data = await post<ExtractData>("/api/recruiting/jobs/extract", { text });
+    if (data) setResult({ kind: "extract", data });
+  }
+
   const reviewCaseId =
     result?.kind === "chat" ? result.data.reviewCaseId : result?.data.reviewCaseId;
   const status = result ? result.data.status : null;
@@ -88,7 +94,7 @@ export function RecruitingAssistantClient() {
     result?.kind === "chat"
       ? result.data.message
       : result
-        ? `Drafted ${result.data.proposed.fullName ?? result.data.proposed.email ?? "candidate"} ` +
+        ? `Drafted ${result.data.proposed.fullName ?? result.data.proposed.email ?? result.data.proposed.title ?? "item"} ` +
           `(confidence ${result.data.confidence}) — pending review.`
         : null;
 
@@ -96,9 +102,9 @@ export function RecruitingAssistantClient() {
     <>
       <h1 className="page-title">Recruiting Assistant</h1>
       <p className="muted">
-        Type a command (&quot;move Dana to interview&quot;, &quot;note on Sam: strong backend&quot;)
-        or paste a candidate&apos;s profile. Stage changes and new candidates go through approval —
-        nothing is written directly.
+        Type a command (&quot;move Dana to interview&quot;, &quot;note on Sam: strong backend&quot;),
+        paste a candidate&apos;s profile, or paste a job description. Stage changes, new candidates,
+        and new jobs go through approval — nothing is written directly.
       </p>
 
       <div className="card" style={{ marginTop: 16 }}>
@@ -116,6 +122,9 @@ export function RecruitingAssistantClient() {
           </button>
           <button className="btn secondary" onClick={createFromProfile} disabled={busy || !text.trim()}>
             Create from pasted profile
+          </button>
+          <button className="btn secondary" onClick={createJobFromJd} disabled={busy || !text.trim()}>
+            Create job from pasted JD
           </button>
           {busy ? <span className="muted">Working…</span> : null}
         </div>

@@ -50,9 +50,9 @@ test("approving an extraction case projects the Candidate", async () => {
 
     const res = await resolveRoute(resolveReq("approved"), { params: { caseId: reviewCase.id } });
     assert.equal(res.status, 200);
-    const json = (await res.json()) as { reviewCase: { status: string }; candidate: { externalKey: string } | null };
+    const json = (await res.json()) as { reviewCase: { status: string }; result: { externalKey: string } | null };
     assert.equal(json.reviewCase.status, "approved");
-    assert.equal(json.candidate?.externalKey, "dana@example.test");
+    assert.equal(json.result?.externalKey, "dana@example.test");
 
     // Assert by the synthetic key (the route's appContext may demo-seed others).
     const dana = (await listObjects(ctx, "Candidate")).filter((c) => c.externalKey === "dana@example.test");
@@ -73,9 +73,9 @@ test("rejecting an extraction case creates no Candidate", async () => {
 
     const res = await resolveRoute(resolveReq("rejected", "duplicate"), { params: { caseId: reviewCase.id } });
     assert.equal(res.status, 200);
-    const json = (await res.json()) as { reviewCase: { status: string }; candidate: null };
+    const json = (await res.json()) as { reviewCase: { status: string }; result: null };
     assert.equal(json.reviewCase.status, "rejected");
-    assert.equal(json.candidate, null);
+    assert.equal(json.result, null);
 
     const dana = (await listObjects(ctx, "Candidate")).filter((c) => c.externalKey === "dana@example.test");
     assert.equal(dana.length, 0, "no Candidate created on rejection");
