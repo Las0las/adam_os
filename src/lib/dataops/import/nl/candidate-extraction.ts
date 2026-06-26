@@ -13,7 +13,7 @@ import { db } from "@/lib/lawrence-core/db";
 import { id, now } from "@/lib/lawrence-core/utils/ids";
 import { requirePermission } from "@/lib/lawrence-core/permissions/permissions";
 import { emitAudit } from "@/lib/lawrence-core/audit/audit-service";
-import { getModelProvider } from "@/lib/aiops/models/model-provider";
+import { resolveModelProvider } from "@/lib/aiops/models/model-router";
 import { upsertObject, type AppendLedgerEntry } from "@/lib/dataops/ontology/object-service";
 import { openReviewCase, resolveReviewCase } from "@/lib/mission-control/review-queue/review-service";
 import {
@@ -101,7 +101,11 @@ export async function extractCandidateDraft(
   if (!text) throw new Error("no text provided to extract a candidate from");
   const source = input.source?.trim() || DEFAULT_SOURCE;
 
-  const completion = await getModelProvider().complete({
+  // Honor a tenant's authorized extraction model (per-purpose routing); falls
+  // back to the process-default provider, which is the deterministic mock until
+  // an operator sets a provider key.
+  const provider = await resolveModelProvider(ctx, "extraction");
+  const completion = await provider.complete({
     prompt:
       "Extract the candidate's contact and profile fields as JSON from the text " +
       "below. Use only information present in the text; leave a field empty if it " +

@@ -13,7 +13,7 @@
 
 import { id } from "@/lib/lawrence-core/utils/ids";
 import { emitAudit } from "@/lib/lawrence-core/audit/audit-service";
-import { getModelProvider } from "@/lib/aiops/models/model-provider";
+import { resolveModelProvider } from "@/lib/aiops/models/model-router";
 import { listObjects } from "@/lib/dataops/ontology/object-service";
 import { executeAction } from "@/lib/mission-control/actions/action-service";
 import { extractCandidateDraft } from "@/lib/dataops/import/nl/candidate-extraction";
@@ -75,7 +75,10 @@ export async function runRecruitingChatCommand(
   const text = input.message?.trim() ?? "";
   if (!text) throw new Error("empty message");
 
-  const completion = await getModelProvider().complete({
+  // Honor a tenant's authorized chat model (per-purpose routing); falls back to
+  // the process-default provider (the deterministic mock until a key is set).
+  const provider = await resolveModelProvider(ctx, "chat");
+  const completion = await provider.complete({
     prompt:
       "Classify this recruiting assistant message into one intent and extract its " +
       'parameters as JSON. intent is one of "advance_stage", "add_note", ' +
