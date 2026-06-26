@@ -1,0 +1,65 @@
+name: Security
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # Static analysis (SAST). Findings surface in the repo's Security tab.
+  codeql:
+    name: CodeQL (SAST)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@v3
+
+  # Secret scanning. Pinned gitleaks binary (no third-party action / license),
+  # filesystem mode so it scans the working tree, not historical commits.
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install gitleaks
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz \
+            | tar -xz gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+      - name: Scan working tree for secrets
+        run: gitleaks detect --no-git --source . --config .gitleaks.toml --redact --exit-code 1
+
+  # NOTE: a `dependency-review` job (PR-diff-aware vuln gating) would go here, but
+  # actions/dependency-review-action requires the repo's "Dependency graph"
+  # feature (Settings → Security → Code security). Enable it, then add:
+  #   dependency-review:
+  #     if: github.event_name == 'pull_request'
+  #     steps: [checkout, dependency-review-action@v4 with fail-on-severity: critical]
+  # Until then, the npm-audit job below provides the dependency gate.
+
+  # Dependency audit. Blocks on CRITICAL production vulnerabilities; the full
+  # audit runs report-only so the moderate/high backlog stays visible.
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci || npm install
+      - name: Block on critical production vulnerabilities
+        run: npm audit --omit=dev --audit-level=critical
+      - name: Full audit (report-only)
+        run: npm audit || true
