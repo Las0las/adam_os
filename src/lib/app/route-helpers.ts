@@ -4,15 +4,10 @@
 import { NextResponse } from "next/server";
 import type { ZodType } from "zod";
 import { captureException } from "@/lib/observability/telemetry";
+import { resolveError, ValidationError } from "./errors";
 
-/** Thrown by parseBody when the request body fails schema validation. `run()`
- *  maps it (like any throw) to a 400 with the validation message. */
-export class ValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ValidationError";
-  }
-}
+// Re-exported so existing routes can keep importing it from here.
+export { ValidationError };
 
 export function ok(data: unknown): NextResponse {
   return NextResponse.json({ ok: true, data });
@@ -22,17 +17,30 @@ export function fail(error: string, status = 400): NextResponse {
   return NextResponse.json({ ok: false, error }, { status });
 }
 
+/**
+ * Map a thrown value to a response via the taxonomy: typed/permission errors get
+ * their proper status + message; unexpected errors are redacted to a generic 500
+ * with a correlation id, and the real detail is exported server-side (never to
+ * the client). Only 5xx are sent to the telemetry sink (client 4xx are not
+ * errors). Used by run() and by raw-response routes in their catch blocks.
+ */
+export function errorResponse(err: unknown): NextResponse {
+  const resolved = resolveError(err);
+  if (resolved.status >= 500) {
+    void captureException(err, {
+      component: "api_route",
+      extra: { correlationId: resolved.body.correlationId },
+    });
+  }
+  return NextResponse.json(resolved.body, { status: resolved.status });
+}
+
 /** Run a service call and map success/throw to the standard envelope. */
 export async function run(fn: () => Promise<unknown>): Promise<NextResponse> {
   try {
     return ok(await fn());
   } catch (err) {
-    // Export server errors (not client validation 400s). Fire-and-forget so the
-    // telemetry round-trip never delays the response.
-    if (!(err instanceof ValidationError)) {
-      void captureException(err, { component: "api_route" });
-    }
-    return fail(err instanceof Error ? err.message : String(err));
+    return errorResponse(err);
   }
 }
 
