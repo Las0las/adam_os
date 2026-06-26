@@ -1,26 +1,23 @@
-// Execution Observability (Milestone 5.0, deliverable #4) — audit engine.
+// Execution Observability (Milestone 5.0, deliverable #4; reworked in 5.5).
 //
-// Defines the canonical, IMMUTABLE audit record produced for every execution and
-// the middleware that builds it. It records WHAT routing chose, WHICH provider/
-// model ran, the request/response fingerprints (identity without retaining text),
-// and the normalized result. There is NO persistence and NO encryption in this
-// milestone — only the canonical structure and its construction from the
-// execution context + result. Observation only.
+// Defines the canonical, IMMUTABLE audit record and the engine that builds one
+// per execution. Since Milestone 5.5 the engine is a BUS SUBSCRIBER: it builds
+// the record from the canonical event (which already carries the routing
+// decision, request/response fingerprints, usage, and normalized error) rather
+// than from the execution context/result. There is NO persistence and NO
+// encryption — only the canonical structure and its construction. Observation
+// only.
 
 import { deepFreeze } from "@/lib/aiops/routing/routing-types";
 import type { RoutingDecision } from "@/lib/aiops/routing/routing-types";
+import type { NormalizedExecutionError } from "../execution-errors";
 import type {
-  InferenceExecutionContext,
-  InferenceExecutionResult,
-} from "../execution-types";
-import type { ExecutionError, NormalizedExecutionError } from "../execution-errors";
-import { fingerprint } from "./fingerprint";
+  ExecutionEvent,
+  ExecutionCompletedEvent,
+  ExecutionFailedEvent,
+} from "./execution-events";
+import type { ExecutionEventSubscriber } from "./execution-event-bus";
 import { observedNowMs } from "./observability-clock";
-import {
-  guard,
-  MIDDLEWARE_PRIORITY,
-  type ExecutionMiddleware,
-} from "./execution-middleware";
 
 /** Normalized, serializable outcome embedded in the audit record. */
 export interface AuditedExecutionResult {
@@ -35,9 +32,9 @@ export interface AuditedExecutionResult {
 
 /** Wall-clock spans for the audited execution (epoch ms). */
 export interface AuditTimestamps {
-  /** Pipeline start time (`ctx.startTime`, wall clock). */
+  /** Pipeline start time (`event.startTime`). */
   startedAt: number;
-  /** When this audit record was sealed (wall clock). */
+  /** When this audit record was sealed. */
   recordedAt: number;
 }
 
@@ -55,47 +52,59 @@ export interface AuditRecord {
   timestamps: AuditTimestamps;
 }
 
-function auditedResult(result: InferenceExecutionResult): AuditedExecutionResult {
+/** Project a terminal event onto the audited result shape. */
+function auditedResult(event: ExecutionCompletedEvent | ExecutionFailedEvent): AuditedExecutionResult {
+  if (event.type === "execution.completed") {
+    return {
+      success: true,
+      latency: event.latency,
+      finishReason: event.finishReason,
+      promptTokens: event.usage?.promptTokens ?? null,
+      completionTokens: event.usage?.completionTokens ?? null,
+      costUsd: event.usage?.costUsd ?? null,
+      error: null,
+    };
+  }
+  // execution.failed
   return {
-    success: result.success,
-    latency: result.latency,
-    finishReason: result.finishReason,
-    promptTokens: result.usage?.promptTokens ?? null,
-    completionTokens: result.usage?.completionTokens ?? null,
-    costUsd: result.usage?.costUsd ?? null,
-    error: result.error,
+    success: false,
+    latency: event.latency,
+    finishReason: null,
+    promptTokens: null,
+    completionTokens: null,
+    costUsd: null,
+    error: event.error,
   };
 }
 
-function record(
-  ctx: InferenceExecutionContext,
-  result: InferenceExecutionResult,
-  responseFingerprint: string,
-): AuditRecord {
-  return deepFreeze({
-    executionId: ctx.executionId,
-    requestId: ctx.requestId,
-    tenantId: ctx.tenantId,
-    routingDecision: ctx.routingDecision,
-    selectedProvider: ctx.provider,
-    selectedModel: ctx.model,
-    requestFingerprint: ctx.requestFingerprint,
-    responseFingerprint,
-    executionResult: auditedResult(result),
-    timestamps: { startedAt: ctx.startTime, recordedAt: observedNowMs() },
-  });
-}
-
-/** Builds immutable audit records as executions complete or fail. */
-export class ExecutionAuditEngine implements ExecutionMiddleware {
+/** Builds immutable audit records from terminal execution events. */
+export class ExecutionAuditEngine implements ExecutionEventSubscriber {
   readonly name = "audit";
-  readonly priority = MIDDLEWARE_PRIORITY.audit;
 
   private readonly records_: AuditRecord[] = [];
   private readonly capacity: number;
 
   constructor(capacity = 1000) {
     this.capacity = Math.max(1, capacity);
+  }
+
+  onEvent(event: ExecutionEvent): void {
+    // Audit every terminal outcome; `started` carries no result to audit.
+    if (event.type === "execution.started") return;
+    const record: AuditRecord = deepFreeze({
+      executionId: event.executionId,
+      requestId: event.requestId,
+      tenantId: event.tenantId,
+      routingDecision: event.routingDecision,
+      selectedProvider: event.provider,
+      selectedModel: event.model,
+      requestFingerprint: event.requestFingerprint,
+      responseFingerprint: event.responseFingerprint,
+      executionResult: auditedResult(event),
+      timestamps: { startedAt: event.startTime, recordedAt: observedNowMs() },
+    });
+    this.records_.push(record);
+    if (this.records_.length > this.capacity) this.records_.shift();
   }
 
   /** Audit records, oldest first (a copy). Each element is deep-frozen. */
@@ -109,38 +118,5 @@ export class ExecutionAuditEngine implements ExecutionMiddleware {
 
   reset(): void {
     this.records_.length = 0;
-  }
-
-  private append(rec: AuditRecord): void {
-    this.records_.push(rec);
-    if (this.records_.length > this.capacity) this.records_.shift();
-  }
-
-  afterExecute(ctx: InferenceExecutionContext, result: InferenceExecutionResult): void {
-    guard(() => {
-      const responseFingerprint = fingerprint({ text: result.response, json: result.json });
-      this.append(record(ctx, result, responseFingerprint));
-    });
-  }
-
-  executionFailed(ctx: InferenceExecutionContext, error: ExecutionError): void {
-    guard(() => {
-      // A failure produces no response body; synthesize the same normalized
-      // result shape the success path records so every execution is audited.
-      const failedResult: InferenceExecutionResult = {
-        executionId: ctx.executionId,
-        provider: ctx.provider,
-        model: ctx.model,
-        response: null,
-        json: null,
-        usage: null,
-        latency: observedNowMs() - ctx.startTime,
-        finishReason: null,
-        success: false,
-        error: { kind: error.kind, name: error.name, message: error.message },
-      };
-      const responseFingerprint = fingerprint({ error: failedResult.error });
-      this.append(record(ctx, failedResult, responseFingerprint));
-    });
   }
 }

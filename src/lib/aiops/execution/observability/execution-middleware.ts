@@ -46,12 +46,12 @@ export function listMiddleware(): ExecutionMiddleware[] {
   );
 }
 
-/** Canonical chain positions, so the three core observers have a stable,
- *  documented order: telemetry first (it feeds metrics), then audit, then
- *  health. Future middleware (security, caching, optimization) slots around
- *  these by choosing a priority. */
+/** Canonical chain positions. Since Milestone 5.5 the observability stack
+ *  registers a SINGLE middleware — the event-bus publisher — which fans out to
+ *  bus subscribers (telemetry, metrics, audit, health) that are priority-
+ *  independent peers. The publisher runs early so events are emitted before any
+ *  future request-shaping middleware. Future middleware slots around it by
+ *  choosing a priority. */
 export const MIDDLEWARE_PRIORITY = {
-  telemetry: 10,
-  audit: 20,
-  health: 30,
+  eventBus: 10,
 } as const;

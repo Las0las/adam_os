@@ -10,8 +10,12 @@
 // It records `completed` and `failed` events. `started` events advance no
 // counter here — totals are counted at terminal state so success + failure
 // always reconcile with total executions.
+//
+// Since Milestone 5.5 the collector is a BUS SUBSCRIBER: `onEvent` is the
+// subscription entry point and folds each event into the running totals.
 
 import type { ExecutionEvent } from "./execution-events";
+import type { ExecutionEventSubscriber } from "./execution-event-bus";
 
 /** Per-key usage tally (provider id or model key). */
 export interface UsageTally {
@@ -43,7 +47,9 @@ function emptyTally(): UsageTally {
   return { executions: 0, successes: 0, failures: 0 };
 }
 
-export class MetricsCollector {
+export class MetricsCollector implements ExecutionEventSubscriber {
+  readonly name = "metrics";
+
   private totalExecutions = 0;
   private successCount = 0;
   private failureCount = 0;
@@ -62,6 +68,11 @@ export class MetricsCollector {
     if (success) t.successes += 1;
     else t.failures += 1;
     map.set(key, t);
+  }
+
+  /** Bus subscription entry point — folds the event into the running totals. */
+  onEvent(event: ExecutionEvent): void {
+    this.record(event);
   }
 
   /** Fold one canonical event into the running totals. `started` is ignored —
