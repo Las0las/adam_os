@@ -3,6 +3,7 @@
 
 import { NextResponse } from "next/server";
 import type { ZodType } from "zod";
+import { captureException } from "@/lib/observability/telemetry";
 
 /** Thrown by parseBody when the request body fails schema validation. `run()`
  *  maps it (like any throw) to a 400 with the validation message. */
@@ -26,6 +27,11 @@ export async function run(fn: () => Promise<unknown>): Promise<NextResponse> {
   try {
     return ok(await fn());
   } catch (err) {
+    // Export server errors (not client validation 400s). Fire-and-forget so the
+    // telemetry round-trip never delays the response.
+    if (!(err instanceof ValidationError)) {
+      void captureException(err, { component: "api_route" });
+    }
     return fail(err instanceof Error ? err.message : String(err));
   }
 }
