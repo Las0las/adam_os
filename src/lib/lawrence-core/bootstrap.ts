@@ -15,6 +15,7 @@ import { listObjects } from "@/lib/dataops/ontology/object-service";
 import { createNotificationRule } from "@/lib/mission-control/notifications/notification-service";
 import { installMissionControlGovernance } from "@/lib/mission-control/runtime/mission-control-seed";
 import { installEvalSuites } from "@/lib/aiops/evals/eval-seed";
+import { installSecuritySeeds } from "@/lib/security/security-seed";
 import "@/lib/mission-control/actions/builtins";
 import "@/lib/integrations/register-integrations";
 import {
@@ -129,6 +130,10 @@ export async function bootstrap(): Promise<void> {
   // Phase 7: seed default eval suites so the evals + observability surfaces have
   // live data for the demo tenant.
   await installEvalSuites(ctx);
+
+  // Phase 10: install the security control plane (security policies, scoped roles
+  // + group, object access policies, sample classifications, retention policies).
+  await installSecuritySeeds(ctx);
 
   // A draft release bundle for the recruiting pack.
   await db.releaseBundles.insert({

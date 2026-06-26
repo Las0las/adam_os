@@ -4,6 +4,7 @@
 
 import { db } from "@/lib/lawrence-core/db";
 import { listObjects, linksFor } from "@/lib/dataops/ontology/object-service";
+import { enforceObjectAccessForActor } from "@/lib/security/access-guard";
 import { availableActionsForObject } from "./available-actions";
 import type { ActorContext } from "@/types/platform";
 import type { ObjectDetail } from "./object-detail-types";
@@ -29,6 +30,15 @@ export async function getObjectDetail(
   if (!object || object.objectType !== objectType) {
     throw new ObjectNotFoundError(objectType, objectId);
   }
+
+  // §D object-level authorization — throws AccessDeniedError (and audits the
+  // denial) before any properties/evidence/traces are assembled.
+  await enforceObjectAccessForActor(ctx, {
+    objectType,
+    objectId,
+    permission: "read",
+    objectTenantId: object.tenantId,
+  });
 
   // Relationships (both directions), titles resolved.
   const links = await linksFor(ctx, objectId);

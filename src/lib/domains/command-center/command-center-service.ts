@@ -8,6 +8,7 @@ import { now } from "@/lib/lawrence-core/utils/ids";
 import { availableActionsForObject } from "@/lib/domains/object-detail/available-actions";
 import { rankItems } from "./command-center-rankers";
 import { inferDomain } from "./command-center-domain";
+import { checkObjectAccessForActor } from "@/lib/security/access-guard";
 import type { ActorContext } from "@/types/platform";
 import type {
   CommandCenterItem,
@@ -61,6 +62,31 @@ export async function getCommandCenterOverview(
   const mode: SurfaceMode = opts.mode ?? "executive";
   const referenceTime = now();
   const rank = (items: CommandCenterItem[]) => rankItems(items, { mode, referenceTime });
+
+  // §D object-level authorization — drop any item referencing an object the
+  // caller cannot read. Items without an objectRef are already tenant-scoped.
+  // Fail-closed: an errored access check suppresses the item.
+  const filterAccessible = async (items: CommandCenterItem[]): Promise<CommandCenterItem[]> => {
+    const out: CommandCenterItem[] = [];
+    for (const it of items) {
+      if (!it.objectRef) {
+        out.push(it);
+        continue;
+      }
+      try {
+        const decision = await checkObjectAccessForActor(ctx, {
+          objectType: it.objectRef.objectType,
+          objectId: it.objectRef.objectId,
+          permission: "read",
+          objectTenantId: ctx.tenantId,
+        });
+        if (decision.allowed) out.push(it);
+      } catch {
+        // suppressed
+      }
+    }
+    return out;
+  };
 
   // ── Actions ────────────────────────────────────────────────────────────
   const actions = await db.actionExecutions.list(ctx.tenantId);
@@ -275,10 +301,10 @@ export async function getCommandCenterOverview(
       generatedAt: referenceTime,
       mode,
       metrics,
-      actionQueue: rank(keepDemo(actionItems)),
-      reviewQueue: rank(keepDemo(reviewItems)),
-      riskQueue: rank(keepDemo(riskItems)),
-      recommendationQueue: rank([...keepDemo(recItems), ...demoObjectItems]),
+      actionQueue: rank(await filterAccessible(keepDemo(actionItems))),
+      reviewQueue: rank(await filterAccessible(keepDemo(reviewItems))),
+      riskQueue: rank(await filterAccessible(keepDemo(riskItems))),
+      recommendationQueue: rank(await filterAccessible([...keepDemo(recItems), ...demoObjectItems])),
       notificationQueue: rank(keepDemo(notifItems)),
       incidentQueue: rank([]),
       recentActivity: auditItems,
@@ -289,10 +315,10 @@ export async function getCommandCenterOverview(
     generatedAt: referenceTime,
     mode,
     metrics,
-    actionQueue: rank(actionItems),
-    reviewQueue: rank(reviewItems),
-    riskQueue: rank([...riskItems.filter((i) => i.status !== "completed"), ...learningRiskItems]),
-    recommendationQueue: rank([...recItems, ...learningRecItems]),
+    actionQueue: rank(await filterAccessible(actionItems)),
+    reviewQueue: rank(await filterAccessible(reviewItems)),
+    riskQueue: rank(await filterAccessible([...riskItems.filter((i) => i.status !== "completed"), ...learningRiskItems])),
+    recommendationQueue: rank(await filterAccessible([...recItems, ...learningRecItems])),
     notificationQueue: rank(notifItems),
     incidentQueue: rank([...incidentItems, ...learningIncidentItems]),
     recentActivity: auditItems,

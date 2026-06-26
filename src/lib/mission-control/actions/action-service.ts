@@ -16,6 +16,7 @@ import {
 } from "../runtime/failure-threshold";
 import { createApprovalForSubject } from "../approvals/approval-request-service";
 import { createRuntimeTrace } from "@/lib/aiops/observability/runtime-trace-service";
+import { checkObjectAccessForActor } from "@/lib/security/access-guard";
 import type { ActorContext, Permission } from "@/types/platform";
 import type { ActionDefinition, ActionExecution } from "@/types/mission-control";
 
@@ -114,6 +115,26 @@ export async function executeAction(
   // Permission check.
   if (handler.requiredPermission && !hasPermission(ctx, handler.requiredPermission)) {
     return await block(ctx, exec.id, `missing permission: ${handler.requiredPermission}`);
+  }
+
+  // §D object-level authorization — an action targeting an object must clear that
+  // object's write/execute ACL. Stays in-pipeline (block + audit) on deny so a
+  // destructive action never runs without object-level authority. Fail-closed.
+  if (input.object) {
+    const objectPermission = handler.dangerous ? "execute" : "write";
+    const decision = await checkObjectAccessForActor(ctx, {
+      objectType: input.object.type,
+      objectId: input.object.id,
+      permission: objectPermission,
+      objectTenantId: ctx.tenantId,
+    });
+    if (!decision.allowed) {
+      return await block(
+        ctx,
+        exec.id,
+        `object access denied (${objectPermission}) on ${input.object.type}:${input.object.id} — ${decision.reason}`,
+      );
+    }
   }
 
   // Precondition check.

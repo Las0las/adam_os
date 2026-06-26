@@ -34,7 +34,15 @@ export type Permission =
   | "mission_control.admin"
   | "deploy.promote"
   | "notifications.manage"
-  | "integrations.manage";
+  | "integrations.manage"
+  | "security.admin"
+  | "security.access_manage"
+  | "security.classification_manage"
+  | "security.retention_manage"
+  | "security.compliance_export"
+  | "security.full_evidence_export"
+  | "security.audit_verify"
+  | "security.finding_resolve";
 
 /** The authenticated actor context threaded through every service call. */
 export interface ActorContext {
@@ -52,4 +60,8 @@ export interface AuditEvent {
   subjectId?: string | null;
   metadata: Record<string, unknown>;
   createdAt: string;
+  // Phase 10 — tamper-evident hash chain (optional; legacy events omit these).
+  previousHash?: string | null;
+  eventHash?: string | null;
+  integrityVersion?: number;
 }
