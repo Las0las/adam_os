@@ -9,6 +9,7 @@ import { requirePermission } from "@/lib/lawrence-core/permissions/permissions";
 import { emitAudit } from "@/lib/lawrence-core/audit/audit-service";
 import { retrieve } from "../retrieval/retrieval-service";
 import { runFunction } from "../functions/function-runner";
+import { enterCostMeter } from "../models/cost-meter";
 import { executeAction } from "@/lib/mission-control/actions/action-service";
 import { openReviewCase } from "@/lib/mission-control/review-queue/review-service";
 import { emitEvent } from "@/lib/mission-control/notifications/notification-service";
@@ -30,6 +31,7 @@ type Blackboard = Record<string, unknown>;
  *   - maxSteps: hard cap on node executions
  *   - timeoutMs: wall-clock deadline for the whole run (enforced per node)
  *   - maxFunctionCalls: cap on model-invoking `function` nodes (a call budget)
+ *   - maxCostUsd: cap on accumulated model spend (a true dollar budget)
  * Defaults come from env; callers may override per run. A breach fails the run
  * through the normal failure path (audit + trace + failure-threshold incident).
  */
@@ -37,9 +39,10 @@ export interface AgentRunLimits {
   maxSteps: number;
   timeoutMs: number;
   maxFunctionCalls: number;
+  maxCostUsd: number;
 }
 
-function intEnv(key: string, fallback: number): number {
+function numEnv(key: string, fallback: number): number {
   const raw = process.env[key];
   const parsed = raw ? Number(raw) : NaN;
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
@@ -47,9 +50,10 @@ function intEnv(key: string, fallback: number): number {
 
 export function defaultAgentLimits(): AgentRunLimits {
   return {
-    maxSteps: intEnv("LAWRENCE_AGENT_MAX_STEPS", 50),
-    timeoutMs: intEnv("LAWRENCE_AGENT_TIMEOUT_MS", 60_000),
-    maxFunctionCalls: intEnv("LAWRENCE_AGENT_MAX_FUNCTION_CALLS", 20),
+    maxSteps: numEnv("LAWRENCE_AGENT_MAX_STEPS", 50),
+    timeoutMs: numEnv("LAWRENCE_AGENT_TIMEOUT_MS", 60_000),
+    maxFunctionCalls: numEnv("LAWRENCE_AGENT_MAX_FUNCTION_CALLS", 20),
+    maxCostUsd: numEnv("LAWRENCE_AGENT_MAX_COST_USD", 5),
   };
 }
 
@@ -94,6 +98,9 @@ export async function runAgent(
   const deadline = Date.now() + limits.timeoutMs;
   let stepCount = 0;
   let functionCalls = 0;
+  // Bind a cost meter for the run: every model call downstream (function nodes,
+  // reranked retrieval) records its USD cost here so we can enforce a budget.
+  const costMeter = enterCostMeter();
 
   try {
     let current = agent.graph.nodes.find((n) => n.kind === "input") ?? agent.graph.nodes[0];
@@ -134,6 +141,12 @@ export async function runAgent(
       });
       Object.assign(blackboard, output);
 
+      // Dollar budget: model cost accrues during node execution; stop as soon as
+      // the run exceeds its spend cap.
+      if (costMeter.totalCostUsd > limits.maxCostUsd) {
+        throw new Error(`agent exceeded cost budget ($${limits.maxCostUsd.toFixed(2)})`);
+      }
+
       if (current.kind === "output") break;
       current = nextNode(agent, current, blackboard, nodesById);
     }
@@ -150,7 +163,7 @@ export async function runAgent(
       componentType: "agent",
       componentKey: agent.key,
       status: "completed",
-      metrics: { nodeCount: steps.length, failedNodeCount: 0, functionCalls },
+      metrics: { nodeCount: steps.length, failedNodeCount: 0, functionCalls, costUsd: costMeter.totalCostUsd },
       outputSummary: { keys: Object.keys(blackboard).slice(0, 12) },
     });
     return completed;
@@ -164,7 +177,7 @@ export async function runAgent(
       componentType: "agent",
       componentKey: agent.key,
       status: "failed",
-      metrics: { nodeCount: steps.length, functionCalls },
+      metrics: { nodeCount: steps.length, functionCalls, costUsd: costMeter.totalCostUsd },
       errors: [message],
     });
     const runs = await db.agentRuns.list(ctx.tenantId, (r) => r.agentId === agent.key);
