@@ -72,6 +72,10 @@ import type {
   RecommendationOutcome,
   LearningSignal,
 } from "@/lib/aiops/learning/learning-types";
+import type {
+  DomainPackInstallation,
+  DomainPackDemoRun,
+} from "@/lib/domain-packs/domain-pack-types";
 
 // The tenants table is the one row-set without a foreign tenantId; it scopes to
 // itself, so we store tenantId === id to satisfy the Collection contract.
@@ -134,6 +138,9 @@ export interface Database {
   humanFeedback: Collection<HumanFeedback>;
   recommendationOutcomes: Collection<RecommendationOutcome>;
   learningSignals: Collection<LearningSignal>;
+  // domain packs — Phase 8
+  domainPackInstallations: Collection<DomainPackInstallation>;
+  domainPackDemoRuns: Collection<DomainPackDemoRun>;
 }
 
 function createDatabase(): Database {
@@ -188,6 +195,8 @@ function createDatabase(): Database {
     humanFeedback: coll("human_feedback"),
     recommendationOutcomes: coll("recommendation_outcomes"),
     learningSignals: coll("learning_signals"),
+    domainPackInstallations: coll("domain_pack_installations"),
+    domainPackDemoRuns: coll("domain_pack_demo_runs"),
   };
 }
 

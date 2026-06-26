@@ -49,6 +49,9 @@ function asSeverity(value: unknown): CommandSeverity | null {
 
 export interface OverviewOptions {
   mode?: SurfaceMode;
+  /** Phase 8 — restrict the overview to a pack's demo objects only. */
+  demoMode?: boolean;
+  packKey?: string;
 }
 
 export async function getCommandCenterOverview(
@@ -243,6 +246,44 @@ export async function getCommandCenterOverview(
       actionItems.filter((i) => i.status === "failed").length +
       notifItems.filter((i) => i.status === "failed").length,
   };
+
+  // Phase 8 — demo mode: show only the selected pack's demo objects + work
+  // scoped to them. Live action behavior is preserved; nothing is faked.
+  if (opts.demoMode && opts.packKey) {
+    const packKey = opts.packKey;
+    const demoObjects = (await listObjects(ctx)).filter(
+      (o) => o.properties.__demo === true && o.properties.__packKey === packKey,
+    );
+    const demoIds = new Set(demoObjects.map((o) => o.id));
+    const keepDemo = (items: CommandCenterItem[]) =>
+      items.filter((i) => i.objectRef && demoIds.has(i.objectRef.objectId));
+    const demoObjectItems: CommandCenterItem[] = demoObjects.map((o) => ({
+      id: o.id,
+      tenantId: o.tenantId,
+      domain: inferDomain(o.objectType),
+      kind: "recommendation",
+      title: o.title ?? o.objectType,
+      summary: `DEMO ${o.objectType}`,
+      status: "open",
+      severity: null,
+      priorityScore: 0,
+      objectRef: { objectType: o.objectType, objectId: o.id, title: o.title },
+      createdAt: o.createdAt,
+      metadata: { demo: true, packKey },
+    }));
+    return {
+      generatedAt: referenceTime,
+      mode,
+      metrics,
+      actionQueue: rank(keepDemo(actionItems)),
+      reviewQueue: rank(keepDemo(reviewItems)),
+      riskQueue: rank(keepDemo(riskItems)),
+      recommendationQueue: rank([...keepDemo(recItems), ...demoObjectItems]),
+      notificationQueue: rank(keepDemo(notifItems)),
+      incidentQueue: rank([]),
+      recentActivity: auditItems,
+    };
+  }
 
   return {
     generatedAt: referenceTime,
