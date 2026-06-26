@@ -41,6 +41,22 @@ export function runPreflight(env: Record<string, string | undefined> = process.e
         : "in-memory (dev only)",
   });
 
+  // Authentication: Clerk is REQUIRED in production (both keys) so requests
+  // resolve a real session. An explicit override (LAWRENCE_ALLOW_DEMO_AUTH=1)
+  // accepts the demo system actor knowingly (e.g. an internal demo deployment).
+  const authRequired = isProduction && env.LAWRENCE_ALLOW_DEMO_AUTH !== "1";
+  const clerkConfigured = Boolean(env.CLERK_SECRET_KEY && env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+  checks.push({
+    key: "auth_provider",
+    ok: clerkConfigured || !authRequired,
+    required: authRequired,
+    detail: clerkConfigured
+      ? "clerk configured"
+      : isProduction
+        ? "MISSING — Clerk required in production (or set LAWRENCE_ALLOW_DEMO_AUTH=1)"
+        : "demo actor (dev only)",
+  });
+
   // At least one model provider key OR explicit mock acceptance.
   const hasModel = ONE_OF_MODEL_KEYS.some((k) => Boolean(env[k]));
   checks.push({

@@ -31,6 +31,7 @@ test("production with DATABASE_URL passes", () => {
     APP_BASE_URL: "http://x",
     ENCRYPTION_KEY: "k",
     LAWRENCE_ALLOW_MOCK_MODEL: "1",
+    LAWRENCE_ALLOW_DEMO_AUTH: "1",
     DATABASE_URL: "postgres://localhost/lawrence",
   });
   assert.equal(result.ok, true);
@@ -43,6 +44,32 @@ test("production with explicit memory-store override passes without DATABASE_URL
     ENCRYPTION_KEY: "k",
     LAWRENCE_ALLOW_MOCK_MODEL: "1",
     LAWRENCE_ALLOW_MEMORY_STORE: "1",
+    LAWRENCE_ALLOW_DEMO_AUTH: "1",
+  });
+  assert.equal(result.ok, true);
+});
+
+test("production without an auth provider fails closed", () => {
+  const result = runPreflight({
+    NODE_ENV: "production",
+    APP_BASE_URL: "http://x",
+    ENCRYPTION_KEY: "k",
+    LAWRENCE_ALLOW_MOCK_MODEL: "1",
+    DATABASE_URL: "postgres://localhost/lawrence",
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.failures.some((f) => f.key === "auth_provider"));
+});
+
+test("production with Clerk configured passes auth check", () => {
+  const result = runPreflight({
+    NODE_ENV: "production",
+    APP_BASE_URL: "http://x",
+    ENCRYPTION_KEY: "k",
+    LAWRENCE_ALLOW_MOCK_MODEL: "1",
+    DATABASE_URL: "postgres://localhost/lawrence",
+    CLERK_SECRET_KEY: "sk_test_x",
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_x",
   });
   assert.equal(result.ok, true);
 });
