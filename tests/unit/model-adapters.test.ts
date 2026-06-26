@@ -7,6 +7,7 @@ import { AnthropicModelProvider, DEFAULT_ANTHROPIC_MODEL } from "@/lib/integrati
 import { OpenAIModelProvider, DEFAULT_OPENAI_MODEL } from "@/lib/integrations/openai/openai-client";
 import { GoogleModelProvider, DEFAULT_GOOGLE_MODEL } from "@/lib/integrations/google/google-client";
 import { AzureOpenAIModelProvider } from "@/lib/integrations/azure/azure-openai-client";
+import { GitHubModelsProvider, DEFAULT_GITHUB_MODEL } from "@/lib/integrations/github/github-models-client";
 import { computeCostUsd } from "@/lib/integrations/model-pricing";
 
 test("Anthropic adapter defaults to the flagship Opus model", () => {
@@ -103,6 +104,49 @@ test("Azure OpenAI adapter calls the deployment endpoint with the api-key header
     globalThis.fetch = realFetch;
     delete process.env.AZURE_OPENAI_API_KEY;
     delete process.env.AZURE_OPENAI_ENDPOINT;
+  }
+});
+
+test("GitHub Models adapter defaults to a publisher/model name", () => {
+  const provider = new GitHubModelsProvider();
+  assert.equal(provider.provider, "github_models");
+  assert.equal(provider.modelKey, DEFAULT_GITHUB_MODEL);
+  assert.equal(DEFAULT_GITHUB_MODEL, "openai/gpt-4o-mini");
+});
+
+test("GitHub Models adapter fails closed without a dedicated token", async () => {
+  delete process.env.GITHUB_MODELS_TOKEN;
+  const provider = new GitHubModelsProvider();
+  await assert.rejects(() => provider.complete({ prompt: "hi" }), /GITHUB_MODELS_TOKEN/);
+});
+
+test("GitHub Models adapter calls the inference endpoint with a Bearer token", async () => {
+  const realFetch = globalThis.fetch;
+  process.env.GITHUB_MODELS_TOKEN = "ghm-token";
+  let capturedUrl = "";
+  let capturedInit: RequestInit | undefined;
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    capturedUrl = String(url);
+    capturedInit = init;
+    return new Response(
+      JSON.stringify({
+        choices: [{ message: { content: '{"ok":true}' } }],
+        usage: { prompt_tokens: 3, completion_tokens: 4 },
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  }) as typeof fetch;
+  try {
+    const provider = new GitHubModelsProvider({ modelKey: "openai/gpt-4o-mini" });
+    const res = await provider.complete({ prompt: "x", outputSchema: { type: "object" } });
+    assert.deepEqual(res.json, { ok: true });
+    assert.equal(res.provider, "github_models");
+    assert.match(capturedUrl, /^https:\/\/models\.github\.ai\/inference\/chat\/completions$/);
+    const headers = capturedInit?.headers as Record<string, string>;
+    assert.equal(headers["authorization"], "Bearer ghm-token");
+  } finally {
+    globalThis.fetch = realFetch;
+    delete process.env.GITHUB_MODELS_TOKEN;
   }
 });
 

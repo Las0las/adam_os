@@ -25,6 +25,7 @@ import { AnthropicModelProvider } from "@/lib/integrations/anthropic/anthropic-c
 import { OpenAIModelProvider } from "@/lib/integrations/openai/openai-client";
 import { GoogleModelProvider } from "@/lib/integrations/google/google-client";
 import { AzureOpenAIModelProvider } from "@/lib/integrations/azure/azure-openai-client";
+import { GitHubModelsProvider } from "@/lib/integrations/github/github-models-client";
 import type { ActorContext } from "@/types/platform";
 import type { ModelDefinition } from "@/types/aiops";
 
@@ -51,6 +52,11 @@ export function resolveDefaultProvider(): ModelProvider {
     return new AzureOpenAIModelProvider({
       deployment: process.env.AZURE_OPENAI_DEPLOYMENT || process.env.LAWRENCE_DEFAULT_MODEL,
     });
+  }
+  // Keyed on the DEDICATED GITHUB_MODELS_TOKEN (never the ubiquitous GITHUB_TOKEN)
+  // so it can't activate by accident in CI/Actions.
+  if (process.env.GITHUB_MODELS_TOKEN) {
+    return new GitHubModelsProvider({ modelKey: process.env.LAWRENCE_DEFAULT_MODEL });
   }
   return new MockModelProvider();
 }
@@ -99,6 +105,15 @@ export function providerFromDefinition(def: ModelDefinition): ModelProvider {
         );
       }
       return new GoogleModelProvider({ modelKey: def.modelKey });
+    case "github_models":
+      if (!process.env.GITHUB_MODELS_TOKEN) {
+        throw new Error(
+          `Tenant '${def.tenantId}' authorized GitHub Models '${def.modelKey}' for ` +
+            `'${def.purpose}', but GITHUB_MODELS_TOKEN is not set. Refusing to substitute ` +
+            `another model.`,
+        );
+      }
+      return new GitHubModelsProvider({ modelKey: def.modelKey });
     default:
       throw new Error(
         `No adapter for provider '${def.provider}' (model '${def.modelKey}'). ` +
