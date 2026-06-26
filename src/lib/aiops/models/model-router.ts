@@ -14,112 +14,53 @@
 // (unauthorized) model. When a tenant has authorized nothing for a purpose we
 // fall back to the process default — which is the deterministic mock unless the
 // operator has set a provider key, so local/test runs stay key-free.
+//
+// The router depends ONLY on the Provider Registry — no provider-specific
+// imports or switch statements. Each provider declares its env requirements,
+// default-selection priority, and adapter factory in its registration.
 
 import { db } from "@/lib/lawrence-core/db";
-import {
-  MockModelProvider,
-  getModelProvider,
-  type ModelProvider,
-} from "./model-provider";
-import { AnthropicModelProvider } from "@/lib/integrations/anthropic/anthropic-client";
-import { OpenAIModelProvider } from "@/lib/integrations/openai/openai-client";
-import { GoogleModelProvider } from "@/lib/integrations/google/google-client";
-import { AzureOpenAIModelProvider } from "@/lib/integrations/azure/azure-openai-client";
-import { GitHubModelsProvider } from "@/lib/integrations/github/github-models-client";
+import { MockModelProvider, getModelProvider, type ModelProvider } from "./model-provider";
+import { providerRegistry } from "@/lib/aiops/providers/provider-registry-bootstrap";
+import { describeRequiredEnv } from "@/lib/aiops/providers/provider-registry-types";
 import type { ActorContext } from "@/types/platform";
 import type { ModelDefinition } from "@/types/aiops";
 
 /**
- * Choose the process default provider from the environment. Preference order:
- * Anthropic → OpenAI → Google → deterministic mock. The mock default keeps the
- * platform fully runnable with no keys (tests, local, CI).
+ * Choose the process default provider from the environment. Providers are tried
+ * in registry priority order (Anthropic → OpenAI → Google → Azure → GitHub
+ * Models); the first one whose env is configured wins, else the deterministic
+ * mock (which keeps the platform fully runnable with no keys).
  */
 export function resolveDefaultProvider(): ModelProvider {
-  if (process.env.ANTHROPIC_API_KEY) {
-    return new AnthropicModelProvider({ modelKey: process.env.LAWRENCE_DEFAULT_MODEL });
-  }
-  if (process.env.OPENAI_API_KEY) {
-    return new OpenAIModelProvider({ modelKey: process.env.LAWRENCE_DEFAULT_MODEL });
-  }
-  if (process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY) {
-    return new GoogleModelProvider({ modelKey: process.env.LAWRENCE_DEFAULT_MODEL });
-  }
-  if (
-    process.env.AZURE_OPENAI_API_KEY &&
-    process.env.AZURE_OPENAI_ENDPOINT &&
-    (process.env.AZURE_OPENAI_DEPLOYMENT || process.env.LAWRENCE_DEFAULT_MODEL)
-  ) {
-    return new AzureOpenAIModelProvider({
-      deployment: process.env.AZURE_OPENAI_DEPLOYMENT || process.env.LAWRENCE_DEFAULT_MODEL,
-    });
-  }
-  // Keyed on the DEDICATED GITHUB_MODELS_TOKEN (never the ubiquitous GITHUB_TOKEN)
-  // so it can't activate by accident in CI/Actions.
-  if (process.env.GITHUB_MODELS_TOKEN) {
-    return new GitHubModelsProvider({ modelKey: process.env.LAWRENCE_DEFAULT_MODEL });
+  for (const provider of providerRegistry.list()) {
+    if (provider.isDefaultEligible()) return provider.createDefault();
   }
   return new MockModelProvider();
 }
 
 /**
  * Build the provider a tenant has authorized for the given purpose. Throws if
- * the authorized provider's key is missing (fail-closed) — we never quietly
- * downgrade to a different model than the one the tenant configured.
+ * the provider is unknown, or if its credentials are missing (fail-closed) — we
+ * never quietly downgrade to a different model than the one the tenant
+ * configured.
  */
 export function providerFromDefinition(def: ModelDefinition): ModelProvider {
-  switch (def.provider) {
-    case "anthropic":
-      if (!process.env.ANTHROPIC_API_KEY) {
-        throw new Error(
-          `Tenant '${def.tenantId}' authorized Anthropic model '${def.modelKey}' for ` +
-            `'${def.purpose}', but ANTHROPIC_API_KEY is not set. Refusing to substitute ` +
-            `another model.`,
-        );
-      }
-      return new AnthropicModelProvider({ modelKey: def.modelKey });
-    case "openai":
-      if (!process.env.OPENAI_API_KEY) {
-        throw new Error(
-          `Tenant '${def.tenantId}' authorized OpenAI model '${def.modelKey}' for ` +
-            `'${def.purpose}', but OPENAI_API_KEY is not set. Refusing to substitute ` +
-            `another model.`,
-        );
-      }
-      return new OpenAIModelProvider({ modelKey: def.modelKey });
-    case "azure_openai":
-      // The deployment name is def.modelKey; Azure has its own endpoint + auth.
-      if (!process.env.AZURE_OPENAI_API_KEY || !process.env.AZURE_OPENAI_ENDPOINT) {
-        throw new Error(
-          `Tenant '${def.tenantId}' authorized Azure OpenAI deployment '${def.modelKey}' for ` +
-            `'${def.purpose}', but AZURE_OPENAI_API_KEY / AZURE_OPENAI_ENDPOINT are not set. ` +
-            `Refusing to substitute another model.`,
-        );
-      }
-      return new AzureOpenAIModelProvider({ deployment: def.modelKey });
-    case "google":
-      if (!process.env.GOOGLE_API_KEY && !process.env.GEMINI_API_KEY) {
-        throw new Error(
-          `Tenant '${def.tenantId}' authorized Google model '${def.modelKey}' for ` +
-            `'${def.purpose}', but GOOGLE_API_KEY (or GEMINI_API_KEY) is not set. Refusing ` +
-            `to substitute another model.`,
-        );
-      }
-      return new GoogleModelProvider({ modelKey: def.modelKey });
-    case "github_models":
-      if (!process.env.GITHUB_MODELS_TOKEN) {
-        throw new Error(
-          `Tenant '${def.tenantId}' authorized GitHub Models '${def.modelKey}' for ` +
-            `'${def.purpose}', but GITHUB_MODELS_TOKEN is not set. Refusing to substitute ` +
-            `another model.`,
-        );
-      }
-      return new GitHubModelsProvider({ modelKey: def.modelKey });
-    default:
-      throw new Error(
-        `No adapter for provider '${def.provider}' (model '${def.modelKey}'). ` +
-          `Refusing to guess a substitute provider.`,
-      );
+  const provider = providerRegistry.get(def.provider);
+  if (!provider) {
+    throw new Error(
+      `No adapter for provider '${def.provider}' (model '${def.modelKey}'). ` +
+        `Refusing to guess a substitute provider.`,
+    );
   }
+  if (!provider.isConfigured()) {
+    throw new Error(
+      `Tenant '${def.tenantId}' authorized ${provider.metadata.displayName} model ` +
+        `'${def.modelKey}' for '${def.purpose}', but ${describeRequiredEnv(provider.requiredEnv)} ` +
+        `is not set. Refusing to substitute another model.`,
+    );
+  }
+  return provider.create(def.modelKey);
 }
 
 /**
