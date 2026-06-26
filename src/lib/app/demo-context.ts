@@ -11,6 +11,8 @@ import { ensureBootstrapped, DEMO_TENANT_ID } from "@/lib/lawrence-core/bootstra
 import { systemActor } from "@/lib/lawrence-core/permissions/permissions";
 import { enterTenant } from "@/lib/lawrence-core/db/tenant-store";
 import { ensureTenant, ensureUser, resolveUserPermissions } from "@/lib/setup/tenant-provisioning-service";
+import { db } from "@/lib/lawrence-core/db";
+import { enterTenant } from "@/lib/lawrence-core/db/tenant-store";
 import type { ActorContext, Permission } from "@/types/platform";
 
 type Env = Record<string, string | undefined>;
@@ -71,6 +73,28 @@ export function permissionsForOrgRole(orgRole: string | null | undefined): Permi
  * existing user/role model (the app user id is the Clerk user id). The org-role
  * grant remains a fallback if a user somehow has no roles.
  */
+ * Resolve permissions from the existing user/role model first (reuse, not
+ * reinvent): app user (by email, tenant-scoped) → roleIds → roles → permissions.
+ * Falls back to the org-role grant when the user has no provisioned app roles.
+ */
+async function resolvePermissions(
+  tenantId: string,
+  email: string | null,
+  orgRole: string | null | undefined,
+): Promise<Permission[]> {
+  if (email) {
+    const user = await db.users.find(tenantId, (u) => u.email === email);
+    if (user && user.roleIds.length > 0) {
+      const roles = await db.roles.list(tenantId, (r) => user.roleIds.includes(r.id));
+      const perms = new Set<Permission>();
+      for (const role of roles) for (const p of role.permissions) perms.add(p);
+      if (perms.size > 0) return [...perms];
+    }
+  }
+  return permissionsForOrgRole(orgRole);
+}
+
+/** Build an ActorContext from the active Clerk session, or null if none/unconfigured. */
 async function resolveClerkActor(): Promise<ActorContext | null> {
   if (!isClerkConfigured()) return null;
   try {
@@ -90,6 +114,9 @@ async function resolveClerkActor(): Promise<ActorContext | null> {
       actorUserId: userId,
       permissions: permissions.length > 0 ? permissions : permissionsForOrgRole(session.orgRole),
     };
+    const email = (session.sessionClaims?.email as string | undefined) ?? null;
+    const permissions = await resolvePermissions(tenantId, email, session.orgRole);
+    return { tenantId, actorUserId: userId, permissions };
   } catch {
     // Not inside a Clerk request context (e.g. tests/jobs) — defer to fallback.
     return null;
