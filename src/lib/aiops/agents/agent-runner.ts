@@ -23,12 +23,55 @@ import type { AgentDefinition, AgentNode, AgentRun, AgentRunStep } from "@/types
 
 type Blackboard = Record<string, unknown>;
 
+/**
+ * Resource governance for a single agent run (§30, runtime safety). Bounds an
+ * agent so a buggy graph, a hung dependency, or a runaway loop cannot consume
+ * unbounded wall-clock or model spend:
+ *   - maxSteps: hard cap on node executions
+ *   - timeoutMs: wall-clock deadline for the whole run (enforced per node)
+ *   - maxFunctionCalls: cap on model-invoking `function` nodes (a call budget)
+ * Defaults come from env; callers may override per run. A breach fails the run
+ * through the normal failure path (audit + trace + failure-threshold incident).
+ */
+export interface AgentRunLimits {
+  maxSteps: number;
+  timeoutMs: number;
+  maxFunctionCalls: number;
+}
+
+function intEnv(key: string, fallback: number): number {
+  const raw = process.env[key];
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+export function defaultAgentLimits(): AgentRunLimits {
+  return {
+    maxSteps: intEnv("LAWRENCE_AGENT_MAX_STEPS", 50),
+    timeoutMs: intEnv("LAWRENCE_AGENT_TIMEOUT_MS", 60_000),
+    maxFunctionCalls: intEnv("LAWRENCE_AGENT_MAX_FUNCTION_CALLS", 20),
+  };
+}
+
+/** Reject if `p` does not settle within `ms`. The underlying work is not killed
+ *  (JS promises are not cancellable), but the run is bounded and fails closed. */
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  if (ms <= 0) return Promise.reject(new Error(`agent exceeded time budget at ${label}`));
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`agent ${label} timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
+}
+
 export async function runAgent(
   ctx: ActorContext,
   agent: AgentDefinition,
   input: Record<string, unknown>,
+  overrides?: Partial<AgentRunLimits>,
 ): Promise<AgentRun> {
   requirePermission(ctx, "aiops.agent_admin");
+  const limits: AgentRunLimits = { ...defaultAgentLimits(), ...overrides };
   // Fail-closed: refuse to run a kill-switched agent.
   await assertNotKilled({ tenantId: ctx.tenantId, componentType: "agent", componentKey: agent.key });
   const run = await db.agentRuns.insert({
@@ -48,6 +91,10 @@ export async function runAgent(
   const steps: AgentRunStep[] = [];
   const nodesById = new Map(agent.graph.nodes.map((n) => [n.id, n]));
 
+  const deadline = Date.now() + limits.timeoutMs;
+  let stepCount = 0;
+  let functionCalls = 0;
+
   try {
     let current = agent.graph.nodes.find((n) => n.kind === "input") ?? agent.graph.nodes[0];
     const guard = new Set<string>();
@@ -55,8 +102,28 @@ export async function runAgent(
       if (guard.has(current.id)) throw new Error(`Cycle detected at node ${current.id}`);
       guard.add(current.id);
 
+      // Resource governance, evaluated before each node executes.
+      stepCount += 1;
+      if (stepCount > limits.maxSteps) {
+        throw new Error(`agent exceeded step budget (${limits.maxSteps})`);
+      }
+      if (Date.now() > deadline) {
+        throw new Error(`agent exceeded time budget (${limits.timeoutMs}ms)`);
+      }
+      if (current.kind === "function") {
+        functionCalls += 1;
+        if (functionCalls > limits.maxFunctionCalls) {
+          throw new Error(`agent exceeded model-call budget (${limits.maxFunctionCalls})`);
+        }
+      }
+
       const startedAt = now();
-      const output = await executeNode(ctx, current, blackboard);
+      const remainingMs = deadline - Date.now();
+      const output = await withTimeout(
+        executeNode(ctx, current, blackboard),
+        remainingMs,
+        `node ${current.id}`,
+      );
       steps.push({
         nodeId: current.id,
         kind: current.kind,
@@ -83,7 +150,7 @@ export async function runAgent(
       componentType: "agent",
       componentKey: agent.key,
       status: "completed",
-      metrics: { nodeCount: steps.length, failedNodeCount: 0 },
+      metrics: { nodeCount: steps.length, failedNodeCount: 0, functionCalls },
       outputSummary: { keys: Object.keys(blackboard).slice(0, 12) },
     });
     return completed;
@@ -97,7 +164,7 @@ export async function runAgent(
       componentType: "agent",
       componentKey: agent.key,
       status: "failed",
-      metrics: { nodeCount: steps.length },
+      metrics: { nodeCount: steps.length, functionCalls },
       errors: [message],
     });
     const runs = await db.agentRuns.list(ctx.tenantId, (r) => r.agentId === agent.key);
