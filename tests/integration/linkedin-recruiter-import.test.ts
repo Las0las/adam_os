@@ -100,6 +100,10 @@ test("LinkedIn xlsx ingests into Candidate/Job/Submission with provenance and li
   assert.equal(prov.source, "linkedin_recruiter");
   assert.equal(prov.sheetName, "Job Applicants");
 
+  // The job is upserted once per applicant row but records a single ledger
+  // entry for the one import run.
+  assert.equal((job.properties.imports as unknown[]).length, 1, "one ledger entry per import");
+
   // Graph: Candidate ──submitted──► Submission ──targets──► Job.
   const adaSub = submissions.find((s) => s.externalKey === "J-100::ada@example.test")!;
   assert.equal(adaSub.status, "new"); // "Applicant" -> new
@@ -132,4 +136,11 @@ test("re-importing the same workbook is idempotent (upsert, not duplicate)", asy
   assert.equal((await listObjects(ctx, "Job")).length, 1);
   assert.equal((await listObjects(ctx, "Candidate")).length, 2);
   assert.equal((await listObjects(ctx, "Submission")).length, 2);
+
+  // Two distinct import runs leave an append-only provenance trail of length 2,
+  // with the first entry preserved unchanged.
+  const job = (await listObjects(ctx, "Job"))[0]!;
+  const imports = job.properties.imports as Array<Record<string, unknown>>;
+  assert.equal(imports.length, 2, "one ledger entry per import run");
+  assert.notEqual(imports[0]!.importRunId, imports[1]!.importRunId);
 });
