@@ -28,7 +28,10 @@ jobs:
       - name: Build release bundle
         run: npx tsx scripts/build-release-bundle.ts "ci-${{ github.run_number }}" "${{ github.event.inputs.environment }}"
       - name: Eval gate (release-validation enforces eval status)
-        run: npm test
+        shell: bash
+        run: |
+          shopt -s globstar
+          node --import tsx --test tests/unit/**/*.test.ts
       # Promotion to prod must go through Mission Control's approval + eval gates.
       - name: Promote (gated)
         if: ${{ github.event.inputs.environment != 'prod' }}

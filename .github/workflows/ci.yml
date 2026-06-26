@@ -25,9 +25,15 @@ jobs:
             echo "No ESLint config present — skipping lint."
           fi
       - name: Unit tests
-        run: npm test
+        shell: bash
+        run: |
+          shopt -s globstar
+          node --import tsx --test tests/unit/**/*.test.ts
       - name: Integration tests (memory backend)
-        run: node --import tsx --test --test-concurrency=1 tests/integration/**/*.test.ts
+        shell: bash
+        run: |
+          shopt -s globstar
+          node --import tsx --test --test-concurrency=1 tests/integration/**/*.test.ts
       - name: Preflight (mock model allowed)
         run: npx tsx scripts/preflight.ts
         env:
