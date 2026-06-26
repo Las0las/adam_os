@@ -14,6 +14,7 @@
 import { id } from "@/lib/lawrence-core/utils/ids";
 import { emitAudit } from "@/lib/lawrence-core/audit/audit-service";
 import { resolveModelProvider } from "@/lib/aiops/models/model-router";
+import { runModelCompletion } from "@/lib/aiops/execution/inference-pipeline";
 import { listObjects } from "@/lib/dataops/ontology/object-service";
 import { executeAction } from "@/lib/mission-control/actions/action-service";
 import { extractCandidateDraft } from "@/lib/dataops/import/nl/candidate-extraction";
@@ -78,13 +79,17 @@ export async function runRecruitingChatCommand(
   // Honor a tenant's authorized chat model (per-purpose routing); falls back to
   // the process-default provider (the deterministic mock until a key is set).
   const provider = await resolveModelProvider(ctx, "chat");
-  const completion = await provider.complete({
-    prompt:
-      "Classify this recruiting assistant message into one intent and extract its " +
-      'parameters as JSON. intent is one of "advance_stage", "add_note", ' +
-      '"create_candidate", or "unknown". For advance_stage set candidate + toStage; ' +
-      "for add_note set candidate + note. Use only what the message states.\n\n" + text,
-    outputSchema: INTENT_SCHEMA,
+  const completion = await runModelCompletion({
+    provider,
+    request: {
+      prompt:
+        "Classify this recruiting assistant message into one intent and extract its " +
+        'parameters as JSON. intent is one of "advance_stage", "add_note", ' +
+        '"create_candidate", or "unknown". For advance_stage set candidate + toStage; ' +
+        "for add_note set candidate + note. Use only what the message states.\n\n" + text,
+      outputSchema: INTENT_SCHEMA,
+    },
+    workloadType: "chat",
   });
   const parsed = completion.json ?? {};
   const intent = (str(parsed.intent) ?? "unknown").toLowerCase();

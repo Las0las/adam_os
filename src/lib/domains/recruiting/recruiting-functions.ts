@@ -7,6 +7,7 @@ import { registerFunction } from "@/lib/aiops/functions/function-registry";
 import { listObjects } from "@/lib/dataops/ontology/object-service";
 import { retrieve } from "@/lib/aiops/retrieval/retrieval-service";
 import { getModelProvider } from "@/lib/aiops/models/model-provider";
+import { runModelCompletion } from "@/lib/aiops/execution/inference-pipeline";
 import { validateOutput } from "@/lib/domains/domain-workflow-types";
 import type { LawrenceFunction, FunctionExecutionResult } from "@/lib/aiops/functions/function-types";
 import type { RetrievalHit } from "@/types/dataops";
@@ -110,12 +111,16 @@ const candidateFitSummary: LawrenceFunction<CandidateFitInput, CandidateFitOutpu
     const matchScore = clamp01(sumScores / hits.length);
 
     const provider = getModelProvider();
-    const completion = await provider.complete({
-      prompt: [
-        `Assess how well candidate "${candidate.title ?? candidateId}" fits job "${job.title ?? jobId}".`,
-        "Evidence excerpts:",
-        ...hits.map((h, i) => `(${i + 1}) [${h.objectType}] ${h.excerpt}`),
-      ].join("\n"),
+    const completion = await runModelCompletion({
+      provider,
+      request: {
+        prompt: [
+          `Assess how well candidate "${candidate.title ?? candidateId}" fits job "${job.title ?? jobId}".`,
+          "Evidence excerpts:",
+          ...hits.map((h, i) => `(${i + 1}) [${h.objectType}] ${h.excerpt}`),
+        ].join("\n"),
+      },
+      workloadType: "recruiting.candidate_fit_summary",
     });
     const summary = completion.text.trim() || `Candidate fit assessed for ${job.title ?? jobId}.`;
 

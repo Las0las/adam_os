@@ -8,6 +8,7 @@ import { registerFunction } from "@/lib/aiops/functions/function-registry";
 import { listObjects } from "@/lib/dataops/ontology/object-service";
 import { retrieve } from "@/lib/aiops/retrieval/retrieval-service";
 import { getModelProvider } from "@/lib/aiops/models/model-provider";
+import { runModelCompletion } from "@/lib/aiops/execution/inference-pipeline";
 import type {
   LawrenceFunction,
   FunctionExecutionResult,
@@ -107,17 +108,21 @@ const answerWithCitations: LawrenceFunction<
       .map((h, i) => `[${i + 1}] (${h.objectType} ${h.objectId}) ${h.excerpt}`)
       .join("\n");
     const provider = getModelProvider();
-    const completion = await provider.complete({
-      prompt: [
-        "You are a support agent. Answer the ticket using ONLY the evidence below.",
-        "Do not invent facts. Cite the evidence you use.",
-        "",
-        `Ticket: ${ticket.title ?? ticketId}`,
-        `Question: ${effectiveQuery}`,
-        "",
-        "Evidence:",
-        grounding,
-      ].join("\n"),
+    const completion = await runModelCompletion({
+      provider,
+      request: {
+        prompt: [
+          "You are a support agent. Answer the ticket using ONLY the evidence below.",
+          "Do not invent facts. Cite the evidence you use.",
+          "",
+          `Ticket: ${ticket.title ?? ticketId}`,
+          `Question: ${effectiveQuery}`,
+          "",
+          "Evidence:",
+          grounding,
+        ].join("\n"),
+      },
+      workloadType: "support.answer_ticket",
     });
 
     const scoreSum = hits.reduce((sum, h) => sum + h.score, 0);

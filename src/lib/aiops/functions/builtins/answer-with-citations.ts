@@ -3,6 +3,7 @@
 // canonical evidence-backed reasoning function.
 
 import { getModelProvider } from "../../models/model-provider";
+import { runModelCompletion } from "../../execution/inference-pipeline";
 import { retrieve } from "../../retrieval/retrieval-service";
 import { recordTrace } from "../../observability/trace-service";
 import { renderTemplate } from "../../prompts/prompt-service";
@@ -57,7 +58,7 @@ export const answerWithCitations: LawrenceFunction<AnswerInput, AnswerOutput> = 
       .join("\n");
     const prompt = renderTemplate(TEMPLATE, { question: input.question, evidence });
 
-    const completion = await getModelProvider().complete({ prompt });
+    const completion = await runModelCompletion({ provider: getModelProvider(), request: { prompt }, workloadType: "reason" });
     const traceId = id("trace");
     await recordTrace(ctx, "function_run", traceId, completion, methods[0]);
 

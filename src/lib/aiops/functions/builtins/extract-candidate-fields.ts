@@ -4,6 +4,7 @@
 // feature runs. Pure: it calls the model and returns fields; it persists nothing.
 
 import { resolveModelProvider } from "@/lib/aiops/models/model-router";
+import { runModelCompletion } from "../../execution/inference-pipeline";
 import type { LawrenceFunction, FunctionExecutionResult } from "../function-types";
 import type { ActorContext } from "@/types/platform";
 
@@ -60,9 +61,13 @@ export async function extractCandidateFields(
   text: string,
 ): Promise<ExtractedCandidateFields> {
   const provider = await resolveModelProvider(ctx, "extraction");
-  const completion = await provider.complete({
-    prompt: buildCandidateExtractionPrompt(text),
-    outputSchema: CANDIDATE_FIELD_SCHEMA,
+  const completion = await runModelCompletion({
+    provider,
+    request: {
+      prompt: buildCandidateExtractionPrompt(text),
+      outputSchema: CANDIDATE_FIELD_SCHEMA,
+    },
+    workloadType: "extraction",
   });
   return {
     fields: completion.json ?? {},
