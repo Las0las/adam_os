@@ -20,6 +20,7 @@ import {
 } from "../runtime/runtime-component-repository";
 import { recordHealthCheck } from "../runtime/health-check-repository";
 import { raiseIncident } from "../runtime/deployment-service";
+import { createRuntimeTrace } from "@/lib/aiops/observability/runtime-trace-service";
 import type { ActorContext } from "@/types/platform";
 import type {
   ReleaseBundle,
@@ -79,6 +80,15 @@ export async function promoteRelease(
     await emitAudit(ctx, "mission.release.failed", { type: "release_bundle", id: release.id }, {
       error: message,
     });
+    await createRuntimeTrace(ctx, {
+      traceType: "release",
+      traceId: release.id,
+      componentType: "release_bundle",
+      componentKey: release.key,
+      status: "failed",
+      metrics: { itemCount: items.length, targetEnv: targetEnv.key },
+      errors: [message],
+    });
     await raiseIncident(ctx, {
       title: `Release promotion failed: ${release.name}`,
       severity: "high",
@@ -112,6 +122,14 @@ export async function promoteRelease(
   await emitAudit(ctx, "mission.release.promoted", { type: "release_bundle", id: release.id }, {
     targetEnvironment: targetEnv.key,
     itemCount: items.length,
+  });
+  await createRuntimeTrace(ctx, {
+    traceType: "release",
+    traceId: release.id,
+    componentType: "release_bundle",
+    componentKey: release.key,
+    status: "completed",
+    metrics: { itemCount: items.length, targetEnv: targetEnv.key },
   });
 
   return promoted;

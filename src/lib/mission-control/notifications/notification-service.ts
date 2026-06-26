@@ -8,6 +8,7 @@ import { emitAudit } from "@/lib/lawrence-core/audit/audit-service";
 import { renderTemplate } from "@/lib/aiops/prompts/prompt-service";
 import { getChannelAdapter } from "./channels/channel-registry";
 import { isKilled } from "../runtime/kill-switch-guard";
+import { createRuntimeTrace } from "@/lib/aiops/observability/runtime-trace-service";
 import type { ActorContext } from "@/types/platform";
 import type { Notification, NotificationChannel, NotificationRule } from "@/types/mission-control";
 
@@ -154,6 +155,14 @@ export async function emitEvent(
       eventKey,
       channel: rule.channel,
       state: notification.state,
+    });
+    await createRuntimeTrace(ctx, {
+      traceType: "notification",
+      traceId: notification.id,
+      componentType: "notification_rule",
+      componentKey: rule.name,
+      status: state === "failed" ? "failed" : "completed",
+      metrics: { channel: rule.channel, deliveryState: state },
     });
     out.push(notification);
   }

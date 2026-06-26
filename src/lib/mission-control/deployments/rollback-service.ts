@@ -20,6 +20,7 @@ import {
 import { recordHealthCheck } from "../runtime/health-check-repository";
 import { raiseIncident } from "../runtime/deployment-service";
 import { createApprovalForSubject } from "../approvals/approval-request-service";
+import { createRuntimeTrace } from "@/lib/aiops/observability/runtime-trace-service";
 import type { ActorContext } from "@/types/platform";
 import type {
   ReleaseBundleItem,
@@ -121,6 +122,15 @@ export async function executeRollback(
     await emitAudit(ctx, "mission.rollback.failed", { type: "rollback", id: record.id }, {
       error: message,
     });
+    await createRuntimeTrace(ctx, {
+      traceType: "release",
+      traceId: record.id,
+      componentType: "release_bundle",
+      componentKey: `rollback-${release.key}`,
+      status: "failed",
+      metrics: { itemCount: items.length },
+      errors: [message],
+    });
     await raiseIncident(ctx, {
       title: `Rollback failed: ${release.name}`,
       severity: "critical",
@@ -154,6 +164,14 @@ export async function executeRollback(
 
   await emitAudit(ctx, "mission.rollback.completed", { type: "rollback", id: record.id }, {
     releaseBundleId: release.id,
+  });
+  await createRuntimeTrace(ctx, {
+    traceType: "release",
+    traceId: record.id,
+    componentType: "release_bundle",
+    componentKey: `rollback-${release.key}`,
+    status: "completed",
+    metrics: { itemCount: items.length },
   });
 
   return completed;
