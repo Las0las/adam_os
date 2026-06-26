@@ -12,6 +12,7 @@ import {
 } from "@/lib/domains/command-center/command-center-formatters";
 import { inferDomain } from "@/lib/domains/command-center/command-center-domain";
 import { CandidateExtractionPreview } from "./CandidateExtractionPreview";
+import { JobExtractionPreview } from "./JobExtractionPreview";
 import { ReviewDecisionBar } from "./ReviewDecisionBar";
 
 export function ReviewCaseDetailPanel({
@@ -75,6 +76,9 @@ export function ReviewCaseDetailPanel({
 
       {c.caseType === "candidate_extraction" && hasSubject ? (
         <CandidateExtractionPreview objectId={c.subjectObjectId as string} />
+      ) : null}
+      {c.caseType === "job_extraction" && hasSubject ? (
+        <JobExtractionPreview objectId={c.subjectObjectId as string} />
       ) : null}
 
       <h4 style={{ marginTop: 16, marginBottom: 0 }}>Decision</h4>
