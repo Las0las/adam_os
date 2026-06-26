@@ -24,6 +24,7 @@ import {
 import { AnthropicModelProvider } from "@/lib/integrations/anthropic/anthropic-client";
 import { OpenAIModelProvider } from "@/lib/integrations/openai/openai-client";
 import { GoogleModelProvider } from "@/lib/integrations/google/google-client";
+import { AzureOpenAIModelProvider } from "@/lib/integrations/azure/azure-openai-client";
 import type { ActorContext } from "@/types/platform";
 import type { ModelDefinition } from "@/types/aiops";
 
@@ -41,6 +42,15 @@ export function resolveDefaultProvider(): ModelProvider {
   }
   if (process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY) {
     return new GoogleModelProvider({ modelKey: process.env.LAWRENCE_DEFAULT_MODEL });
+  }
+  if (
+    process.env.AZURE_OPENAI_API_KEY &&
+    process.env.AZURE_OPENAI_ENDPOINT &&
+    (process.env.AZURE_OPENAI_DEPLOYMENT || process.env.LAWRENCE_DEFAULT_MODEL)
+  ) {
+    return new AzureOpenAIModelProvider({
+      deployment: process.env.AZURE_OPENAI_DEPLOYMENT || process.env.LAWRENCE_DEFAULT_MODEL,
+    });
   }
   return new MockModelProvider();
 }
@@ -62,7 +72,6 @@ export function providerFromDefinition(def: ModelDefinition): ModelProvider {
       }
       return new AnthropicModelProvider({ modelKey: def.modelKey });
     case "openai":
-    case "azure_openai":
       if (!process.env.OPENAI_API_KEY) {
         throw new Error(
           `Tenant '${def.tenantId}' authorized OpenAI model '${def.modelKey}' for ` +
@@ -71,6 +80,16 @@ export function providerFromDefinition(def: ModelDefinition): ModelProvider {
         );
       }
       return new OpenAIModelProvider({ modelKey: def.modelKey });
+    case "azure_openai":
+      // The deployment name is def.modelKey; Azure has its own endpoint + auth.
+      if (!process.env.AZURE_OPENAI_API_KEY || !process.env.AZURE_OPENAI_ENDPOINT) {
+        throw new Error(
+          `Tenant '${def.tenantId}' authorized Azure OpenAI deployment '${def.modelKey}' for ` +
+            `'${def.purpose}', but AZURE_OPENAI_API_KEY / AZURE_OPENAI_ENDPOINT are not set. ` +
+            `Refusing to substitute another model.`,
+        );
+      }
+      return new AzureOpenAIModelProvider({ deployment: def.modelKey });
     case "google":
       if (!process.env.GOOGLE_API_KEY && !process.env.GEMINI_API_KEY) {
         throw new Error(

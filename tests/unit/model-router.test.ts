@@ -20,6 +20,8 @@ function clearProviderKeys() {
   delete process.env.OPENAI_API_KEY;
   delete process.env.GOOGLE_API_KEY;
   delete process.env.GEMINI_API_KEY;
+  delete process.env.AZURE_OPENAI_API_KEY;
+  delete process.env.AZURE_OPENAI_ENDPOINT;
   delete process.env.LAWRENCE_DEFAULT_MODEL;
 }
 
@@ -102,4 +104,26 @@ test("providerFromDefinition builds Google but fails closed without a key", asyn
     () => providerFromDefinition(def({ provider: "google", modelKey: "gemini-2.0-flash" })),
     /GOOGLE_API_KEY/,
   );
+});
+
+test("providerFromDefinition fails closed for Azure without key/endpoint", async () => {
+  await fresh();
+  assert.throws(
+    () => providerFromDefinition(def({ provider: "azure_openai", modelKey: "my-deploy" })),
+    /AZURE_OPENAI/,
+  );
+});
+
+test("providerFromDefinition builds a real Azure provider when configured", async () => {
+  await fresh();
+  process.env.AZURE_OPENAI_API_KEY = "k";
+  process.env.AZURE_OPENAI_ENDPOINT = "https://r.openai.azure.com";
+  try {
+    const provider = providerFromDefinition(def({ provider: "azure_openai", modelKey: "my-deploy" }));
+    assert.equal(provider.provider, "azure_openai");
+    assert.equal(provider.modelKey, "my-deploy"); // deployment routing, not public OpenAI
+  } finally {
+    delete process.env.AZURE_OPENAI_API_KEY;
+    delete process.env.AZURE_OPENAI_ENDPOINT;
+  }
 });
