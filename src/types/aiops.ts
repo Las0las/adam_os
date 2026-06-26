@@ -92,7 +92,7 @@ export interface AgentRunStep {
 export interface ModelDefinition {
   id: string;
   tenantId: string;
-  provider: "openai" | "anthropic" | "google" | "azure_openai" | "other";
+  provider: "openai" | "anthropic" | "google" | "azure_openai" | "github_models" | "other";
   modelKey: string;
   purpose: "chat" | "extraction" | "classification" | "embedding";
   config: Record<string, unknown>;

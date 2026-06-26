@@ -22,6 +22,7 @@ function clearProviderKeys() {
   delete process.env.GEMINI_API_KEY;
   delete process.env.AZURE_OPENAI_API_KEY;
   delete process.env.AZURE_OPENAI_ENDPOINT;
+  delete process.env.GITHUB_MODELS_TOKEN;
   delete process.env.LAWRENCE_DEFAULT_MODEL;
 }
 
@@ -125,5 +126,31 @@ test("providerFromDefinition builds a real Azure provider when configured", asyn
   } finally {
     delete process.env.AZURE_OPENAI_API_KEY;
     delete process.env.AZURE_OPENAI_ENDPOINT;
+  }
+});
+
+test("providerFromDefinition handles GitHub Models (fail-closed, then builds)", async () => {
+  await fresh();
+  assert.throws(
+    () => providerFromDefinition(def({ provider: "github_models", modelKey: "openai/gpt-4o-mini" })),
+    /GITHUB_MODELS_TOKEN/,
+  );
+  process.env.GITHUB_MODELS_TOKEN = "ghm";
+  try {
+    const provider = providerFromDefinition(def({ provider: "github_models", modelKey: "openai/gpt-4o-mini" }));
+    assert.equal(provider.provider, "github_models");
+    assert.equal(provider.modelKey, "openai/gpt-4o-mini");
+  } finally {
+    delete process.env.GITHUB_MODELS_TOKEN;
+  }
+});
+
+test("resolveDefaultProvider selects GitHub Models from its dedicated token", async () => {
+  await fresh();
+  process.env.GITHUB_MODELS_TOKEN = "ghm";
+  try {
+    assert.equal(resolveDefaultProvider().provider, "github_models");
+  } finally {
+    delete process.env.GITHUB_MODELS_TOKEN;
   }
 });
