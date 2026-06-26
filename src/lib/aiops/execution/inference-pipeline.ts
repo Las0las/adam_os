@@ -81,16 +81,22 @@ interface LifecycleOutcome {
 
 /**
  * Run the standard lifecycle:
- *   BeforeExecute (observe) → interceptRequest (security: inspect/redact/reject)
- *     → provider → interceptResponse (validate/reject) → AfterExecute (observe)
+ *   BeforeExecute (observe) → resolveCompletion (cache lookup) →
+ *     interceptRequest (security: inspect/redact/reject) →
+ *     provider OR cached response → interceptResponse (validate/reject) →
+ *     recordCompletion (cache store, fresh only) → AfterExecute (observe)
  *
- * Interceptors run in the same priority order as the hooks. `interceptRequest`
- * folds the request (each returns the request the next sees), so a security
- * middleware can hand the provider a transformed (e.g. PII-redacted) request;
- * the caller's original request object is never mutated. A throwing interceptor
- * rejects the execution — it is normalized like any other failure. When no hook
- * implements an interceptor (the common case), the request reaches `invoke`
- * unchanged and behavior is identical to before Milestone 6.0.
+ * `resolveCompletion` (the prompt cache) runs first, on the ORIGINAL request, and
+ * may short-circuit the provider with a cached response — but it NEVER bypasses
+ * security: the request interceptors (firewall, PII) and the response interceptor
+ * (validator) still run around a cached response; only the provider call is
+ * skipped. `interceptRequest` folds the request (each returns the request the
+ * next sees), so a security middleware can hand the provider a transformed (e.g.
+ * PII-redacted) request; the caller's original request object is never mutated.
+ * A fresh (non-cached) response that passes validation is offered to
+ * `recordCompletion` — failures and invalid responses are never recorded. When
+ * no hook implements these (the common case), the request reaches `invoke`
+ * unchanged and behavior is identical to before Milestones 6.0/7.0.
  */
 async function runLifecycle(
   ctx: InferenceExecutionContext,
@@ -100,13 +106,29 @@ async function runLifecycle(
 ): Promise<LifecycleOutcome> {
   try {
     for (const h of hooks) await h.beforeExecute?.(ctx);
+    // Cache lookup: first non-null short-circuits the provider (a cache hit).
+    let resolved: CompletionResponse | null = null;
+    for (const h of hooks) {
+      if (h.resolveCompletion) {
+        const hit = await h.resolveCompletion(request, ctx);
+        if (hit) { resolved = hit; break; }
+      }
+    }
+    // Security/request transforms still run, even on a cache hit.
     let effectiveRequest = request;
     for (const h of hooks) {
       if (h.interceptRequest) effectiveRequest = await h.interceptRequest(effectiveRequest, ctx);
     }
-    const completion = await invoke(effectiveRequest);
+    const completion = resolved ?? await invoke(effectiveRequest);
+    // Response validation runs on cached and fresh responses alike.
     for (const h of hooks) {
       if (h.interceptResponse) await h.interceptResponse(completion, ctx);
+    }
+    // Record only fresh, validated responses (never cache hits or failures).
+    if (!resolved) {
+      for (const h of hooks) {
+        if (h.recordCompletion) await h.recordCompletion(request, completion, ctx);
+      }
     }
     const result = deepFreeze(successResult(ctx, completion));
     for (const h of hooks) await h.afterExecute?.(ctx, result);

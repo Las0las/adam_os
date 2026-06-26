@@ -73,6 +73,23 @@ export interface ExecutionHook {
    * (the result becomes a normalized failure). It must not mutate the response.
    */
   interceptResponse?(response: CompletionResponse, ctx: InferenceExecutionContext): void | Promise<void>;
+  /**
+   * Completion resolver (Milestone 7.0 — prompt cache). Runs FIRST in the
+   * lifecycle — before the request interceptors and the provider — so it sees
+   * the original request. Returning a CompletionResponse short-circuits the
+   * provider (a cache hit); returning null continues normally. It NEVER bypasses
+   * security: the request interceptors (firewall, PII) and the response
+   * interceptor (validator) still run around a resolved response — only the
+   * provider call is skipped.
+   */
+  resolveCompletion?(request: CompletionRequest, ctx: InferenceExecutionContext): CompletionResponse | null | Promise<CompletionResponse | null>;
+  /**
+   * Completion recorder (Milestone 7.0 — prompt cache). Runs after a FRESH
+   * provider response passes the response interceptors (so failures and
+   * invalid responses are never recorded). Not called when the response was
+   * resolved from cache. Keyed on the original request.
+   */
+  recordCompletion?(request: CompletionRequest, response: CompletionResponse, ctx: InferenceExecutionContext): void | Promise<void>;
 }
 
 export interface InferenceExecutionParams {
