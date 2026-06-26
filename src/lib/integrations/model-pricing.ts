@@ -27,10 +27,17 @@ const OPENAI_PRICES: Record<string, TokenPrice> = {
   "gpt-4o-mini": { inputPerMTok: 0.15, outputPerMTok: 0.6 },
 };
 
+const GOOGLE_PRICES: Record<string, TokenPrice> = {
+  "gemini-2.0-flash": { inputPerMTok: 0.1, outputPerMTok: 0.4 },
+  "gemini-1.5-pro": { inputPerMTok: 1.25, outputPerMTok: 5 },
+  "gemini-1.5-flash": { inputPerMTok: 0.075, outputPerMTok: 0.3 },
+};
+
 const TABLES: Record<string, Record<string, TokenPrice>> = {
   anthropic: ANTHROPIC_PRICES,
   openai: OPENAI_PRICES,
   azure_openai: OPENAI_PRICES,
+  google: GOOGLE_PRICES,
 };
 
 /** Compute USD cost for a completion; unknown models cost 0 (never fabricated). */

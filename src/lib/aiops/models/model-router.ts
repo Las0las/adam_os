@@ -23,13 +23,14 @@ import {
 } from "./model-provider";
 import { AnthropicModelProvider } from "@/lib/integrations/anthropic/anthropic-client";
 import { OpenAIModelProvider } from "@/lib/integrations/openai/openai-client";
+import { GoogleModelProvider } from "@/lib/integrations/google/google-client";
 import type { ActorContext } from "@/types/platform";
 import type { ModelDefinition } from "@/types/aiops";
 
 /**
  * Choose the process default provider from the environment. Preference order:
- * Anthropic → OpenAI → deterministic mock. The mock default keeps the platform
- * fully runnable with no keys (tests, local, CI).
+ * Anthropic → OpenAI → Google → deterministic mock. The mock default keeps the
+ * platform fully runnable with no keys (tests, local, CI).
  */
 export function resolveDefaultProvider(): ModelProvider {
   if (process.env.ANTHROPIC_API_KEY) {
@@ -37,6 +38,9 @@ export function resolveDefaultProvider(): ModelProvider {
   }
   if (process.env.OPENAI_API_KEY) {
     return new OpenAIModelProvider({ modelKey: process.env.LAWRENCE_DEFAULT_MODEL });
+  }
+  if (process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY) {
+    return new GoogleModelProvider({ modelKey: process.env.LAWRENCE_DEFAULT_MODEL });
   }
   return new MockModelProvider();
 }
@@ -67,6 +71,15 @@ export function providerFromDefinition(def: ModelDefinition): ModelProvider {
         );
       }
       return new OpenAIModelProvider({ modelKey: def.modelKey });
+    case "google":
+      if (!process.env.GOOGLE_API_KEY && !process.env.GEMINI_API_KEY) {
+        throw new Error(
+          `Tenant '${def.tenantId}' authorized Google model '${def.modelKey}' for ` +
+            `'${def.purpose}', but GOOGLE_API_KEY (or GEMINI_API_KEY) is not set. Refusing ` +
+            `to substitute another model.`,
+        );
+      }
+      return new GoogleModelProvider({ modelKey: def.modelKey });
     default:
       throw new Error(
         `No adapter for provider '${def.provider}' (model '${def.modelKey}'). ` +
