@@ -62,6 +62,29 @@ test("deriveCapability matches the descriptor's capability set", () => {
   assert.deepEqual(cap.capabilities, { vision: true, tools: false, streaming: false, json: true, reasoning: true, embeddings: false });
 });
 
+test("the registry produces all canonical metadata facets from the declaration", () => {
+  const d = desc("p1", "m1", { contextWindow: 64_000, deprecated: true, pricing: { inputPerMTok: 1, outputPerMTok: 2 } });
+  const cap = deriveCapability(d);
+  // ModelLimits, ModelFeatures, ModelPricingMetadata, ModelLifecycleState, ModelPublisherMetadata.
+  assert.deepEqual(cap.limits, { contextWindow: 64_000 });
+  assert.deepEqual(cap.features, cap.capabilities);
+  assert.deepEqual(cap.pricingMetadata, { pricing: { inputPerMTok: 1, outputPerMTok: 2 } });
+  assert.equal(cap.lifecycle, "deprecated");
+  assert.deepEqual(cap.publisherMetadata, { publisher: "acme", family: "fam" });
+
+  const active = deriveCapability(desc("p2", "m2", { deprecated: false }));
+  assert.equal(active.lifecycle, "active");
+});
+
+test("metadata facets are immutable on a published record", () => {
+  const reg = registry({ id: "p1", descriptors: [desc("p1", "m1")] });
+  const c = new ModelCapabilityRegistry().buildFrom(reg).capabilities().get("p1", "m1")!;
+  assert.equal(Object.isFrozen(c.limits), true);
+  assert.equal(Object.isFrozen(c.pricingMetadata), true);
+  assert.equal(Object.isFrozen(c.publisherMetadata), true);
+  assert.throws(() => { (c.limits as { contextWindow: number }).contextWindow = 1; }, TypeError);
+});
+
 // ── Immutability ─────────────────────────────────────────────────────────────
 
 test("produced ModelCapability records are immutable", () => {

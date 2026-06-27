@@ -3,94 +3,97 @@
 | Field | Value |
 |-------|-------|
 | Identifier | RUN-009 |
-| Version | 0.1 |
+| Version | 0.2 |
 | Status | Draft |
-| Authority | Normative Specification |
+| Authority | Normative Specification (Constitutional Runtime Contract) |
 | Owner | LAWRENCE Architecture Council |
 | Effective Date | — (Draft) |
 | Superseded By | — |
-| Related Artifacts | AS-003, ADR-0005, RUN-001 … RUN-008 |
+| Related Artifacts | AS-003, RUN-000, ADR-0005 |
 
-> Normative Specification skeleton. Terminology follows RFC-2119. No implementation
-> until ratified and ADR-0005 approved.
+> Constitutional runtime contract. Normative sections define **what must be true**, not
+> how. Implementation guidance appears only under Implementation Notes (non-normative).
+> Terminology follows RFC-2119. No implementation until ratified and ADR-0005 approved.
 
 ## Purpose
 
-Define the **Runtime Exception taxonomy**: a normalized, typed hierarchy for Processor
-Runtime faults (contract violations, capability mismatch, clearance denial,
-materialization failure, registry conflict), **separate from** the IOS `ExecutionError`
-taxonomy, which it SHALL NOT modify or widen.
+Define the canonical **Runtime Exception taxonomy**: a normalized, typed hierarchy for
+Processor Runtime faults, **separate from** the IOS `ExecutionError` taxonomy, which it
+SHALL NOT modify, alias, or widen.
 
 ## Scope
 
-- A `RuntimeException` base type and an enumerated `RuntimeFaultKind`.
-- Specific exception types for each RUN concern.
-- Normalization and retryability semantics for processor faults.
+**In scope:** the `RuntimeException` base; the enumerated `RuntimeFaultKind`; the specific
+fault subtypes for each RUN concern; normalization and retryability obligations; wrapping
+of underlying IOS errors.
 
-## Non-Goals
+**Out of scope (Non-Goals):** modifying or re-mapping IOS `ExecutionError` /
+`ExecutionErrorKind`; changing retry/circuit/fallback behavior (which key off IOS kinds).
 
-- SHALL NOT modify, replace, alias, or re-map the IOS `ExecutionError` /
-  `ExecutionErrorKind` taxonomy (closed set in `aiops/execution`). The two hierarchies
-  are distinct (AS-003 R1, R10).
-- SHALL NOT change retry/circuit/fallback behavior, which key off IOS error kinds.
+## Canonical Object Contract
 
-## Normative Requirements
+### Objects Owned
+- `RuntimeException` — the base of all Processor Runtime faults.
+- `RuntimeFaultKind` — the enumerated fault classification.
+- RUN fault subtypes: `ProcessorContractViolationFault` (RUN-001),
+  `ContractValidationFault` (RUN-002), `CapabilityMismatchFault` (RUN-004),
+  `IncrementalConsistencyFault` (RUN-005), `ClearanceDeniedFault` (RUN-006),
+  `RegistryConflictFault` (RUN-007), `MaterializationFault` (RUN-008).
+
+### Objects Consumed (and their authoritative producer)
+| Consumed object | Authoritative producer |
+|---|---|
+| `ExecutionError` (wrapped, not modified) | IOS (`aiops/execution`, external) |
+| fault conditions from each RUN concern | RUN-001 … RUN-008 |
+
+### Objects Produced → Authorized Consumers
+| Produced object | Authorized consumers |
+|---|---|
+| `RuntimeException` / `RuntimeFaultKind` / subtypes | all RUN specs (raise), runtime executor, RUN-010 |
+
+## Normative Interfaces
 
 - **RUN-009/1.** All Processor Runtime faults SHALL normalize to a `RuntimeException`
-  subtype carrying an enumerated `RuntimeFaultKind`; raw/unknown errors SHALL be wrapped,
-  never leaked untyped.
-- **RUN-009/2.** The taxonomy SHALL include at least: `ContractValidationFault` (RUN-002),
-  `CapabilityMismatchFault` (RUN-004), `IncrementalConsistencyFault` (RUN-005),
-  `ClearanceDeniedFault` (RUN-006), `RegistryConflictFault` (RUN-007),
-  `MaterializationFault` (RUN-008), and `ProcessorContractViolationFault` (RUN-001).
-- **RUN-009/3.** `RuntimeException` SHALL be a **separate hierarchy** from
+  subtype carrying a `RuntimeFaultKind`; raw/unknown errors SHALL be wrapped, never leaked
+  untyped.
+- **RUN-009/2.** The taxonomy SHALL include at least the subtypes enumerated in Objects
+  Owned, one per RUN concern.
+- **RUN-009/3.** Each fault SHALL declare a deterministic `retryable` classification.
+
+## Runtime Invariants
+
+- **INV-009.1 (Separate hierarchy).** `RuntimeException` SHALL be a separate hierarchy from
   `ExecutionError`; a Processor Runtime fault SHALL NOT be presented as an IOS execution
-  error and vice versa.
-- **RUN-009/4.** When a processor's inference call fails, the underlying IOS
-  `ExecutionError` SHALL be preserved (wrapped, not rewritten) so IOS-level diagnostics
-  remain intact.
-- **RUN-009/5.** Each fault SHALL declare a deterministic `retryable` classification;
-  governance/clearance faults SHALL be non-retryable.
-- **RUN-009/6.** Exceptions SHALL be immutable once constructed (AS-003 R9) and SHALL
-  carry enough context (processor key, run id, fault kind) for audit without leaking
+  error or vice versa (AS-003 R1, R10).
+- **INV-009.2 (Preserve IOS diagnostics).** When a processor's inference call fails, the
+  underlying IOS `ExecutionError` SHALL be preserved (wrapped, not rewritten).
+- **INV-009.3 (Governance non-retryable).** Governance/clearance faults
+  (`ClearanceDeniedFault`) SHALL be non-retryable.
+- **INV-009.4 (Immutability & safe context).** A `RuntimeException` SHALL be immutable and
+  SHALL carry enough context (processor key, run id, fault kind) for audit without leaking
   sensitive payloads or secrets.
-- **RUN-009/7 (SHOULD).** Normalization SHOULD mirror the IOS `normalizeError()` pattern
-  in shape (a `normalizeRuntimeFault()` analog) for consistency, without sharing types.
-- **RUN-009/8 (MAY).** The taxonomy MAY be extended additively by future RUN specs; new
-  kinds SHALL be added, never repurposed.
+- **INV-009.5 (Additive extension).** New kinds SHALL be added, never repurposed.
 
-## Proposed Public Surface (illustrative)
+## Conformance Requirements
 
-`RuntimeException` (base), `RuntimeFaultKind`, the specific fault subtypes above,
-`normalizeRuntimeFault()`. (`ProcessorException extends RuntimeException` MAY be used for
-processor-specific faults.)
+- **RUN-009/C1.** Every RUN fault path raises a typed `RuntimeException`, never an untyped
+  error.
+- **RUN-009/C2.** An inference failure inside a processor preserves the original
+  `ExecutionError`.
+- **RUN-009/C3.** Clearance/governance faults are non-retryable.
+- **RUN-009/C4.** RUN-009 does not import or subclass `ExecutionError`/`ExecutionErrorKind`.
 
-## Dependency Direction
+## Related Specifications
 
-Depends on the RUN concern specs it classifies. Lower layers SHALL NOT depend on RUN-009.
-RUN-009 SHALL NOT import or extend `aiops/execution` error types.
+RUN-000, RUN-001 … RUN-008 (fault sources), RUN-010 (verifies).
 
-## Compatibility with AS-001 / IOS
+## Related ADRs
 
-The IOS error taxonomy is untouched; processor faults are a parallel hierarchy. Wrapping
-preserves IOS diagnostics; retry/circuit/fallback semantics are unaffected.
+ADR-0005 (establishing); ADR-0003 (IOS error taxonomy unchanged).
 
-## Additive-Only Constraints
+## Implementation Notes (non-normative)
 
-New, separate error hierarchy; IOS `ExecutionError` unchanged and not re-mapped.
-
-## Conformance Hooks
-
-- C1: every RUN fault path raises a typed `RuntimeException`, never an untyped error.
-- C2: an inference failure inside a processor preserves the original `ExecutionError`.
-- C3: clearance/governance faults are non-retryable.
-- C4: RUN-009 does not import or subclass `ExecutionError`/`ExecutionErrorKind`.
-
-## Dependencies
-
-Constitution v1.0; AS-003; RUN-001 … RUN-008.
-
-## Open Questions
-
-- Whether `RuntimeFaultKind` is closed or open-extensible.
-- Mapping policy when a processor fault and an IOS error co-occur (which surfaces first).
+- Normalization SHOULD mirror the IOS `normalizeError()` *shape* via a
+  `normalizeRuntimeFault()` analog — without sharing types.
+- `ProcessorException extends RuntimeException` MAY be used for processor-specific faults.
+- Open: whether `RuntimeFaultKind` is closed or open-extensible (RUN-000 OQ).

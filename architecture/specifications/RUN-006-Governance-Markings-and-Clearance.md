@@ -3,98 +3,103 @@
 | Field | Value |
 |-------|-------|
 | Identifier | RUN-006 |
-| Version | 0.1 |
+| Version | 0.2 |
 | Status | Draft |
-| Authority | Normative Specification |
+| Authority | Normative Specification (Constitutional Runtime Contract) |
 | Owner | LAWRENCE Architecture Council |
 | Effective Date | — (Draft) |
 | Superseded By | — |
-| Related Artifacts | AS-003, ADR-0005, RUN-002, RUN-003, RUN-008 |
+| Related Artifacts | AS-003, RUN-000, ADR-0005 |
 
-> Normative Specification skeleton. Terminology follows RFC-2119. No implementation
-> until ratified and ADR-0005 approved.
+> Constitutional runtime contract. Normative sections define **what must be true**, not
+> how. Implementation guidance appears only under Implementation Notes (non-normative).
+> Terminology follows RFC-2119. No implementation until ratified and ADR-0005 approved.
 
 ## Purpose
 
-Define **`GovernanceMarking`** / **`MarkingSet`** and **`ClearancePolicy`** /
-**`ClearanceDecision`**: a markings-and-clearance model that travels with processor data,
-propagates onto derived outputs, and gates access by **composing with** the existing
-Security access decision — never replacing or relaxing it.
+Define the canonical **`GovernanceMarking` / `MarkingSet`** and **`ClearancePolicy` /
+`ClearanceDecision`** model: markings that travel with processor data and propagate onto
+derived outputs, and a clearance evaluation that gates access by **composing with** the
+existing Security access decision — never replacing or relaxing it.
 
 ## Scope
 
-- Governance markings attached to data and propagated through processors.
-- Clearance entitlements held by principals and the policy that evaluates marking vs.
-  clearance.
-- Composition with the existing `evaluateObjectAccess` / `AccessDecision`.
+**In scope:** governance markings on data and their propagation; the
+`MarkingPropagationRule`; clearance entitlements and the policy evaluating marking vs.
+clearance; composition with `evaluateObjectAccess` / `AccessDecision`.
 
-## Non-Goals
+**Out of scope (Non-Goals):** redefining or replacing Security `DataClassification`
+(sensitivity tagging); introducing a parallel access-control path; weakening redaction,
+retention, RBAC/ABAC, or tenant isolation.
 
-- SHALL NOT redefine or replace Security `DataClassification` (data sensitivity).
-  **Marking/Clearance (entitlement-based access) and Classification (sensitivity
-  tagging) SHALL remain distinct concepts** (AS-003 R10).
-- SHALL NOT introduce a parallel or competing access-control path.
-- SHALL NOT weaken redaction, retention, RBAC/ABAC, or tenant isolation.
+## Canonical Object Contract
 
-## Normative Requirements
+### Objects Owned
+- `GovernanceMarking`, `MarkingSet` — labels on a datum.
+- `MarkingPropagationRule` — how a processor propagates input markings to outputs.
+- `ClearancePolicy` — evaluates `(MarkingSet, principal clearances)`.
+- `ClearanceDecision` — the result of clearance evaluation.
+- `ClearanceLevel` — a principal's entitlement level.
+
+### Objects Consumed (and their authoritative producer)
+| Consumed object | Authoritative producer |
+|---|---|
+| `AccessDecision` | Security (`evaluateObjectAccess`, external) |
+| `SecurityContext` | Security (external) |
+
+### Objects Produced → Authorized Consumers
+| Produced object | Authorized consumers |
+|---|---|
+| `GovernanceMarking` / `MarkingSet` | RUN-002 (carriage), RUN-008 (enforcement), audit |
+| `MarkingPropagationRule` | RUN-001 (declared), RUN-008 |
+| `ClearancePolicy` / `ClearanceDecision` | RUN-003 (context), RUN-008 (enforcement) |
+
+## Normative Interfaces
 
 - **RUN-006/1.** A `GovernanceMarking` SHALL be a declared label; a `MarkingSet` SHALL be
-  the set of markings on a datum. Markings SHALL NOT be inferred from content alone
-  without a declared detector source.
-- **RUN-006/2.** A processor SHALL propagate input markings onto derived outputs by a
-  declared rule; the default rule SHALL be **union-and-preserve** (outputs are at least
-  as restricted as their inputs). A processor SHALL NOT drop a marking without an
-  explicit, audited declassification step.
-- **RUN-006/3.** A `ClearancePolicy` SHALL evaluate `(MarkingSet, principal clearances)`
-  to a `ClearanceDecision`. A clearance decision SHALL only ever **further restrict**
-  access; it SHALL NOT grant access denied by the existing Security access decision
-  (AS-003 R7).
-- **RUN-006/4.** Clearance evaluation SHALL **compose with** `evaluateObjectAccess`:
-  effective access = (Security decision) AND (clearance decision). Deny-override
-  semantics SHALL be preserved.
-- **RUN-006/5.** Marking assignment, propagation, declassification, and clearance denials
-  SHALL be audited via the existing audit hash-chain (Art. VII).
-- **RUN-006/6.** Markings and clearance decisions SHALL be immutable once produced
-  (AS-003 R9).
-- **RUN-006/7 (SHOULD).** Markings SHOULD be expressible as policy `config` on existing
-  `ObjectAccessPolicy` where practical, to reuse the established policy surface.
-- **RUN-006/8 (MAY).** A `ClearancePolicy` MAY reference principal attributes already in
-  `SecurityContext` (roles, groups, attributes).
+  the markings on a datum. Markings SHALL NOT be inferred from content without a declared
+  detector source.
+- **RUN-006/2.** A processor SHALL propagate input markings to derived outputs by a
+  declared `MarkingPropagationRule`; the default rule SHALL be **union-and-preserve**.
+- **RUN-006/3.** A `ClearancePolicy` SHALL evaluate `(MarkingSet, principal clearances)` to
+  a `ClearanceDecision`, composed with the Security `AccessDecision`.
 
-## Proposed Public Surface (illustrative)
+## Runtime Invariants
 
-`GovernanceMarking`, `MarkingSet`, `MarkingPropagationRule`, `ClearancePolicy`,
-`ClearanceDecision`, `ClearanceLevel`. (`*Policy` names are qualified; bare `Policy`
-SHALL NOT be exported — AS-003 R10.)
+- **INV-006.1 (Monotone restriction).** A `ClearanceDecision` SHALL only ever further
+  restrict access; it SHALL NOT grant access denied by the Security `AccessDecision`
+  (AS-003 R7). Effective access = Security decision AND clearance decision; deny-override
+  preserved.
+- **INV-006.2 (Propagation floor).** Derived outputs SHALL be at least as restricted as
+  their inputs under the default rule; a marking SHALL NOT be dropped without an explicit,
+  audited declassification step.
+- **INV-006.3 (Distinct concepts).** Marking/Clearance (entitlement-based access) SHALL
+  remain distinct from Security `Classification` (sensitivity) and SHALL NOT alias it.
+- **INV-006.4 (Auditability).** Marking assignment, propagation, declassification, and
+  clearance denials SHALL be audited via the existing audit hash-chain (Art. VII).
+- **INV-006.5 (Immutability).** Markings and clearance decisions SHALL be immutable once
+  produced (AS-003 R9).
 
-## Dependency Direction
+## Conformance Requirements
 
-Depends on Security public contracts (`AccessDecision`, `SecurityContext`,
-`evaluateObjectAccess`) and RUN-002/003. Lower layers (including Security) SHALL NOT
-depend on RUN-006.
+- **RUN-006/C1.** A clearance decision never grants what Security denied (monotone
+  restriction).
+- **RUN-006/C2.** Default propagation makes outputs at least as restricted as inputs.
+- **RUN-006/C3.** Declassification requires an explicit, audited step.
+- **RUN-006/C4.** Marking/clearance never reuses or aliases `DataClassification`.
 
-## Compatibility with AS-001 / IOS
+## Related Specifications
 
-Independent of IOS. Aligns with Constitution Art. V: governance attaches as evaluation
-that further restricts; it never reroutes, retries, or mutates provider behavior, and a
-cache/materializer SHALL NOT bypass it.
+RUN-000, RUN-001 (declares rule), RUN-002 (carriage), RUN-003 (context), RUN-008
+(enforcement); consumes Security public contracts.
 
-## Additive-Only Constraints
+## Related ADRs
 
-New types composing with Security; Security contracts unchanged; access can only narrow.
+ADR-0005 (establishing); Constitution Art. V (governed attachment).
 
-## Conformance Hooks
+## Implementation Notes (non-normative)
 
-- C1: clearance decision never grants what Security denied (monotone restriction).
-- C2: default propagation makes outputs at least as restricted as inputs.
-- C3: declassification requires an explicit, audited step.
-- C4: marking/clearance never reuses or aliases `DataClassification`.
-
-## Dependencies
-
-Constitution v1.0; AS-003; Security public contracts; RUN-002; RUN-003.
-
-## Open Questions
-
-- Canonical clearance lattice and whether compartments/caveats are in scope v1.
-- Whether markings persist as a new record type or as policy config on existing objects.
+- Markings MAY be expressed as policy `config` on existing `ObjectAccessPolicy` to reuse
+  the established surface; a `ClearancePolicy` MAY reference `SecurityContext` attributes.
+- `*Policy` names are qualified (`ClearancePolicy`); bare `Policy` SHALL NOT be exported.
+- Open: clearance lattice and whether compartments/caveats are in scope v1 (RUN-000 OQ).

@@ -74,6 +74,7 @@ a specification disagree, the specification governs.
 | IOS-016 | Traffic Replay Engine | Phase 2 (spec-driven) |
 | IOS-017 | Evaluation Engine | Phase 2 (spec-driven) |
 | IOS-018 | Model Capability Registry (impl of IOS-002) | Phase 2 (spec-driven) |
+| IOS-019 | Cost Optimization Engine | Phase 2 (spec-driven) |
 
 ## Working Under Governance (from Milestone 8.0 onward)
 

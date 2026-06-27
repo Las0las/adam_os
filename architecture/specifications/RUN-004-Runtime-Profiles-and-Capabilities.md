@@ -3,92 +3,100 @@
 | Field | Value |
 |-------|-------|
 | Identifier | RUN-004 |
-| Version | 0.1 |
+| Version | 0.2 |
 | Status | Draft |
-| Authority | Normative Specification |
+| Authority | Normative Specification (Constitutional Runtime Contract) |
 | Owner | LAWRENCE Architecture Council |
 | Effective Date | — (Draft) |
 | Superseded By | — |
-| Related Artifacts | AS-003, ADR-0005, RUN-001, RUN-003, RUN-008 |
+| Related Artifacts | AS-003, RUN-000, ADR-0005 |
 
-> Normative Specification skeleton. Terminology follows RFC-2119. No implementation
-> until ratified and ADR-0005 approved.
+> Constitutional runtime contract. Normative sections define **what must be true**, not
+> how. Implementation guidance appears only under Implementation Notes (non-normative).
+> Terminology follows RFC-2119. No implementation until ratified and ADR-0005 approved.
 
 ## Purpose
 
-Define **`RuntimeProfile`**, **`RuntimeRequirement`**, and **`RuntimeCapability`**: the
-declarative model by which a processor states what it needs from an execution host, and
-by which a host advertises what it offers, so the same processor runs unchanged across
-lightweight, distributed, GPU, serverless, automation, and human-review runtimes.
+Define the canonical **`RuntimeProfile`**, **`RuntimeRequirement`**, and
+**`RuntimeCapability`** model by which a processor declares what it needs from an
+execution host and a host advertises what it offers, so the same processor runs unchanged
+across lightweight, distributed, GPU, serverless, automation, and human-review runtimes.
 
 ## Scope
 
-- `RuntimeRequirement`: what a processor requires (compute class, locality, concurrency,
-  budget, accelerator, durability).
-- `RuntimeCapability`: what a runtime host provides.
-- `RuntimeProfile`: a named, immutable binding selecting a runtime for a processor run,
-  with matching rules between requirement and capability.
+**In scope:** `RuntimeRequirement` (what a processor needs); `RuntimeCapability` (what a
+host provides); `RuntimeProfile` (the immutable matched binding); `RuntimeClass`; the
+deterministic matching obligation.
 
-## Non-Goals
+**Out of scope (Non-Goals):** reusing or aliasing the IOS model `Capability` /
+`CapabilitySet` (model features); implementing a scheduler or provisioning infrastructure.
 
-- SHALL NOT reuse or alias the IOS model `Capability` / `CapabilitySet` (which describe
-  *model* features such as vision/tools/streaming). `RuntimeCapability` is about
-  *execution-host* capability and SHALL remain distinct (AS-003 R10).
-- SHALL NOT implement a scheduler or provision infrastructure; it defines the contract a
-  scheduler would honor.
+## Canonical Object Contract
 
-## Normative Requirements
+### Objects Owned
+- `RuntimeRequirement` — a processor's declared execution-host needs.
+- `RuntimeCapability` — a host's declared execution-host offerings.
+- `RuntimeProfile` — the immutable binding selecting a runtime for a run.
+- `RuntimeClass` — `lightweight | distributed | gpu | serverless | automation | human_review`.
 
-- **RUN-004/1.** A processor SHALL declare a `RuntimeRequirement` set (RUN-001/3).
-  Undeclared requirements SHALL resolve to the most conservative runtime, never the most
-  powerful or most permissive.
-- **RUN-004/2.** A `RuntimeProfile` SHALL be immutable once resolved and SHALL record the
-  matched requirements and capabilities for auditability (AS-003 R9, Art. VII).
-- **RUN-004/3.** Requirement→capability matching SHALL be deterministic: identical
-  declarations against identical host capabilities SHALL select the same profile.
-- **RUN-004/4.** A profile SHALL NOT embed host-specific live handles; the contract SHALL
-  remain transport- and locality-agnostic so execution can occur in-process, remote,
-  serverless, or accelerated without contract change (AS-003 scalability goal).
-- **RUN-004/5.** `RuntimeCapability` SHALL NOT be inferred from a host's name; it SHALL be
-  declared (mirrors Constitution Art. III "declared, never inferred").
-- **RUN-004/6.** A run whose requirements cannot be satisfied SHALL raise a typed Runtime
-  Exception (RUN-009) and SHALL NOT silently downgrade to an unsafe host.
-- **RUN-004/7 (SHOULD).** Profiles SHOULD compose with existing resource governance
-  (e.g. agent run limits, cost budgets) rather than duplicate it.
-- **RUN-004/8 (MAY).** A host MAY advertise optional capabilities; processors MAY declare
-  optional (preferred-but-not-required) requirements.
+### Objects Consumed (and their authoritative producer)
+| Consumed object | Authoritative producer |
+|---|---|
+| processor's declared `RuntimeRequirement` | RUN-001 (declared on the contract) |
+| host's advertised `RuntimeCapability` | runtime host (external/declared) |
 
-## Proposed Public Surface (illustrative)
+### Objects Produced → Authorized Consumers
+| Produced object | Authorized consumers |
+|---|---|
+| `RuntimeProfile` | RUN-003 (carries ref), RUN-007 (per-node overrides), RUN-008 (sink selection) |
+| `RuntimeRequirement` / `RuntimeCapability` / `RuntimeClass` | RUN-004 matcher, RUN-010 |
 
-`RuntimeProfile`, `RuntimeRequirement`, `RuntimeCapability`, `RuntimeClass`
-(`lightweight | distributed | gpu | serverless | automation | human_review`),
-`matchProfile()`.
+## Normative Interfaces
 
-## Dependency Direction
+- **RUN-004/1.** A `RuntimeRequirement` SHALL be declarable per processor and SHALL
+  describe execution-host needs (e.g. compute class, locality, concurrency, budget,
+  accelerator, durability).
+- **RUN-004/2.** A `RuntimeCapability` SHALL be declared by a host and SHALL describe what
+  the host offers in the same terms.
+- **RUN-004/3.** A `RuntimeProfile` SHALL be the result of matching a requirement set
+  against host capabilities and SHALL record the matched requirements and capabilities.
 
-Depends on RUN-001/003 contracts only. Lower layers SHALL NOT depend on RUN-004.
+## Runtime Invariants
 
-## Compatibility with AS-001 / IOS
+- **INV-004.1 (Declared, not inferred).** `RuntimeCapability` SHALL NOT be inferred from a
+  host's name; both requirement and capability SHALL be declared (Art. III).
+- **INV-004.2 (Deterministic matching).** Identical declarations against identical host
+  capabilities SHALL select the same `RuntimeProfile`.
+- **INV-004.3 (Immutability & auditability).** A resolved `RuntimeProfile` SHALL be
+  immutable and SHALL retain the matched requirement/capability evidence (Art. VII).
+- **INV-004.4 (Portability).** A `RuntimeProfile` SHALL embed no host-specific live handle;
+  the contract SHALL remain transport- and locality-agnostic.
+- **INV-004.5 (No silent downgrade).** An unsatisfiable requirement SHALL raise a typed
+  `CapabilityMismatchFault` (RUN-009); the run SHALL NOT downgrade to an unsafe host.
+- **INV-004.6 (Capability namespacing).** `RuntimeCapability` SHALL remain distinct from
+  the IOS model `Capability`/`CapabilitySet` and SHALL NOT be interchanged with it.
 
-No overlap with IOS model capabilities; the two capability concepts are namespaced apart
-and never interchanged.
+## Conformance Requirements
 
-## Additive-Only Constraints
+- **RUN-004/C1.** Identical declarations select identical profiles (determinism).
+- **RUN-004/C2.** Unsatisfiable requirements raise a typed fault; no silent downgrade.
+- **RUN-004/C3.** A profile carries no non-serializable handle.
+- **RUN-004/C4.** RUN-004 does not reference or alias IOS `Capability`/`CapabilitySet`
+  (AS-003 R10).
 
-New types; no edit to IOS `CapabilitySet`; opt-in.
+## Related Specifications
 
-## Conformance Hooks
+RUN-000, RUN-001 (declares requirement), RUN-003 (carries profile), RUN-007, RUN-008.
 
-- C1: identical declarations select identical profiles (determinism).
-- C2: unsatisfiable requirements raise a typed exception, no silent downgrade.
-- C3: a profile carries no non-serializable handle.
-- C4: RUN-004 does not reference or alias IOS `Capability`/`CapabilitySet`.
+## Related ADRs
 
-## Dependencies
+ADR-0005 (establishing).
 
-Constitution v1.0; AS-003; RUN-001; RUN-003.
+## Implementation Notes (non-normative)
 
-## Open Questions
-
-- Canonical `RuntimeClass` enumeration and whether it is open/closed.
-- Whether GPU/accelerator requirements are first-class fields or opaque key/values.
+- Likely shape: `interface RuntimeProfile { class; matched: { requirement; capability };
+  attributes }`.
+- Profiles SHOULD compose with existing resource governance (agent run limits, cost
+  budgets) rather than duplicate it.
+- Optional (preferred-but-not-required) requirements MAY be expressed; hosts MAY advertise
+  optional capabilities.
