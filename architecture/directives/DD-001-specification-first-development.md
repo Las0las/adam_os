@@ -73,6 +73,38 @@ Every implementation request SHALL include:
 6. **Success Criteria** — implementation SHALL satisfy the published specification
    without architectural drift.
 
+## Specification Structure — Canonical Object Contract
+
+Every IOS specification SHALL include a **Canonical Object Contract** section that
+explicitly documents ownership and dependency direction, with:
+
+1. **Canonical Objects Consumed** — canonical platform objects the subsystem reads
+   (by reference, never mutating).
+2. **Canonical Objects Produced** — canonical objects the subsystem authors and
+   owns (it becomes their canonical producer).
+3. **Existing Contracts Reused** — published contracts/APIs reused without change.
+4. **Authoritative Producers** — for each consumed object, the owning subsystem
+   (authority direction; consumers SHALL NOT redefine or mutate it).
+5. **Authorized Consumers** — who MAY read the objects the subsystem produces.
+
+This keeps the specification library internally consistent as the Intelligence
+Layer grows. The section is NORMATIVE and MANDATORY in
+`specifications/_TEMPLATE.md` and applies to all specifications authored from
+IOS-017 onward.
+
+In addition, every such specification SHALL include **conformance requirements**
+that prove:
+
+1. consumed canonical objects are treated as READ-ONLY (never mutated);
+2. produced canonical objects are owned EXCLUSIVELY by that specification (it is
+   their sole canonical producer);
+3. authority is never inverted (a consumer never assumes a producer's role);
+4. dependency direction follows AS-001 (no dependency on a lower layer);
+5. implementations cannot mutate canonical objects they do not own.
+
+The Canonical Object Contract is thus a binding part of each specification, not
+merely documentation.
+
 ## Architecture Decision Rules
 
 If implementation requires changing Architecture, Standards, Public Contracts, or

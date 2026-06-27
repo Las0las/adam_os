@@ -18,6 +18,11 @@ import { installRetryMiddleware } from "@/lib/aiops/retry/retry-bootstrap";
 import { installCircuitBreaker } from "@/lib/aiops/circuit/circuit-bootstrap";
 import { installFallbackOrchestrator } from "@/lib/aiops/fallback/fallback-bootstrap";
 import { installProviderHealthManager } from "@/lib/aiops/health/health-bootstrap";
+import { installBenchmarkHarness } from "@/lib/aiops/benchmark/benchmark-bootstrap";
+import { installExplainabilityEngine } from "@/lib/aiops/explainability/explainability-bootstrap";
+import { installTrafficReplay } from "@/lib/aiops/replay/replay-bootstrap";
+import { installEvaluationEngine } from "@/lib/aiops/evaluation/evaluation-bootstrap";
+import { installModelCapabilityRegistry } from "@/lib/aiops/capability/capability-bootstrap";
 import { registerSource, ingestAsset } from "@/lib/dataops/sources/source-service";
 import { runAssetPipeline } from "@/lib/dataops/pipelines/pipeline-runner";
 import { indexEvidence } from "@/lib/dataops/evidence/chunking-service";
@@ -135,6 +140,39 @@ async function initRuntime(): Promise<void> {
   // execution hook and changes no execution behavior; default policy DISABLED
   // (no-op). It never routes, invokes providers, or touches the Execution Plan.
   installProviderHealthManager();
+  // Install the Benchmark Harness (IOS-014): subscribe its metrics collector to
+  // the bus and expose the on-demand harness + result store. It is NOT an
+  // execution hook and changes no execution behavior; default policy DISABLED, so
+  // runs are a no-op until enabled. It drives cases through the public pipeline,
+  // never invoking providers directly or influencing production routing.
+  installBenchmarkHarness();
+  // Attach the Explainability Engine (IOS-015) as a bus subscriber. Purely
+  // observational: it correlates per-execution events into immutable Explanation
+  // records and publishes explanation.produced. It registers NO execution hook and
+  // changes no execution behavior; default policy DISABLED. It reads the canonical
+  // objects (RoutingDecision/ExecutionPlan, ProviderHealth by reference) without
+  // mutating them, and never routes or invokes providers.
+  installExplainabilityEngine();
+  // Install the Traffic Replay Engine (IOS-016) around a DEDICATED replay bus.
+  // Replay-scoped observers subscribe to the replay bus only — nothing here
+  // touches the production bus, so replays can never contaminate production health
+  // (IOS-013) or production metrics. The engine replays recorded inputs through
+  // the public pipeline (never invoking providers directly), default DISABLED.
+  installTrafficReplay();
+  // Install the Evaluation Engine (IOS-017) around a DEDICATED evaluation bus
+  // (an Isolated Execution Environment, IOS-016 model). It scores completed
+  // executions and produces the canonical EvaluationResult/Report; its observers
+  // subscribe to the evaluation bus only, so production health/metrics are never
+  // contaminated. Observational: no routing, no target authorization, no direct
+  // provider invocation. Default policy DISABLED.
+  installEvaluationEngine();
+  // Install the Model Capability Registry (IOS-018) — the canonical producer of
+  // ModelCapability/ModelDescriptor metadata, implementing the IOS-002 contract.
+  // Declarative: it registers NO execution hook, changes no execution behavior,
+  // and does NOT influence routing (routing keeps consuming capability metadata
+  // via the existing IOS-001/002 contracts). Populated on demand from published
+  // provider declarations.
+  installModelCapabilityRegistry();
   if (shouldAutoSeedDemo()) {
     await bootstrap();
     return;

@@ -32,6 +32,23 @@
 <!-- The stable contracts consumers depend on (types/functions/events), described
      normatively. Reference the contract, do not reproduce implementation. -->
 
+## Canonical Object Contract
+<!-- NORMATIVE and MANDATORY for every IOS specification. It is a binding part of
+     the specification (not just documentation): it fixes ownership and dependency
+     direction so the specification library stays internally consistent as the
+     Intelligence Layer grows. Every specification SHALL populate all five fields. -->
+
+- **Canonical Objects Consumed** — canonical platform objects this subsystem reads
+  (by reference, never mutating), e.g. ExecutionPlan, RoutingDecision,
+  ProviderHealthSnapshot, Explanation, BenchmarkResult, ReplayResult.
+- **Canonical Objects Produced** — canonical objects this subsystem authors and
+  owns (it becomes their canonical producer).
+- **Existing Contracts Reused** — published contracts/APIs reused without change
+  (e.g. IOS-004 executeInference, IOS-005 event bus, IOS-003 routing).
+- **Authoritative Producers** — for each consumed object, the subsystem that owns
+  it (authority direction; consumers SHALL NOT redefine or mutate it).
+- **Authorized Consumers** — who MAY read the objects this subsystem produces.
+
 ## Invariants
 <!-- Properties that SHALL always hold. -->
 
@@ -42,6 +59,14 @@
 ## Conformance Requirements
 <!-- Observable, testable requirements a conformant implementation SHALL satisfy.
      Each SHOULD map to a future conformance suite. -->
+<!-- MANDATORY Canonical Object Contract conformance — every specification SHALL
+     include testable requirements proving:
+     (a) consumed canonical objects are treated as READ-ONLY (never mutated);
+     (b) produced canonical objects are owned EXCLUSIVELY by this specification
+         (it is their sole canonical producer);
+     (c) authority is NEVER inverted (a consumer never assumes a producer's role);
+     (d) dependency direction follows AS-001 (no dependency on a lower layer);
+     (e) implementations cannot mutate canonical objects they do not own. -->
 
 ## Related ADRs
 <!-- ADRs that established or amended this specification. -->

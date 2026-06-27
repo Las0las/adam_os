@@ -96,6 +96,11 @@ as they consume the IOS public contracts.
 | IOS-011 | Circuit Breaker | (Phase 2) |
 | IOS-012 | Fallback Orchestrator | (Phase 2) |
 | IOS-013 | Provider Health Manager | (Phase 2) |
+| IOS-014 | Benchmark Harness | (Phase 2) |
+| IOS-015 | Explainability Engine | (Phase 2) |
+| IOS-016 | Traffic Replay Engine | (Phase 2) |
+| IOS-017 | Evaluation Engine | (Phase 2) |
+| IOS-018 | Model Capability Registry (impl of IOS-002) | (Phase 2) |
 
 ## 5. Conformance
 

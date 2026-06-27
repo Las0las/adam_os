@@ -57,3 +57,28 @@ de-facto conformance evidence and SHALL NOT be moved or changed by this mileston
 
 The directory structure exists with placeholders. No suites are populated in this
 milestone; population is future work per §4.
+
+## 6. Specification Conformance Rule — Canonical Object Contract
+
+Every IOS specification authored from **IOS-017 onward** SHALL contain a valid
+**Canonical Object Contract** (a NORMATIVE part of the specification, per DD-001
+and `specifications/_TEMPLATE.md`). The contract SHALL declare all five fields:
+
+- **Canonical Objects Consumed**
+- **Canonical Objects Produced**
+- **Existing Contracts Reused**
+- **Authoritative Producers**
+- **Authorized Consumers**
+
+A specification that omits any of these SHALL be considered **non-conformant** and
+SHALL NOT be approved. (No retroactive rewrite of IOS-001 … IOS-016 is required;
+the rule applies to IOS-017 and later.)
+
+### 6.1 Enforcement — specification schema validation
+
+This rule is enforced by a lightweight **specification schema validator**
+(`tests/unit/architecture-spec-governance.test.ts`) — the architectural equivalent
+of a schema check. It is structural, not semantic: it only verifies that every
+governed IOS specification (IOS-017+) contains the required normative sections
+(the `## Canonical Object Contract` heading and all five field labels). It affects
+no runtime behavior.
