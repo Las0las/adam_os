@@ -77,3 +77,4 @@ governance feedback loop that keeps the architecture stable yet improvable.
 | IOS-006 | Constitution v1.0, AS-001 | ADR-0001 | `src/lib/aiops/security/*` |
 | IOS-007 | Constitution v1.0, AS-001 | ADR-0001 | `src/lib/aiops/cache/*` |
 | IOS-008 | Constitution v1.0, AS-001 | ADR-0001, ADR-0002 | `src/lib/aiops/batch/*` |
+| IOS-009 | Constitution v1.0, AS-001 | ADR-0001, ADR-0002 | `src/lib/aiops/cache/semantic-*` |
