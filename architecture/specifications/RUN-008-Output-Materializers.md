@@ -34,8 +34,9 @@ bypassing Security, clearance (RUN-006), or redaction; defining a new storage en
 ## Canonical Object Contract
 
 ### Objects Owned
-- `OutputMaterializer` — validates and persists/projects a processor output.
-- `MaterializationSink` — the target a materializer writes to (incl. a preview/no-op sink).
+- `OutputMaterializer` — validates and writes a processor output to a **projection** sink.
+- `MaterializationSink` — a **projection** target a materializer writes to (incl. a
+  preview/no-op sink). Per Principle 0, a sink targets disposable projections only.
 - `MaterializationResult` — the typed outcome of a materialization.
 
 ### Objects Consumed (and their authoritative producer)
@@ -45,8 +46,15 @@ bypassing Security, clearance (RUN-006), or redaction; defining a new storage en
 | `ProcessorRunContext` | RUN-003 |
 | `IncrementalSemantics` | RUN-005 |
 | `MarkingSet` / `ClearanceDecision` | RUN-006 |
+| `ProcessorEffect` (`ProjectionWrite`) | RUN-011 |
 | kernel persistence, `requirePermission`, audit hash-chain | `lawrence-core` (external) |
 | lineage emission | DataOps lineage (external) |
+
+> **Principle 0 boundary (RUN-011).** This specification governs **projection**
+> materialization only. A reality change is a `CommandIntent` (RUN-011) realized by an
+> accepted event through the Ontology/Event subsystem; it is **not** a materialization and
+> is **out of scope** here. An `OutputMaterializer` SHALL NOT mutate ontology objects
+> directly.
 
 ### Objects Produced → Authorized Consumers
 | Produced object | Authorized consumers |
@@ -80,6 +88,12 @@ bypassing Security, clearance (RUN-006), or redaction; defining a new storage en
   computed output and SHALL emit lineage/provenance (Art. IV, Art. VII).
 - **INV-008.7 (Security boundary).** A materializer/sink SHALL NOT bypass security
   ("a cache SHALL NOT bypass security", Art. V, applied to sinks).
+- **INV-008.8 (Projections only; ontology owns reality).** A materializer SHALL write only
+  disposable projections (`ProjectionWrite`, RUN-011) and SHALL NOT mutate ontology
+  objects or assert business truth. Reality changes SHALL be expressed as `CommandIntent`
+  realized by accepted events (Principle 0 §5/§9; Axioms 1–3).
+- **INV-008.9 (Projection disposability).** A materialized projection SHALL be rebuildable
+  from the ontology and SHALL NOT be treated as authoritative (Axiom 3).
 
 ## Conformance Requirements
 
@@ -91,15 +105,21 @@ bypassing Security, clearance (RUN-006), or redaction; defining a new storage en
 - **RUN-008/C4.** Re-materializing unchanged output creates no duplicates (idempotence).
 - **RUN-008/C5.** Materialization never broadens access vs. the Security + clearance
   decision.
+- **RUN-008/C6.** A materializer performs no direct ontology mutation; reality changes are
+  routed as `CommandIntent` (RUN-011), not materializations.
+- **RUN-008/C7.** A materialized projection is rebuildable from the ontology and is not
+  treated as authoritative.
 
 ## Related Specifications
 
 RUN-000, RUN-002 (output), RUN-003 (context), RUN-004 (sink selection), RUN-005
-(idempotency), RUN-006 (governance), RUN-007 (pipelines), RUN-009.
+(idempotency), RUN-006 (governance), RUN-007 (pipelines), RUN-009, RUN-011 (ontology/event
+boundary).
 
 ## Related ADRs
 
-ADR-0005 (establishing); Constitution Art. V (no security bypass).
+ADR-0005 (establishing); ADR-0006 (Principle 0 boundary); Constitution Art. V (no security
+bypass).
 
 ## Implementation Notes (non-normative)
 
