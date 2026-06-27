@@ -18,65 +18,105 @@ export function ProjectionField({
   onChange: (key: string, value: unknown) => void;
 }) {
   const id = `pf-${field.key}`;
-  const common = {
-    id,
-    className: "pf-control",
-    disabled: !field.editable,
-    "aria-invalid": error ? true : undefined,
-    "aria-describedby": error ? `${id}-err` : undefined,
-  };
+  const invalid = Boolean(error);
+  const describedBy = error ? `${id}-err` : field.helpText ? `${id}-help` : undefined;
 
-  return (
-    <div className="pf-field">
-      <label className="pf-label" htmlFor={id}>
-        {field.label}
-        {field.required ? <span className="pf-req"> *</span> : null}
-      </label>
-
-      {field.type === "textarea" ? (
+  const control = (() => {
+    if (field.type === "textarea") {
+      return (
         <textarea
-          {...common}
+          id={id}
+          className={`proj-textarea${invalid ? " invalid" : ""}`}
+          disabled={!field.editable}
           rows={3}
           placeholder={field.placeholder}
+          aria-invalid={invalid || undefined}
+          aria-describedby={describedBy}
           value={String(value ?? "")}
           onChange={(e) => onChange(field.key, e.target.value)}
         />
-      ) : field.type === "select" ? (
+      );
+    }
+    if (field.type === "select") {
+      return (
         <select
-          {...common}
+          id={id}
+          className={`proj-select${invalid ? " invalid" : ""}`}
+          disabled={!field.editable}
+          aria-invalid={invalid || undefined}
+          aria-describedby={describedBy}
           value={String(value ?? "")}
           onChange={(e) => onChange(field.key, e.target.value)}
         >
+          <option value="">Select…</option>
           {(field.options ?? []).map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>
           ))}
         </select>
-      ) : field.type === "boolean" ? (
-        <input
-          {...common}
-          type="checkbox"
-          className="pf-checkbox"
-          checked={Boolean(value)}
-          onChange={(e) => onChange(field.key, e.target.checked)}
-        />
-      ) : (
-        <input
-          {...common}
-          type={field.type === "email" ? "email" : field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
-          placeholder={field.placeholder}
-          value={String(value ?? "")}
-          onChange={(e) => onChange(field.key, e.target.value)}
-        />
-      )}
+      );
+    }
+    return (
+      <input
+        id={id}
+        className={`proj-input${invalid ? " invalid" : ""}`}
+        type={field.type === "email" ? "email" : field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
+        disabled={!field.editable}
+        placeholder={field.placeholder}
+        aria-invalid={invalid || undefined}
+        aria-describedby={describedBy}
+        value={String(value ?? "")}
+        onChange={(e) => onChange(field.key, e.target.value)}
+      />
+    );
+  })();
 
+  // Boolean renders the label inline with the checkbox.
+  if (field.type === "boolean") {
+    return (
+      <div className="proj-field">
+        <label className="proj-checkbox" htmlFor={id}>
+          <input
+            id={id}
+            type="checkbox"
+            disabled={!field.editable}
+            checked={Boolean(value)}
+            onChange={(e) => onChange(field.key, e.target.checked)}
+          />
+          <span>
+            {field.label}
+            {field.required ? <span className="req">*</span> : null}
+          </span>
+        </label>
+        {error ? (
+          <p id={`${id}-err`} className="proj-error">
+            {error}
+          </p>
+        ) : field.helpText ? (
+          <p id={`${id}-help`} className="proj-help">
+            {field.helpText}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="proj-field">
+      <label className="proj-label" htmlFor={id}>
+        {field.label}
+        {field.required ? <span className="req">*</span> : null}
+      </label>
+      {control}
       {error ? (
-        <p id={`${id}-err`} className="pf-error">
+        <p id={`${id}-err`} className="proj-error">
           {error}
         </p>
       ) : field.helpText ? (
-        <p className="pf-help">{field.helpText}</p>
+        <p id={`${id}-help`} className="proj-help">
+          {field.helpText}
+        </p>
       ) : null}
     </div>
   );
