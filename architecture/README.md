@@ -5,6 +5,9 @@ authoritative description of the architecture; it contains no runtime code and h
 no runtime dependency. Established by Milestone 8.0 (ADR-0001). Terminology
 throughout follows RFC-2119 (SHALL, SHALL NOT, SHOULD, SHOULD NOT, MAY).
 
+> **Released:** LAWRENCE Architecture **v1.0** (`LAWRENCE-ARCH-1.0`) — see
+> `releases/LAWRENCE-ARCH-1.0.md` (approved by ADR-0002).
+>
 > **Architecture v1.0 is FROZEN** (normative baseline). Architecture Phase 1 is
 > **COMPLETE**; Platform Phase 2 is **ACTIVE**. Development is now
 > **specification-driven**: future work is identified by specification id (e.g.
@@ -41,6 +44,7 @@ a specification disagree, the specification governs.
 | `specifications/` | Normative Specifications (IOS-001 … IOS-007) + `_TEMPLATE.md`. |
 | `directives/` | Development Directives (DD-001 Specification-First Development) + `_TEMPLATE.md`. |
 | `adr/` | Architecture Decision Records + `_TEMPLATE.md`. |
+| `releases/` | Architectural release manifests (LAWRENCE-ARCH-1.0). |
 | `contracts/` | Public Contract index (interfaces consumers depend on). |
 | `conformance/` | The Conformance Framework definition. |
 | `governance/` | Governance metadata schema. |
