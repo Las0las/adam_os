@@ -97,6 +97,7 @@ as they consume the IOS public contracts.
 | IOS-012 | Fallback Orchestrator | (Phase 2) |
 | IOS-013 | Provider Health Manager | (Phase 2) |
 | IOS-014 | Benchmark Harness | (Phase 2) |
+| IOS-015 | Explainability Engine | (Phase 2) |
 
 ## 5. Conformance
 

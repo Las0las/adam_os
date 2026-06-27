@@ -19,6 +19,7 @@ import { installCircuitBreaker } from "@/lib/aiops/circuit/circuit-bootstrap";
 import { installFallbackOrchestrator } from "@/lib/aiops/fallback/fallback-bootstrap";
 import { installProviderHealthManager } from "@/lib/aiops/health/health-bootstrap";
 import { installBenchmarkHarness } from "@/lib/aiops/benchmark/benchmark-bootstrap";
+import { installExplainabilityEngine } from "@/lib/aiops/explainability/explainability-bootstrap";
 import { registerSource, ingestAsset } from "@/lib/dataops/sources/source-service";
 import { runAssetPipeline } from "@/lib/dataops/pipelines/pipeline-runner";
 import { indexEvidence } from "@/lib/dataops/evidence/chunking-service";
@@ -142,6 +143,13 @@ async function initRuntime(): Promise<void> {
   // runs are a no-op until enabled. It drives cases through the public pipeline,
   // never invoking providers directly or influencing production routing.
   installBenchmarkHarness();
+  // Attach the Explainability Engine (IOS-015) as a bus subscriber. Purely
+  // observational: it correlates per-execution events into immutable Explanation
+  // records and publishes explanation.produced. It registers NO execution hook and
+  // changes no execution behavior; default policy DISABLED. It reads the canonical
+  // objects (RoutingDecision/ExecutionPlan, ProviderHealth by reference) without
+  // mutating them, and never routes or invokes providers.
+  installExplainabilityEngine();
   if (shouldAutoSeedDemo()) {
     await bootstrap();
     return;
