@@ -45,6 +45,7 @@ a specification disagree, the specification governs.
 | `directives/` | Development Directives (DD-001 Specification-First Development) + `_TEMPLATE.md`. |
 | `adr/` | Architecture Decision Records + `_TEMPLATE.md`. |
 | `releases/` | Architectural release manifests (LAWRENCE-ARCH-1.0). |
+| `roadmap/` | Informative phase roadmaps (LAWRENCE Platform Phase 3 — planes A–E). |
 | `contracts/` | Public Contract index (interfaces consumers depend on). |
 | `conformance/` | The Conformance Framework definition. |
 | `governance/` | Governance metadata schema. |
@@ -76,6 +77,19 @@ a specification disagree, the specification governs.
 | IOS-018 | Model Capability Registry (impl of IOS-002) | Phase 2 (spec-driven) |
 | IOS-019 | Cost Optimization Engine | Phase 2 (spec-driven) |
 | IOS-020 | SLA Management | Phase 2 (spec-driven) |
+
+## Phase 3 Roadmap (planning)
+
+Phase 2 delivered the execution, resilience, observability, and **Recommendation
+Platform** foundations (IOS-008 … IOS-020). The next phase is organized into
+**architectural planes** rather than independent features — see
+`roadmap/LAWRENCE-Phase-3-Roadmap.md` (informative): Plane A Intelligence (IOS-021…
+024), Plane B Optimization (IOS-025…028), Plane C Governance (IOS-029…032), Plane D
+Runtime Intelligence (IOS-033…036), Plane E Enterprise Intelligence (IOS-037…040).
+Each plane consumes only published canonical objects, produces only what it owns,
+reuses shared canonical contracts, preserves AS-001 dependency direction, and remains
+observational/advisory unless an ADR grants execution authority. Specifications
+become normative only when authored under DD-001 and registered in AS-001.
 
 ## Working Under Governance (from Milestone 8.0 onward)
 
