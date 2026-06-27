@@ -20,6 +20,7 @@ import { installFallbackOrchestrator } from "@/lib/aiops/fallback/fallback-boots
 import { installProviderHealthManager } from "@/lib/aiops/health/health-bootstrap";
 import { installBenchmarkHarness } from "@/lib/aiops/benchmark/benchmark-bootstrap";
 import { installExplainabilityEngine } from "@/lib/aiops/explainability/explainability-bootstrap";
+import { installTrafficReplay } from "@/lib/aiops/replay/replay-bootstrap";
 import { registerSource, ingestAsset } from "@/lib/dataops/sources/source-service";
 import { runAssetPipeline } from "@/lib/dataops/pipelines/pipeline-runner";
 import { indexEvidence } from "@/lib/dataops/evidence/chunking-service";
@@ -150,6 +151,12 @@ async function initRuntime(): Promise<void> {
   // objects (RoutingDecision/ExecutionPlan, ProviderHealth by reference) without
   // mutating them, and never routes or invokes providers.
   installExplainabilityEngine();
+  // Install the Traffic Replay Engine (IOS-016) around a DEDICATED replay bus.
+  // Replay-scoped observers subscribe to the replay bus only — nothing here
+  // touches the production bus, so replays can never contaminate production health
+  // (IOS-013) or production metrics. The engine replays recorded inputs through
+  // the public pipeline (never invoking providers directly), default DISABLED.
+  installTrafficReplay();
   if (shouldAutoSeedDemo()) {
     await bootstrap();
     return;
