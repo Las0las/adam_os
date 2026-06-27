@@ -84,6 +84,7 @@ as they consume the IOS public contracts.
 | IOS-008 | Batch Scheduler | (Phase 2) |
 | IOS-009 | Semantic Cache | (Phase 2) |
 | IOS-010 | Retry Policy | (Phase 2) |
+| IOS-011 | Circuit Breaker | (Phase 2) |
 
 ## 5. Conformance
 
