@@ -2,8 +2,8 @@
 
 <!--
   Normative Specification (Ontology family). RFC-2119 terminology. Governs
-  canonical relationships between objects. ACTIVE: runtime validation is warn-only
-  in this slice (VS-003); enforcement is gated behind a future ADR, mirroring
+  canonical relationships between objects. ACTIVE: runtime validation is warn by
+  default; opt-in fail-closed enforce mode is available (ADR-0008), mirroring
   ONT-001's warn-then-enforce posture.
 -->
 
@@ -132,9 +132,18 @@ On creation/update of an edge `(linkType, sourceType, targetType)`:
 - **cardinality** — the new edge would breach the matched definition's cardinality
   (checked where practical).
 
-All findings are **warnings** in VS-003: emitted as an
-`ontology.relationship.warning` audit event; the edge is still persisted
-(fail-open). Validation is **total** — it never throws.
+Validation is **total** — it never throws. The effect of a finding depends on the
+tenant's relationship enforcement mode (ADR-0008; default **warn**):
+
+- **warn** (DEFAULT): emit an `ontology.relationship.warning` audit event and
+  persist the edge (fail-open). Unchanged baseline behavior.
+- **enforce** (opt-in: per-tenant → global → env `ONTOLOGY_RELATIONSHIP_ENFORCEMENT`):
+  for an invalid **registered** relationship (known `linkType`, illegal
+  source/target/direction or cardinality breach), emit
+  `ontology.relationship.rejected` and throw `RelationshipSchemaError` **before
+  persistence** (fail-closed). **Unregistered** relationship types
+  (`unknown_relationship_type`) are NEVER rejected — they only warn in both modes,
+  so enabling enforcement never breaks edges the registry does not yet model.
 
 ## Versioning strategy
 
@@ -148,13 +157,16 @@ each definition.
 
 The Architecture Council owns the registry (AS-005). Definitions carry
 `governance.owner` and `governance.stability` (`stable` / `experimental`).
-Enforcement (rejecting invalid edges) is **out of scope** for VS-003 and SHALL
-require a future ADR, exactly as ONT-001 reached enforcement via ADR-0006.
+Enforcement is **opt-in and off by default** (ADR-0008): rejecting invalid
+registered edges happens only when a tenant/global/env override sets `enforce`.
+Unregistered relationship types are never rejected.
 
 ## ADR references
 
 - **ADR-0007** — Relationships as first-class canonical contracts (establishes
   ONT-002, AS-005, the registry, and warn-only validation).
+- **ADR-0008** — Relationship enforce-mode (opt-in, fail-closed; default warn;
+  parallel to the object enforcement of ADR-0006).
 
 ## Conformance requirements
 
@@ -170,16 +182,23 @@ A conformant implementation SHALL satisfy (suites under `tests/unit/`):
 - **§D Validation classes** — each of unknown type, invalid source, invalid
   target, invalid direction, illegal pair, and cardinality is detected; valid
   edges produce none.
-- **§E Warn-only integration** — `linkObjects` emits `ontology.relationship.warning`
-  on violation yet always persists; unknown types pass through; re-linking is
-  idempotent and silent; the full pack/demo surface yields a **zero** relationship
-  warning baseline.
+- **§E Warn integration** — in warn mode `linkObjects` emits
+  `ontology.relationship.warning` on violation yet always persists; unknown types
+  pass through; re-linking is idempotent and silent; the full pack/demo surface
+  yields a **zero** relationship warning baseline.
+- **§F Enforce integration** (ADR-0008) — in enforce mode `linkObjects` rejects an
+  invalid **registered** relationship before persistence with
+  `RelationshipSchemaError` (emitting `ontology.relationship.rejected`); valid
+  edges pass; **unregistered** relationship types are never rejected; the mode
+  resolves per tenant (per-tenant → global → env → default warn).
 
 ## Implementation references
 
 - `src/lib/dataops/ontology/relationships/types.ts` — typed contracts.
 - `src/lib/dataops/ontology/relationships/definitions.ts` — seed definitions.
 - `src/lib/dataops/ontology/relationships/registry.ts` — typed lookups.
+- `src/lib/dataops/ontology/relationships/enforcement.ts` — mode resolution (ADR-0008).
+- `src/lib/dataops/ontology/relationships/errors.ts` — `RelationshipSchemaError`.
 - `src/lib/dataops/ontology/relationships/validate.ts` — pure validation.
 - `src/lib/dataops/ontology/object-service.ts` — warn-only integration in
   `linkObjects` (`ontology.relationship.warning`).

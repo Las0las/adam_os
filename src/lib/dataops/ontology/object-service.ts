@@ -10,6 +10,9 @@ import { validateCanonicalObject } from "./schemas/validate";
 import { resolveEnforcementMode } from "./schemas/enforcement";
 import { OntologySchemaError } from "./schemas/errors";
 import { validateRelationship } from "./relationships/validate";
+import { relationshipsByLinkType } from "./relationships/registry";
+import { resolveRelationshipEnforcementMode } from "./relationships/enforcement";
+import { RelationshipSchemaError } from "./relationships/errors";
 import type { CanonicalObjectInput, Violation } from "./schemas/types";
 import type { ActorContext } from "@/types/platform";
 import type { OntologyObject, OntologyLink } from "@/types/dataops";
@@ -192,8 +195,9 @@ export async function linkObjects(
   );
   if (existing) return existing;
 
-  // Warn-only canonical relationship check (ONT-002). Never blocks the write.
-  await warnOnRelationshipViolations(ctx, input);
+  // Canonical relationship check (ONT-002). Warns or rejects per the tenant's
+  // relationship enforcement mode (default warn). May throw in enforce mode.
+  await checkRelationship(ctx, input);
 
   return await db.ontologyLinks.insert({
     id: id("link"),
@@ -209,29 +213,65 @@ export async function linkObjects(
 }
 
 /**
- * Warn-only canonical relationship validation (ONT-002 §Validation). Emits an
- * `ontology.relationship.warning` audit event when a new edge is unknown, has an
- * illegal source/target/direction, or violates a practical cardinality bound —
- * but NEVER blocks the write. Fail-open: any error here is swallowed
- * (Constitution Article IV). Cardinality degree counts exclude the exact edge
- * being created (it was already shown not to exist by the caller).
+ * Canonical relationship check (ONT-002 §Validation, ADR-0008). Runs before edge
+ * persistence:
+ *
+ *  - No violations → no-op.
+ *  - WARN mode (default): emit `ontology.relationship.warning` and persist the
+ *    edge (fail-open). Unchanged prior behavior.
+ *  - ENFORCE mode (explicitly enabled per tenant/global/env): for an invalid
+ *    REGISTERED relationship, emit `ontology.relationship.rejected` and THROW
+ *    RelationshipSchemaError before persistence (fail-closed). UNREGISTERED
+ *    relationship types (unknown linkType) are NOT rejected — they only warn, so
+ *    enabling enforcement never breaks edges the registry does not yet model.
+ *
+ * Validation infra errors fail open (return, never block); the only error this
+ * raises is the deliberate enforce-mode rejection.
  */
-async function warnOnRelationshipViolations(
+async function checkRelationship(
   ctx: ActorContext,
   input: { linkType: string; from: { objectType: string; objectId: string }; to: { objectType: string; objectId: string } },
 ): Promise<void> {
+  let violations: ReturnType<typeof validateRelationship>;
+  let known: boolean;
   try {
     const all = await db.ontologyLinks.list(ctx.tenantId, (l) => l.linkType === input.linkType);
     const sourceOutDegree = all.filter((l) => l.fromObjectId === input.from.objectId).length;
     const targetInDegree = all.filter((l) => l.toObjectId === input.to.objectId).length;
-    const violations = validateRelationship(
+    violations = validateRelationship(
       { linkType: input.linkType, sourceType: input.from.objectType, targetType: input.to.objectType },
       { sourceOutDegree, targetInDegree },
     );
-    if (violations.length === 0) return;
+    known = relationshipsByLinkType(input.linkType).length > 0;
+  } catch {
+    return; // fail-open: validation infra error SHALL NOT block a write
+  }
+  if (violations.length === 0) return;
+
+  const mode = resolveRelationshipEnforcementMode(ctx.tenantId);
+  if (mode === "enforce" && known) {
+    await safeEmitRelationshipEvent(ctx, "ontology.relationship.rejected", input, violations);
+    throw new RelationshipSchemaError(
+      input.linkType,
+      input.from.objectType,
+      input.to.objectType,
+      violations,
+    );
+  }
+  await safeEmitRelationshipEvent(ctx, "ontology.relationship.warning", input, violations);
+}
+
+/** Best-effort relationship audit emit. Never throws, never alters the outcome. */
+async function safeEmitRelationshipEvent(
+  ctx: ActorContext,
+  action: "ontology.relationship.warning" | "ontology.relationship.rejected",
+  input: { linkType: string; from: { objectType: string; objectId: string }; to: { objectType: string; objectId: string } },
+  violations: Violation[],
+): Promise<void> {
+  try {
     await emitAudit(
       ctx,
-      "ontology.relationship.warning",
+      action,
       { type: input.linkType, id: `${input.from.objectId}->${input.to.objectId}` },
       {
         linkType: input.linkType,
@@ -241,7 +281,7 @@ async function warnOnRelationshipViolations(
       },
     );
   } catch {
-    // Warn-only: relationship validation SHALL NOT block or fail a write.
+    // Auditing the check SHALL NOT block or fail the operation.
   }
 }
 
