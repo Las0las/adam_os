@@ -28,7 +28,8 @@ import {
   type ExecutionError,
 } from "./execution-errors";
 import { listExecutionHooks } from "./execution-hooks";
-import { isAuthorizedTarget, type InvocationTarget } from "./invocation-target";
+import { buildExecutionPlan, planContains } from "@/lib/aiops/routing/execution-plan";
+import type { ExecutionPlan, ExecutionTarget } from "@/lib/aiops/routing/routing-types";
 import type {
   ExecutionHook,
   InferenceExecutionContext,
@@ -103,7 +104,7 @@ async function runLifecycle(
   ctx: InferenceExecutionContext,
   hooks: ExecutionHook[],
   request: CompletionRequest,
-  invoke: (request: CompletionRequest, target?: InvocationTarget) => Promise<CompletionResponse>,
+  invoke: (request: CompletionRequest, target?: ExecutionTarget) => Promise<CompletionResponse>,
 ): Promise<LifecycleOutcome> {
   try {
     for (const h of hooks) await h.beforeExecute?.(ctx);
@@ -129,13 +130,13 @@ async function runLifecycle(
     if (resolved) {
       completion = resolved;
     } else {
-      // Each layer's `next` threads any invocation-target override (ADR-0004)
+      // Each layer's `next` threads any execution-target override (ADR-0004)
       // down to the provider: a target supplied by an OUTER middleware flows
       // through inner layers (which call `next` with no target) unchanged, while
       // an inner middleware that supplies its own target takes precedence
       // (`thisTarget ?? outerTarget`). With no override anywhere, `target` stays
-      // undefined and the routing-selected provider is invoked exactly once.
-      let chain: (req: CompletionRequest, target?: InvocationTarget) => Promise<CompletionResponse> =
+      // undefined and the primary plan target is invoked exactly once.
+      let chain: (req: CompletionRequest, target?: ExecutionTarget) => Promise<CompletionResponse> =
         (req, target) => invoke(req, target);
       const around = hooks.filter((h) => h.aroundInvoke);
       for (let i = around.length - 1; i >= 0; i--) {
@@ -179,6 +180,10 @@ export async function executeInference(
   const provider = routingDecision.selectedProvider ?? "";
   const model = routingDecision.selectedModel ?? "";
 
+  // The routing-authorized Execution Plan travels with the context (ADR-0004).
+  // Execution reads it; it never builds, authorizes, or extends alternate targets.
+  const executionPlan = buildExecutionPlan(routingDecision);
+
   const ctx: InferenceExecutionContext = deepFreeze({
     executionId: id("exec"),
     requestId: params.requestId,
@@ -189,6 +194,7 @@ export async function executeInference(
     workloadType: params.workloadType ?? "inference",
     startTime: nowMs(),
     requestFingerprint: fingerprint(params.request),
+    executionPlan,
   });
 
   if (!routingDecision.selectedProvider || !routingDecision.selectedModel) {
@@ -198,16 +204,16 @@ export async function executeInference(
   }
 
   const { result } = await runLifecycle(ctx, hooks, params.request, async (req, target) => {
-    // Resolve the invocation target (ADR-0004). With no override, this is the
-    // routing-selected provider/model — unchanged. An override may name only a
-    // target the routing layer already authorized for this execution; routing is
-    // never re-run and the immutable RoutingDecision is never mutated.
+    // Resolve the execution target (ADR-0004). With no override, this is the
+    // primary (routing-selected) target — unchanged. An override may name only a
+    // target CONTAINED in the immutable Execution Plan the routing layer
+    // authorized; routing is never re-run and the RoutingDecision is never mutated.
     let invProvider = provider;
     let invModel = model;
     if (target) {
-      if (!isAuthorizedTarget(routingDecision, target)) {
+      if (!planContains(executionPlan, target)) {
         throw new ProviderUnavailableError(
-          `invocation target not authorized by routing: ${target.provider}|${target.model}`,
+          `execution target not in the authorized execution plan: ${target.provider}|${target.model}`,
         );
       }
       invProvider = target.provider;
@@ -243,6 +249,12 @@ export async function runModelCompletion(
   opts: RunModelCompletionOptions,
   hooks: ExecutionHook[] = listExecutionHooks(),
 ): Promise<CompletionResponse> {
+  // No routing here: the only authorized target is the already-resolved provider.
+  // The plan is that single target, so no alternate override can be selected.
+  const executionPlan: ExecutionPlan = {
+    targets: [{ provider: opts.provider.provider, model: opts.provider.modelKey }],
+  };
+
   const ctx: InferenceExecutionContext = deepFreeze({
     executionId: id("exec"),
     requestId: opts.requestId ?? id("req"),
@@ -253,14 +265,14 @@ export async function runModelCompletion(
     workloadType: opts.workloadType ?? "inference",
     startTime: nowMs(),
     requestFingerprint: fingerprint(opts.request),
+    executionPlan,
   });
 
   const { completion, error } = await runLifecycle(ctx, hooks, opts.request, (req, target) => {
-    // This path has an already-resolved provider and no RoutingDecision, so no
-    // alternate target can be authorized (ADR-0004). Honoring an override here
-    // would be routing without a routing context — reject it.
-    if (target) {
-      throw new ProviderUnavailableError("invocation target override requires a routing context");
+    // The plan contains only the resolved provider (no RoutingDecision). An
+    // override naming any other target is not in the plan — reject it (ADR-0004).
+    if (target && !planContains(executionPlan, target)) {
+      throw new ProviderUnavailableError("execution target not in the authorized execution plan");
     }
     return opts.provider.complete(req);
   });

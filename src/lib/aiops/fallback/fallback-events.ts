@@ -3,9 +3,8 @@
 // Published onto the shared Execution Event Bus (IOS-005). Immutable; carry the
 // primary provider/model and the alternate target, with no prompt/response text.
 
-import { deepFreeze } from "@/lib/aiops/routing/routing-types";
+import { deepFreeze, type ExecutionTarget } from "@/lib/aiops/routing/routing-types";
 import type { InferenceExecutionContext } from "@/lib/aiops/execution/execution-types";
-import type { InvocationTarget } from "@/lib/aiops/execution/invocation-target";
 import type { ExecutionErrorKind } from "@/lib/aiops/execution/execution-errors";
 import { observedNowMs } from "@/lib/aiops/execution/observability/observability-clock";
 
@@ -80,13 +79,13 @@ function base(type: FallbackEventType, ctx: InferenceExecutionContext): Fallback
 export function fallbackStarted(ctx: InferenceExecutionContext, failureKind: ExecutionErrorKind): FallbackStartedEvent {
   return deepFreeze({ ...base("fallback.started", ctx), type: "fallback.started" as const, failureKind });
 }
-export function fallbackAttempt(ctx: InferenceExecutionContext, target: InvocationTarget, attempt: number): FallbackAttemptEvent {
+export function fallbackAttempt(ctx: InferenceExecutionContext, target: ExecutionTarget, attempt: number): FallbackAttemptEvent {
   return deepFreeze({
     ...base("fallback.attempt", ctx), type: "fallback.attempt" as const,
     targetProvider: target.provider, targetModel: target.model, attempt,
   });
 }
-export function fallbackSucceeded(ctx: InferenceExecutionContext, target: InvocationTarget, attempt: number, latencyMs: number): FallbackSucceededEvent {
+export function fallbackSucceeded(ctx: InferenceExecutionContext, target: ExecutionTarget, attempt: number, latencyMs: number): FallbackSucceededEvent {
   return deepFreeze({
     ...base("fallback.succeeded", ctx), type: "fallback.succeeded" as const,
     targetProvider: target.provider, targetModel: target.model, attempt, latencyMs,

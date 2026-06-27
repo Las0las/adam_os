@@ -47,6 +47,23 @@ export interface RoutingRejection {
   reason: string;
 }
 
+/** A (provider, model) pair the routing layer SELECTED and AUTHORIZED for
+ *  invocation. Targets are produced ONLY by routing; execution never invents,
+ *  authorizes, or mutates them (ADR-0004). */
+export interface ExecutionTarget {
+  provider: string;
+  model: string;
+}
+
+/** The immutable, ordered set of execution targets the routing layer authorized
+ *  for an execution (ADR-0004). `targets[0]` is the primary (selected) target;
+ *  the remainder are authorized alternates in routing-preference order. The
+ *  Execution Pipeline SHALL invoke ONLY targets contained in this plan; execution
+ *  middleware SHALL select among them but SHALL NOT add to or mutate them. */
+export interface ExecutionPlan {
+  targets: readonly ExecutionTarget[];
+}
+
 /** Immutable result of a routing evaluation — the foundation for explainability. */
 export interface RoutingDecision {
   selectedProvider: string | null;
@@ -54,6 +71,9 @@ export interface RoutingDecision {
   evaluatedProviders: string[];
   rejectionReasons: RoutingRejection[];
   policySnapshot: RoutingPolicy;
+  /** The authorized Execution Plan (ADR-0004). Optional for backward
+   *  compatibility: when absent, the plan is the single selected target. */
+  executionPlan?: ExecutionPlan;
 }
 
 /** Map the request's boolean flags onto the capabilities they imply. */

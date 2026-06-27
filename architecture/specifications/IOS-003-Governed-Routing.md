@@ -3,13 +3,13 @@
 | Field | Value |
 |-------|-------|
 | Identifier | IOS-003 |
-| Version | 1.0 |
+| Version | 1.1 |
 | Status | Active |
 | Authority | Normative Specification |
 | Owner | LAWRENCE Architecture Council |
 | Effective Date | 2026-06-27 |
 | Superseded By | — |
-| Related Artifacts | IOS-001, IOS-002, IOS-004, ADR-0001 |
+| Related Artifacts | IOS-001, IOS-002, IOS-004, ADR-0001, ADR-0004 |
 
 ## Purpose
 
@@ -34,12 +34,20 @@ or cost scoring (deferred to a future specification + ADR).
 - Evaluate eligibility using ONLY declared capabilities and explicit policy.
 - Return an immutable `RoutingDecision` recording the selection, evaluated
   providers, and deterministic rejection reasons.
+- (v1.1, ADR-0004) Emit the immutable **Execution Plan** on the decision
+  (`executionPlan`): the ordered, authorized execution targets (the surviving
+  candidates in routing-preference order; `targets[0]` = the selected/primary).
+  Routing is the SOLE authority that selects and authorizes invocation targets;
+  the execution layer invokes only plan members and never authorizes or constructs
+  targets.
 
 ## Public Interfaces
 
 - `RoutingRequest`, `RoutingPolicy`, `RoutingRejection`, `RoutingDecision`.
 - `route(request, policy, registry): RoutingDecision`.
 - `impliedCapabilities`, `effectivePolicy`, `deepFreeze`.
+- (v1.1) `ExecutionTarget`, `ExecutionPlan`, `RoutingDecision.executionPlan`;
+  `buildExecutionPlan(decision)`, `planContains(plan, target)`, `primaryTarget(plan)`.
 
 ## Invariants
 
@@ -60,10 +68,13 @@ or cost scoring (deferred to a future specification + ADR).
    SHALL NOT be selected.
 3. The returned decision SHALL be frozen.
 4. No name-based selection SHALL occur.
+5. (v1.1) The decision SHALL carry an immutable Execution Plan whose `targets[0]`
+   equals the selected target and whose remaining entries are the other authorized
+   survivors in routing-preference order.
 
 ## Related ADRs
 
-- ADR-0001.
+- ADR-0001; ADR-0004 (v1.1 Execution Plan).
 
 ## Derived From
 
@@ -77,4 +88,4 @@ or cost scoring (deferred to a future specification + ADR).
 ## Implementation References
 
 - `src/lib/aiops/routing/routing-types.ts`, `capability-resolver.ts`,
-  `routing-engine.ts`.
+  `routing-engine.ts`, `execution-plan.ts` (v1.1).

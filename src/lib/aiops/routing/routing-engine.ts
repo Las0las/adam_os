@@ -18,6 +18,7 @@ import {
 import {
   deepFreeze,
   effectivePolicy,
+  type ExecutionPlan,
   type RoutingDecision,
   type RoutingPolicy,
   type RoutingRejection,
@@ -102,6 +103,13 @@ export function route(
   );
   const top = ordered[0];
 
+  // Routing owns selection AND authorization: the ordered survivors ARE the
+  // authorized Execution Plan (ADR-0004), primary first. Execution invokes only
+  // these; it never authorizes or constructs alternate targets.
+  const executionPlan: ExecutionPlan = {
+    targets: ordered.map((c) => ({ provider: c.provider, model: c.descriptor.model })),
+  };
+
   const decision: RoutingDecision = {
     selectedProvider: top ? top.provider : null,
     selectedModel: top ? top.descriptor.model : null,
@@ -110,6 +118,7 @@ export function route(
     // Snapshot a deep copy of the effective policy so the record is stable and
     // immutable regardless of later mutation of the caller's policy object.
     policySnapshot: JSON.parse(JSON.stringify(pol)) as RoutingPolicy,
+    executionPlan,
   };
   return deepFreeze(decision);
 }

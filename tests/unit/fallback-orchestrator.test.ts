@@ -63,17 +63,19 @@ function multiRegistry(specs: Spec[]): { reg: ProviderRegistry; calls: Record<st
 const echo = (tag: string): ModelProvider["complete"] => async (req) => ({ ...OK, text: `${tag}:${req.prompt}` });
 const fails = (msg: string): ModelProvider["complete"] => async () => { throw new Error(msg); };
 
-function decision(evaluated: string[] = ["p", "p2", "p3"]): RoutingDecision {
+// The routing layer authorizes the Execution Plan; the first target is primary.
+function decision(targets: Array<[string, string]> = [["p", "m"], ["p2", "m2"]]): RoutingDecision {
   return deepFreeze({
-    selectedProvider: "p", selectedModel: "m",
-    evaluatedProviders: evaluated, rejectionReasons: [], policySnapshot: {},
+    selectedProvider: targets[0]![0], selectedModel: targets[0]![1],
+    evaluatedProviders: [...new Set(targets.map((t) => t[0]))], rejectionReasons: [], policySnapshot: {},
+    executionPlan: { targets: targets.map(([provider, model]) => ({ provider, model })) },
   });
 }
 function params(reg: ProviderRegistry, d: RoutingDecision = decision(), prompt = "x") {
   return { request: { prompt }, routingDecision: d, registry: reg, requestId: "req", tenantId: "tnt", workloadType: "chat" };
 }
 function enabledFallback(overrides: Partial<FallbackPolicy> = {}): FallbackPolicy {
-  return { ...defaultFallbackPolicy(), mode: "enabled", fallbackProviders: ["p2"], fallbackModels: ["m2"], ...overrides };
+  return { ...defaultFallbackPolicy(), mode: "enabled", ...overrides };
 }
 function harness(policy: FallbackPolicy) {
   const bus = new ExecutionEventBus();
@@ -124,7 +126,7 @@ test("the fallback chain is exhausted when every target fails", async () => {
     { id: "p", model: "m", complete: fails("503 unavailable") },
     { id: "p2", model: "m2", complete: fails("503 unavailable") },
   ]);
-  const h = harness(enabledFallback({ fallbackProviders: ["p2"], fallbackModels: ["m2"] }));
+  const h = harness(enabledFallback());
   const res = await executeInference(params(reg), h.hooks);
   assert.equal(res.success, false);
   assert.equal(res.error?.kind, "provider_unavailable");
@@ -137,18 +139,19 @@ test("the fallback chain is exhausted when every target fails", async () => {
 
 // ── Deterministic ordered selection ──────────────────────────────────────────
 
-test("fallback tries targets in deterministic policy order", async () => {
+test("fallback tries plan targets in deterministic plan order", async () => {
   const order: string[] = [];
   const { reg, calls } = multiRegistry([
     { id: "p", model: "m", complete: fails("timed out") },
     { id: "p2", model: "m2", complete: async () => { order.push("p2"); throw new Error("rate limit 429"); } },
     { id: "p3", model: "m3", complete: async (req) => { order.push("p3"); return echo("p3")(req); } },
   ]);
-  const h = harness(enabledFallback({ fallbackProviders: ["p2", "p3"], fallbackModels: ["m2", "m3"], maxFallbackAttempts: 3 }));
-  const res = await executeInference(params(reg), h.hooks);
+  const h = harness(enabledFallback({ maxFallbackAttempts: 3 }));
+  // Plan order p → p2 → p3 (routing preference); fallback follows it deterministically.
+  const res = await executeInference(params(reg, decision([["p", "m"], ["p2", "m2"], ["p3", "m3"]])), h.hooks);
   assert.equal(res.success, true);
   assert.equal(res.response, "p3:x");
-  assert.deepEqual(order, ["p2", "p3"], "p2 before p3, deterministically");
+  assert.deepEqual(order, ["p2", "p3"], "p2 before p3, deterministically (plan order)");
   assert.equal(calls.p2, 1);
   assert.equal(calls.p3, 1);
 });
@@ -257,19 +260,20 @@ test("an authentication failure is not eligible for fallback", async () => {
   assert.deepEqual(typesOf(h.telemetry).filter((t) => t.startsWith("fallback.")), []);
 });
 
-// ── Unauthorized target ──────────────────────────────────────────────────────
+// ── Policy cannot select a target outside the plan ───────────────────────────
 
-test("a fallback target the routing layer did not authorize is skipped", async () => {
+test("a policy fallbackProviders entry not in the execution plan selects nothing", async () => {
   const { reg, calls } = multiRegistry([
     { id: "p", model: "m", complete: fails("503 unavailable") },
     { id: "p3", model: "m3", complete: echo("p3") },
   ]);
-  // p3 is not in evaluatedProviders → unauthorized; the only configured target is p3.
-  const h = harness(enabledFallback({ fallbackProviders: ["p3"], fallbackModels: ["m3"] }));
-  const res = await executeInference(params(reg, decision(["p", "p2"])), h.hooks);
-  assert.equal(res.success, false, "no authorized target → primary failure stands");
+  // The plan authorizes only [p, p2]; the policy asks for p3 — which the plan does
+  // not contain, so the policy cannot add it. No eligible target → no fallback.
+  const h = harness(enabledFallback({ fallbackProviders: ["p3"] }));
+  const res = await executeInference(params(reg, decision([["p", "m"], ["p2", "m2"]])), h.hooks);
+  assert.equal(res.success, false, "no plan target selected → primary failure stands");
   assert.equal(res.error?.kind, "provider_unavailable");
-  assert.equal(calls.p3, 0, "an unauthorized target is never invoked");
+  assert.equal(calls.p3, 0, "a non-plan target is never invoked");
   assert.deepEqual(typesOf(h.telemetry).filter((t) => t.startsWith("fallback.")), []);
 });
 
