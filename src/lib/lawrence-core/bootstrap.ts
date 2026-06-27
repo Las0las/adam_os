@@ -21,6 +21,7 @@ import { installProviderHealthManager } from "@/lib/aiops/health/health-bootstra
 import { installBenchmarkHarness } from "@/lib/aiops/benchmark/benchmark-bootstrap";
 import { installExplainabilityEngine } from "@/lib/aiops/explainability/explainability-bootstrap";
 import { installTrafficReplay } from "@/lib/aiops/replay/replay-bootstrap";
+import { installEvaluationEngine } from "@/lib/aiops/evaluation/evaluation-bootstrap";
 import { registerSource, ingestAsset } from "@/lib/dataops/sources/source-service";
 import { runAssetPipeline } from "@/lib/dataops/pipelines/pipeline-runner";
 import { indexEvidence } from "@/lib/dataops/evidence/chunking-service";
@@ -157,6 +158,13 @@ async function initRuntime(): Promise<void> {
   // (IOS-013) or production metrics. The engine replays recorded inputs through
   // the public pipeline (never invoking providers directly), default DISABLED.
   installTrafficReplay();
+  // Install the Evaluation Engine (IOS-017) around a DEDICATED evaluation bus
+  // (an Isolated Execution Environment, IOS-016 model). It scores completed
+  // executions and produces the canonical EvaluationResult/Report; its observers
+  // subscribe to the evaluation bus only, so production health/metrics are never
+  // contaminated. Observational: no routing, no target authorization, no direct
+  // provider invocation. Default policy DISABLED.
+  installEvaluationEngine();
   if (shouldAutoSeedDemo()) {
     await bootstrap();
     return;

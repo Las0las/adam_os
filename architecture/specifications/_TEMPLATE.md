@@ -32,6 +32,21 @@
 <!-- The stable contracts consumers depend on (types/functions/events), described
      normatively. Reference the contract, do not reproduce implementation. -->
 
+## Canonical Object Contract
+<!-- REQUIRED for every IOS specification. Explicitly documents ownership and
+     dependency direction so the specification library stays internally consistent
+     as the Intelligence Layer grows.
+- **Canonical Objects Consumed** — canonical platform objects this subsystem reads
+  (by reference, never mutating), e.g. ExecutionPlan, RoutingDecision,
+  ProviderHealthSnapshot, Explanation, BenchmarkResult, ReplayResult.
+- **Canonical Objects Produced** — canonical objects this subsystem authors and
+  owns (it becomes their canonical producer).
+- **Existing Contracts Reused** — published contracts/APIs reused without change
+  (e.g. IOS-004 executeInference, IOS-005 event bus, IOS-003 routing).
+- **Authoritative Producers** — for each consumed object, the subsystem that owns
+  it (authority direction; consumers SHALL NOT redefine or mutate it).
+- **Authorized Consumers** — who MAY read the objects this subsystem produces. -->
+
 ## Invariants
 <!-- Properties that SHALL always hold. -->
 
