@@ -56,6 +56,7 @@ export const lawrenceNav: NavSection[] = [
       { label: "Notifications", href: "/mission-control/notifications" },
       { label: "Incidents", href: "/mission-control/incidents" },
       { label: "Runtime Health", href: "/mission-control/runtime/health" },
+      { label: "Graph Integrity", href: "/mission-control/graph-integrity" },
       { label: "Audit", href: "/mission-control/runtime/audit" },
     ],
   },
