@@ -99,6 +99,7 @@ as they consume the IOS public contracts.
 | IOS-014 | Benchmark Harness | (Phase 2) |
 | IOS-015 | Explainability Engine | (Phase 2) |
 | IOS-016 | Traffic Replay Engine | (Phase 2) |
+| IOS-017 | Evaluation Engine | (Phase 2) |
 
 ## 5. Conformance
 

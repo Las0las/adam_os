@@ -72,6 +72,7 @@ a specification disagree, the specification governs.
 | IOS-014 | Benchmark Harness | Phase 2 (spec-driven) |
 | IOS-015 | Explainability Engine | Phase 2 (spec-driven) |
 | IOS-016 | Traffic Replay Engine | Phase 2 (spec-driven) |
+| IOS-017 | Evaluation Engine | Phase 2 (spec-driven) |
 
 ## Working Under Governance (from Milestone 8.0 onward)
 
