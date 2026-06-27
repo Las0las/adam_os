@@ -38,10 +38,15 @@ middleware (IOS-005/006/007).
   no raw exception SHALL escape.
 - Expose a priority-ordered hook registry (lower priority first; registration
   order as a stable tie-break).
-- Expose a provider-invocation extension point (`aroundInvoke`, added in v1.1 by
-  ADR-0003): hooks implementing it compose as an onion around the single provider
-  call (priority order, lowest = outermost). It wraps ONLY the provider call (not
-  cache hits) and the request/response interceptors still run around it.
+- Expose a **general provider-invocation middleware extension point**
+  (`aroundInvoke`, added in v1.1 by ADR-0003). It is a permanent execution seam —
+  not retry-specific — that any middleware needing to control the provider
+  invocation reuses (IOS-010 Retry, IOS-011 Circuit Breaker, IOS-012 Fallback,
+  IOS-013 Provider Health, …). Hooks implementing it compose as a deterministic
+  onion around the single provider call (priority order, lowest = outermost;
+  registration order as a stable tie-break). A middleware MAY call `next` zero,
+  one, or many times. It wraps ONLY the provider call (not cache hits) and the
+  request/response interceptors still run around it.
 
 ## Public Interfaces
 
@@ -76,10 +81,15 @@ middleware (IOS-005/006/007).
 3. The provider SHALL be invoked exactly once on the success path and zero times
    when a pre-provider interceptor rejects.
 4. No source outside the pipeline and provider layer SHALL call `.complete(`.
-5. (v1.1) The provider invocation SHALL be wrappable by `aroundInvoke` hooks in
-   priority order; with none registered it SHALL behave identically to a single
-   direct invocation (byte-for-byte unchanged). `aroundInvoke` SHALL NOT run on a
-   cache hit, and the request/response interceptors SHALL still run around it.
+5. (v1.1) With **no** `aroundInvoke` middleware registered, execution SHALL be
+   byte-for-byte identical to a single direct provider invocation.
+6. (v1.1) A **pass-through** `aroundInvoke` middleware (one that only calls
+   `next`) SHALL produce identical execution to having none.
+7. (v1.1) Multiple `aroundInvoke` middleware SHALL compose deterministically as an
+   onion in priority order, with **registration order** as the stable tie-break
+   (first = outermost).
+8. (v1.1) `aroundInvoke` SHALL NOT run on a cache hit, and the request/response
+   interceptors (security, validation) SHALL still run around it.
 
 ## Related ADRs
 
