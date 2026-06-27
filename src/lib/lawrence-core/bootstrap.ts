@@ -18,6 +18,7 @@ import { installRetryMiddleware } from "@/lib/aiops/retry/retry-bootstrap";
 import { installCircuitBreaker } from "@/lib/aiops/circuit/circuit-bootstrap";
 import { installFallbackOrchestrator } from "@/lib/aiops/fallback/fallback-bootstrap";
 import { installProviderHealthManager } from "@/lib/aiops/health/health-bootstrap";
+import { installBenchmarkHarness } from "@/lib/aiops/benchmark/benchmark-bootstrap";
 import { registerSource, ingestAsset } from "@/lib/dataops/sources/source-service";
 import { runAssetPipeline } from "@/lib/dataops/pipelines/pipeline-runner";
 import { indexEvidence } from "@/lib/dataops/evidence/chunking-service";
@@ -135,6 +136,12 @@ async function initRuntime(): Promise<void> {
   // execution hook and changes no execution behavior; default policy DISABLED
   // (no-op). It never routes, invokes providers, or touches the Execution Plan.
   installProviderHealthManager();
+  // Install the Benchmark Harness (IOS-014): subscribe its metrics collector to
+  // the bus and expose the on-demand harness + result store. It is NOT an
+  // execution hook and changes no execution behavior; default policy DISABLED, so
+  // runs are a no-op until enabled. It drives cases through the public pipeline,
+  // never invoking providers directly or influencing production routing.
+  installBenchmarkHarness();
   if (shouldAutoSeedDemo()) {
     await bootstrap();
     return;
