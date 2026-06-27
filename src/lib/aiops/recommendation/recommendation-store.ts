@@ -1,10 +1,12 @@
-// IOS-019 — Recommendation store.
+// Recommendation store — SHARED taxonomy infrastructure (not owned by IOS-019).
 //
-// Holds immutable Recommendation objects (currently CostRecommendation). Read-only
-// to consumers; the engine writes. In-memory only. The store is keyed by kind so
-// future specializations coexist under one taxonomy without collision.
+// Holds immutable Recommendation objects of any concrete specialization, keyed by
+// kind so future specializations coexist under one taxonomy without collision.
+// Read-only to consumers; each specialization's owning engine writes its own
+// concrete recommendations (IOS-019 writes CostRecommendation). In-memory only.
 
-import type { CostRecommendation, Recommendation, RecommendationKind } from "./recommendation-types";
+import type { Recommendation, RecommendationKind } from "./recommendation-contract";
+import type { CostRecommendation } from "./recommendation-types";
 
 export class RecommendationStore {
   private readonly items: Recommendation[] = [];

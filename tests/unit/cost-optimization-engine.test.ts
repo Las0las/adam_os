@@ -122,6 +122,25 @@ test("CostRecommendation is a specialization of the base Recommendation contract
   assert.equal(e.store.costRecommendations().length, 1);
 });
 
+// ── Abstract Recommendation contract is shared, not IOS-019-owned ────────────
+
+test("the abstract Recommendation contract lives in the shared taxonomy module", async () => {
+  // The base taxonomy (Recommendation/RecommendationKind/RecommendationSubject) is
+  // importable from the shared contract module — it is not owned by IOS-019.
+  const contract = await import("@/lib/aiops/recommendation/recommendation-contract");
+  assert.equal(typeof contract.recommendationKey, "function");
+  assert.equal(contract.recommendationKey("p", "m"), "p|m");
+
+  // CostRecommendation (IOS-019's concrete specialization) extends the base
+  // contract: a produced cost recommendation carries the base fields and kind.
+  const input: CostAnalysisInput = { capabilities: [cap("p1", "m", 1, 1)], observations: [obs("p1", "m", 1, 1_000_000)] };
+  const r = engineWith(enabled()).engine.recommend(input)[0]!;
+  assert.equal(r.kind, "cost");
+  for (const f of ["recommendationId", "kind", "subject", "rationale", "confidence", "createdAt", "advisory"]) {
+    assert.ok(f in r, `base contract field "${f}" present`);
+  }
+});
+
 // ── Eligibility + disabled no-op ─────────────────────────────────────────────
 
 test("ineligible providers are not analyzed", () => {

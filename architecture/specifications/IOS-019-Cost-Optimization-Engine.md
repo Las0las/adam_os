@@ -16,32 +16,37 @@
 The Cost Optimization Engine SHALL be a purely ADVISORY subsystem. It consumes
 published model metadata (IOS-018), execution history, benchmark results, provider
 health, and evaluation results, and produces immutable **CostRecommendation**
-objects. It establishes the canonical **Recommendation** object family and becomes
-the canonical producer of its first specialization, CostRecommendation.
+objects. IOS-019 is the canonical producer of **CostRecommendation only**; it does
+NOT own the Recommendation hierarchy.
 
 ## Scope
 
-Governs the base `Recommendation` contract, the `CostRecommendation` specialization,
-the cost analyzer, the recommendation store, and the CostOptimizationPolicy. It
-does NOT introduce a generic recommendation engine and does NOT implement the
-future specializations (SLARecommendation, RoutingRecommendation,
-ProviderRecommendation, CapacityRecommendation, PolicyRecommendation) — each future
-specification SHALL own only its specialization while reusing the base contract.
-Out of scope: routing, provider invocation, execution authorization, and automatic
-application of recommendations.
+Governs the `CostRecommendation` specialization, the cost analyzer, and the
+CostOptimizationPolicy. The base `Recommendation` contract is **abstract and
+shared** (taxonomy-level, not owned by IOS-019); the recommendation store is shared
+taxonomy infrastructure. IOS-019 does NOT introduce a generic recommendation engine
+and does NOT implement the future specializations (SLARecommendation,
+RoutingRecommendation, ProviderRecommendation, CapacityRecommendation,
+PolicyRecommendation) — each future specification SHALL own only its specialization
+while reusing the abstract contract. Out of scope: routing, provider invocation,
+execution authorization, and automatic application of recommendations.
 
 ## Recommendation Taxonomy
 
-IOS-019 defines the single platform-wide recommendation taxonomy:
+A single platform-wide recommendation taxonomy, with ownership boundaries:
 
-- **Recommendation** — base canonical contract (recommendationId, kind, subject,
-  rationale, confidence, createdAt, advisory). Every specialization extends it.
-- **CostRecommendation** — first specialization (kind `cost`): observed/published
-  cost per 1M tokens, an action (no_change / switch_model / reduce_usage /
-  investigate), an optional cheaper no-worse alternative, and projected savings.
+- **Recommendation** — the **abstract**, shared canonical contract
+  (recommendationId, kind, subject, rationale, confidence, createdAt, advisory). It
+  is never produced directly and is NOT owned by IOS-019; every concrete
+  specialization extends it.
+- **CostRecommendation** — the first **concrete** specialization (kind `cost`),
+  owned and produced solely by IOS-019: observed/published cost per 1M tokens, an
+  action (no_change / switch_model / reduce_usage / investigate), an optional
+  cheaper no-worse alternative, and projected savings.
 
-Future specializations (sla, routing, provider, capacity, policy) reuse the base
-contract; IOS-019 does not implement them.
+Future concrete specializations (sla, routing, provider, capacity, policy) reuse
+the abstract contract; each is owned by its own specification. IOS-019 implements
+none of them.
 
 ## Responsibilities
 
@@ -53,27 +58,31 @@ contract; IOS-019 does not implement them.
 
 ## Public Interfaces
 
-- `Recommendation`, `CostRecommendation`, `RecommendationKind`,
-  `RecommendationSubject`.
+- `Recommendation` (abstract, shared — `recommendation-contract.ts`),
+  `RecommendationKind`, `RecommendationSubject`; `CostRecommendation` (IOS-019).
 - `CostOptimizationEngine.recommend(input)`; `analyzeCost(...)` (deterministic).
 - `CostOptimizationPolicy` / `CostOptimizationPolicyStore`; `RecommendationStore`
   (`byKind`, `costRecommendations`, `all`).
 
 ## Canonical Object Contract
 
-- **Canonical Objects Consumed** (read by reference, never mutated): ModelCapability
-  / model metadata (IOS-018), execution history (cost observations assembled from
-  IOS-004/005 execution outcomes), BenchmarkResult (IOS-014),
-  ProviderHealthSnapshot (IOS-013), EvaluationResult (IOS-017).
-- **Canonical Objects Produced**: the base **Recommendation** contract and its
-  first specialization **CostRecommendation** — IOS-019 is the canonical producer
-  of CostRecommendation.
-- **Existing Contracts Reused**: IOS-018 published metadata contracts; IOS-013/014/
-  017 observation objects.
-- **Authoritative Producers** (of consumed objects): IOS-018 owns model metadata;
-  IOS-013 owns ProviderHealthSnapshot; IOS-014 owns BenchmarkResult; IOS-017 owns
-  EvaluationResult; the Execution Pipeline (IOS-004/005) owns execution history.
-  This engine SHALL NOT mutate any of them.
+- **Canonical Objects Consumed** (read by reference, never mutated): **ModelDescriptor**,
+  **ModelCapability**, **ModelLimits**, **ModelFeatures**, **ModelPricingMetadata**,
+  **ModelLifecycleState**, **ModelPublisherMetadata** (all IOS-018);
+  **ProviderHealthSnapshot** (IOS-013); **EvaluationResult** (IOS-017);
+  **BenchmarkResult** (IOS-014); **ExecutionHistory** (cost observations assembled
+  from IOS-004/005 execution outcomes).
+- **Canonical Objects Produced**: **CostRecommendation** only — IOS-019 is its
+  canonical producer. (The abstract `Recommendation` base contract is shared,
+  taxonomy-level, and NOT owned by IOS-019.)
+- **Existing Contracts Reused**: the abstract `Recommendation` taxonomy contract;
+  IOS-018 published metadata contracts; IOS-013/014/017 observation objects.
+- **Authoritative Producers** (of consumed objects): IOS-018 owns all model metadata
+  (ModelDescriptor/Capability/Limits/Features/PricingMetadata/LifecycleState/
+  PublisherMetadata); IOS-013 owns ProviderHealthSnapshot; IOS-014 owns
+  BenchmarkResult; IOS-017 owns EvaluationResult; the Execution Pipeline (IOS-004/
+  005) owns ExecutionHistory. Authority for every consumed object remains with its
+  respective producing specification; this engine SHALL NOT mutate any of them.
 - **Authorized Consumers** (of produced objects): operator/FinOps surfaces, SLA
   Management, and other advisory consumers MAY read CostRecommendation. Routing
   SHALL NOT consume it to make automatic decisions — recommendations are advisory.
@@ -130,7 +139,8 @@ contract; IOS-019 does not implement them.
 
 ## Implementation References
 
-- `src/lib/aiops/recommendation/*` (recommendation-types, cost-analyzer,
+- `src/lib/aiops/recommendation/*` (recommendation-contract — the abstract shared
+  taxonomy; recommendation-types — CostRecommendation; cost-analyzer,
   recommendation-store, cost-engine, cost-bootstrap); consumes
   `src/lib/aiops/capability` (IOS-018) and IOS-013/014/017 objects; installed in
   `src/lib/lawrence-core/bootstrap.ts`.
