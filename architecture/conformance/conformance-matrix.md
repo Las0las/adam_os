@@ -48,6 +48,7 @@
 | Enterprise governance orchestrator (VS-008) | `tests/integration/governance-orchestrator.test.ts` |
 | Mission execution planner (MS-010) | `tests/unit/mission-planner.test.ts` |
 | Mission execution runtime (MS-010) | `tests/integration/mission-runtime.test.ts` |
+| Governed action executor + execution persistence (MS-011) | `tests/integration/mission-action-executor.test.ts` |
 
 ## Graph integrity validation categories
 

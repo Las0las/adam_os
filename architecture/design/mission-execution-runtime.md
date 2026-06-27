@@ -86,10 +86,22 @@ A task that exhausts its retries is `failed`; its transitive dependents are
 existing-behavior change. Concrete executors and any execution wiring are additive
 follow-ups.
 
+## Delivered follow-ups
+
+- **Governed Action Executor (MS-011 / ADR-0013)** — `executors/action-executor.ts`
+  (key `mission.action`) bridges a task to the Mission Control action engine via
+  `executeAction()`, reusing its governed pipeline. Self-registers via the platform
+  bootstrap. Task input: `{ actionKey, actionInput?, object?, approvalExempt? }`.
+- **Durable Mission Executions (MS-011 / ADR-0013)** — `mission-execution-store.ts`
+  + the `missionExecutions` collection persist every report at every exit path;
+  read via `getMissionExecution` / `listMissionExecutions`.
+
 ## Future extension points
 
-- **Concrete executors** registered by domain packs (Agent Dispatcher).
+- **Domain-specific executors** registered by domain packs (Agent Dispatcher).
 - **Persisted/resumable execution state** (true pause/resume without re-running
-  completed tasks).
+  completed tasks; today executions are persisted as terminal records).
+- **Mission-task handling of an action's own approval gate** (today surfaced
+  fail-closed).
 - **Workflow Runtime** reusing the planner/scheduler/dispatcher/governance shape.
-- **Approval UI** over the existing Waiting state + `pendingApprovals`.
+- **Approval / mission-execution UI** over the Waiting state + persisted records.

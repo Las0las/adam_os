@@ -7,6 +7,7 @@ import "@/lib/dataops/parsers/parser-registry";
 import "@/lib/dataops/transforms/transform-registry";
 import "@/lib/aiops/functions/function-registry";
 import "@/lib/dataops/ontology/object-mapper-registry";
+import "@/lib/missions/executors/action-executor";
 import "@/lib/domains";
 
 let registered = false;
