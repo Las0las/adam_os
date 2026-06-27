@@ -46,6 +46,8 @@
 | Graph review surface service + route (VS-006) | `tests/integration/graph-integrity-surface.test.ts`, `tests/integration/graph-integrity-route.test.ts` |
 | Mission/workflow graph preflight (VS-007) | `tests/integration/graph-preflight.test.ts` |
 | Enterprise governance orchestrator (VS-008) | `tests/integration/governance-orchestrator.test.ts` |
+| Mission execution planner (MS-010) | `tests/unit/mission-planner.test.ts` |
+| Mission execution runtime (MS-010) | `tests/integration/mission-runtime.test.ts` |
 
 ## Graph integrity validation categories
 
