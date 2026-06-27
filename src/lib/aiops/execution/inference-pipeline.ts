@@ -28,6 +28,7 @@ import {
   type ExecutionError,
 } from "./execution-errors";
 import { listExecutionHooks } from "./execution-hooks";
+import { isAuthorizedTarget, type InvocationTarget } from "./invocation-target";
 import type {
   ExecutionHook,
   InferenceExecutionContext,
@@ -102,7 +103,7 @@ async function runLifecycle(
   ctx: InferenceExecutionContext,
   hooks: ExecutionHook[],
   request: CompletionRequest,
-  invoke: (request: CompletionRequest) => Promise<CompletionResponse>,
+  invoke: (request: CompletionRequest, target?: InvocationTarget) => Promise<CompletionResponse>,
 ): Promise<LifecycleOutcome> {
   try {
     for (const h of hooks) await h.beforeExecute?.(ctx);
@@ -128,12 +129,20 @@ async function runLifecycle(
     if (resolved) {
       completion = resolved;
     } else {
-      let chain: (req: CompletionRequest) => Promise<CompletionResponse> = (req) => invoke(req);
+      // Each layer's `next` threads any invocation-target override (ADR-0004)
+      // down to the provider: a target supplied by an OUTER middleware flows
+      // through inner layers (which call `next` with no target) unchanged, while
+      // an inner middleware that supplies its own target takes precedence
+      // (`thisTarget ?? outerTarget`). With no override anywhere, `target` stays
+      // undefined and the routing-selected provider is invoked exactly once.
+      let chain: (req: CompletionRequest, target?: InvocationTarget) => Promise<CompletionResponse> =
+        (req, target) => invoke(req, target);
       const around = hooks.filter((h) => h.aroundInvoke);
       for (let i = around.length - 1; i >= 0; i--) {
         const h = around[i]!;
-        const next = chain;
-        chain = (req) => h.aroundInvoke!(req, ctx, next);
+        const inner = chain;
+        chain = (req, outerTarget) =>
+          h.aroundInvoke!(req, ctx, (r, thisTarget) => inner(r, thisTarget ?? outerTarget));
       }
       completion = await chain(effectiveRequest);
     }
@@ -188,13 +197,28 @@ export async function executeInference(
     return deepFreeze(failure(ctx, error));
   }
 
-  const { result } = await runLifecycle(ctx, hooks, params.request, async (req) => {
-    const entry = params.registry.get(provider);
-    if (!entry) throw new ProviderUnavailableError(`provider not registered: ${provider}`);
-    if (!entry.isConfigured()) {
-      throw new AuthenticationError(`provider '${provider}' is not configured (credentials missing)`);
+  const { result } = await runLifecycle(ctx, hooks, params.request, async (req, target) => {
+    // Resolve the invocation target (ADR-0004). With no override, this is the
+    // routing-selected provider/model — unchanged. An override may name only a
+    // target the routing layer already authorized for this execution; routing is
+    // never re-run and the immutable RoutingDecision is never mutated.
+    let invProvider = provider;
+    let invModel = model;
+    if (target) {
+      if (!isAuthorizedTarget(routingDecision, target)) {
+        throw new ProviderUnavailableError(
+          `invocation target not authorized by routing: ${target.provider}|${target.model}`,
+        );
+      }
+      invProvider = target.provider;
+      invModel = target.model;
     }
-    return entry.create(model).complete(req);
+    const entry = params.registry.get(invProvider);
+    if (!entry) throw new ProviderUnavailableError(`provider not registered: ${invProvider}`);
+    if (!entry.isConfigured()) {
+      throw new AuthenticationError(`provider '${invProvider}' is not configured (credentials missing)`);
+    }
+    return entry.create(invModel).complete(req);
   });
   return result;
 }
@@ -231,7 +255,15 @@ export async function runModelCompletion(
     requestFingerprint: fingerprint(opts.request),
   });
 
-  const { completion, error } = await runLifecycle(ctx, hooks, opts.request, (req) => opts.provider.complete(req));
+  const { completion, error } = await runLifecycle(ctx, hooks, opts.request, (req, target) => {
+    // This path has an already-resolved provider and no RoutingDecision, so no
+    // alternate target can be authorized (ADR-0004). Honoring an override here
+    // would be routing without a routing context — reject it.
+    if (target) {
+      throw new ProviderUnavailableError("invocation target override requires a routing context");
+    }
+    return opts.provider.complete(req);
+  });
   if (completion) return completion;
   throw error ?? new ExecutionFailedError("inference failed");
 }

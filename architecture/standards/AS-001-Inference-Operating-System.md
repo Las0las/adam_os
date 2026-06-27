@@ -69,6 +69,12 @@ as they consume the IOS public contracts.
   IOS-010 (Retry Policy) is its first consumer, and execution-control middleware
   such as IOS-011 (Circuit Breaker), IOS-012 (Fallback Orchestrator), and IOS-013
   (Provider Health Manager) SHALL reuse it without further architectural change.
+  The contract includes an OPTIONAL **invocation-target override** (ADR-0004): a
+  middleware MAY request invocation of an alternate (provider, model) that the
+  routing layer has already authorized for the execution, and the PIPELINE resolves
+  and invokes it. Routing remains authoritative — middleware SHALL NOT re-run
+  routing or mutate the RoutingDecision; the pipeline SHALL reject any target the
+  RoutingDecision did not authorize. This too is general (first consumer: IOS-012).
 
 ## 4. Governed Specifications
 
@@ -85,6 +91,7 @@ as they consume the IOS public contracts.
 | IOS-009 | Semantic Cache | (Phase 2) |
 | IOS-010 | Retry Policy | (Phase 2) |
 | IOS-011 | Circuit Breaker | (Phase 2) |
+| IOS-012 | Fallback Orchestrator | (Phase 2) |
 
 ## 5. Conformance
 
