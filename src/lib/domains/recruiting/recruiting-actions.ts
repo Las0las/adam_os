@@ -68,8 +68,25 @@ registerAction({
       objectType: "Submission",
       externalKey: `sub-${candidateId}-${jobId}`,
       title: "Shortlist submission",
-      status: "shortlisted",
-      properties: { candidateId, jobId, score, rationale },
+      // ONT-001 Submission: status SHALL be a CandidateStage. Shortlisting puts a
+      // candidate forward to a job → "submitted". The shortlist sub-state is
+      // retained via the `shortlisted` marker below (read by the dashboard).
+      status: "submitted",
+      properties: {
+        // Canonical ONT-001 keys.
+        jobKey: jobId,
+        candidateKey: candidateId,
+        stage: "submitted",
+        score,
+        rationale,
+        // Marks this submission as shortlist-originated (preserves the
+        // "Shortlist recommendations" dashboard set after the status alignment).
+        shortlisted: true,
+        // Legacy aliases retained for backward compatibility (documented shim,
+        // not a new contract). Do not rely on these for new code.
+        candidateId,
+        jobId,
+      },
     });
 
     // Also drop a recruiter note recording the shortlist rationale.
@@ -91,6 +108,6 @@ registerAction({
       subjectId: candidateId,
     });
 
-    return { submissionId: submission.id, stage: "shortlisted" };
+    return { submissionId: submission.id, stage: "submitted", shortlisted: true };
   },
 });
