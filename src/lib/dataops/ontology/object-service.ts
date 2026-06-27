@@ -5,6 +5,9 @@ import { db } from "@/lib/lawrence-core/db";
 import { id, now } from "@/lib/lawrence-core/utils/ids";
 import { requirePermission } from "@/lib/lawrence-core/permissions/permissions";
 import { emitAudit } from "@/lib/lawrence-core/audit/audit-service";
+import { schemaFor } from "./schemas/registry";
+import { validateCanonicalObject } from "./schemas/validate";
+import type { CanonicalObjectInput } from "./schemas/types";
 import type { ActorContext } from "@/types/platform";
 import type { OntologyObject, OntologyLink } from "@/types/dataops";
 
@@ -62,14 +65,25 @@ export async function upsertObject(ctx: ActorContext, input: UpsertObjectInput):
     : undefined;
 
   if (existing) {
+    const effTitle = input.title ?? existing.title;
+    const effStatus = input.status ?? existing.status;
+    const effProperties = applyLedgers(
+      { ...existing.properties, ...(input.properties ?? {}) },
+      existing.properties,
+      input.appendLedger,
+    );
+    // Warn-only canonical-schema check on the effective (post-merge) object.
+    await warnOnSchemaViolations(ctx, {
+      objectType: input.objectType,
+      externalKey: input.externalKey ?? existing.externalKey,
+      title: effTitle,
+      status: effStatus,
+      properties: effProperties,
+    });
     const merged = await db.ontologyObjects.update(existing.id, {
-      title: input.title ?? existing.title,
-      status: input.status ?? existing.status,
-      properties: applyLedgers(
-        { ...existing.properties, ...(input.properties ?? {}) },
-        existing.properties,
-        input.appendLedger,
-      ),
+      title: effTitle,
+      status: effStatus,
+      properties: effProperties,
       updatedAt: now(),
     });
     await recordHistory(ctx, merged, "update");
@@ -77,6 +91,15 @@ export async function upsertObject(ctx: ActorContext, input: UpsertObjectInput):
   }
 
   const ts = now();
+  const createdProperties = applyLedgers(input.properties ?? {}, {}, input.appendLedger);
+  // Warn-only canonical-schema check on the object about to be created.
+  await warnOnSchemaViolations(ctx, {
+    objectType: input.objectType,
+    externalKey: input.externalKey ?? null,
+    title: input.title ?? null,
+    status: input.status ?? null,
+    properties: createdProperties,
+  });
   const created = await db.ontologyObjects.insert({
     id: id("obj"),
     tenantId: ctx.tenantId,
@@ -84,12 +107,41 @@ export async function upsertObject(ctx: ActorContext, input: UpsertObjectInput):
     externalKey: input.externalKey ?? null,
     title: input.title ?? null,
     status: input.status ?? null,
-    properties: applyLedgers(input.properties ?? {}, {}, input.appendLedger),
+    properties: createdProperties,
     createdAt: ts,
     updatedAt: ts,
   });
   await recordHistory(ctx, created, "create");
   return created;
+}
+
+/**
+ * Warn-only canonical-object validation (ONT-001 §C). If a schema is registered
+ * for the objectType and the effective object violates it, emit an
+ * `ontology.schema.warning` audit event — but NEVER block, reject, or fail the
+ * write. Fail-open: any error here is swallowed so schema observation can never
+ * turn a successful write into a failure (Constitution Article IV). Promotion to
+ * reject-mode is gated behind an ADR (see ONT-001 / the schema-registry design).
+ */
+async function warnOnSchemaViolations(ctx: ActorContext, effective: CanonicalObjectInput): Promise<void> {
+  try {
+    const schema = schemaFor(effective.objectType);
+    if (!schema) return;
+    const violations = validateCanonicalObject(schema, effective);
+    if (violations.length === 0) return;
+    await emitAudit(
+      ctx,
+      "ontology.schema.warning",
+      { type: effective.objectType, id: effective.externalKey ?? null },
+      {
+        objectType: effective.objectType,
+        externalKey: effective.externalKey ?? null,
+        violations,
+      },
+    );
+  } catch {
+    // Warn-only: schema validation SHALL NOT block or fail a write.
+  }
 }
 
 export async function linkObjects(
