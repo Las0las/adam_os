@@ -63,6 +63,7 @@ a specification disagree, the specification governs.
 | IOS-005 | Execution Event Bus & Observability | 5.0, 5.5 |
 | IOS-006 | Security Middleware | 6.0 |
 | IOS-007 | Cache Platform | 7.0, 7.5 |
+| IOS-008 | Batch Scheduler | Phase 2 (spec-driven) |
 
 ## Working Under Governance (from Milestone 8.0 onward)
 
