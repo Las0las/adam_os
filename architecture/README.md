@@ -45,6 +45,7 @@ a specification disagree, the specification governs.
 | `directives/` | Development Directives (DD-001 Specification-First Development) + `_TEMPLATE.md`. |
 | `adr/` | Architecture Decision Records + `_TEMPLATE.md`. |
 | `releases/` | Architectural release manifests (LAWRENCE-ARCH-1.0). |
+| `vision/` | Informative platform vision & conceptual architecture (plane stack, lifecycles). |
 | `roadmap/` | Informative phase roadmaps (LAWRENCE Platform Phase 3 — planes A–E). |
 | `contracts/` | Public Contract index (interfaces consumers depend on). |
 | `conformance/` | The Conformance Framework definition. |
