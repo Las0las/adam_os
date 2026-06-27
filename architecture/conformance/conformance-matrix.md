@@ -42,6 +42,8 @@
 | ONT spec governance | `tests/unit/ont-spec-governance.test.ts` |
 | Graph integrity validators (all categories) | `tests/unit/graph-integrity.test.ts` |
 | Graph enforce-mode / events / metrics | `tests/unit/graph-enforcement.test.ts` |
+| Graph review surface presenter (VS-006) | `tests/unit/graph-surface.test.ts` |
+| Graph review surface service + route (VS-006) | `tests/integration/graph-integrity-surface.test.ts`, `tests/integration/graph-integrity-route.test.ts` |
 
 ## Graph integrity validation categories
 

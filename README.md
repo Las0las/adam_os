@@ -28,6 +28,7 @@ Everything below runs today against an in-memory, tenant-scoped store and is cov
 - Canonical pipeline runner executing the full §18 flow plus **recursive EML attachment processing** (depth-limited, raw_asset→raw_asset lineage); pipeline preview (parse + transform, no persist)
 - Ontology object graph: idempotent upsert/merge on `(objectType, externalKey)`, links, history via audit
 - **Canonical ontology governance** — objects (ONT-001 / ADR-0006), relationships (ONT-002 / AS-005 / ADR-0008), and the **Enterprise Graph Integrity Engine** (ADR-0009): deterministic, rule-driven validation, warn-by-default with opt-in fail-closed enforce mode (`ONTOLOGY_SCHEMA_ENFORCEMENT`, `ONTOLOGY_RELATIONSHIP_ENFORCEMENT`, `ONTOLOGY_GRAPH_ENFORCEMENT`)
+- **Graph Integrity review surface** (VS-006) — read-only, user-triggered governance page (`/mission-control/graph-integrity`) that runs `validateGraph()` on demand and shows Pass/Warning/Failed state, summary metrics, and findings grouped by severity/code/object/relationship/rule. No auto-fix; never changes write behavior.
 - Evidence fabric: paragraph chunking + deterministic hashed embeddings
 
 **AIOps**
