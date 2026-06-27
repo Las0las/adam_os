@@ -13,6 +13,8 @@ import type { CompletionResponse, ModelProvider } from "@/lib/aiops/models/model
 import { ExecutionEventBus } from "@/lib/aiops/execution/observability/execution-event-bus";
 import { ExecutionEventPublisher } from "@/lib/aiops/execution/observability/event-bus-publisher";
 import { ExecutionTelemetryEngine } from "@/lib/aiops/execution/observability/telemetry-engine";
+import { registerExecutionHook, listExecutionHooks, clearExecutionHooks } from "@/lib/aiops/execution/execution-hooks";
+import type { ExecutionHook } from "@/lib/aiops/execution/execution-types";
 import { RetryMiddleware } from "@/lib/aiops/retry/retry-middleware";
 import { RetryPolicyStore, defaultRetryPolicy } from "@/lib/aiops/retry/retry-types";
 import { BenchmarkHarness } from "@/lib/aiops/benchmark/benchmark-harness";
@@ -224,6 +226,56 @@ test("with retry enabled, a transient failure is retried and reflected in retryC
   const r = runs[0]!.results[0]!;
   assert.equal(r.success, true);
   assert.ok(r.retryCount >= 1, "retry attempts were correlated from the bus");
+});
+
+// ── Bypass filters only a local hook-list copy (no global mutation) ──────────
+
+test("bypass/disable flags filter only a local hook copy; the global registry and policies are untouched", async () => {
+  clearExecutionHooks();
+  try {
+    const { reg, calls } = multiRegistry([{ id: "p1", model: "m1", complete: fails("timed out") }]);
+    const bus = new ExecutionEventBus();
+    const telemetry = new ExecutionTelemetryEngine();
+    bus.subscribe(telemetry);
+    // Register the full optional middleware GLOBALLY (the path the harness uses
+    // when ctx.hooks is omitted → listExecutionHooks()).
+    const retryStore = new RetryPolicyStore({ ...defaultRetryPolicy(), mode: "enabled", maxAttempts: 3, initialDelayMs: 1, backoff: "fixed" });
+    const retry = new RetryMiddleware(bus, retryStore, { sleep: async () => {} });
+    const fakeCache: ExecutionHook = { name: "prompt-cache", resolveCompletion: () => null };
+    const fakeFallback: ExecutionHook = { name: "fallback-orchestrator", aroundInvoke: (r, _c, n) => n(r) };
+    registerExecutionHook(new ExecutionEventPublisher(bus));
+    registerExecutionHook(retry);
+    registerExecutionHook(fakeCache);
+    registerExecutionHook(fakeFallback);
+    const beforeNames = listExecutionHooks().map((h) => h.name);
+
+    const store = new BenchmarkResultStore();
+    const harnessObj = new BenchmarkHarness(
+      bus, store,
+      new BenchmarkPolicyStore(enabled({ disableRetry: true, disableFallback: true, bypassCache: true })),
+      { now: () => 0, newRunId: () => "r1" },
+    );
+    // ctx.hooks omitted → the harness reads + filters the GLOBAL hook list.
+    await harnessObj.runSuite(
+      suite({ cases: [{ caseId: "c1", inputMessages: [{ role: "user", content: "hi" }] }] }),
+      { registry: reg },
+    );
+
+    // The bypass took effect for the run: retry did not run (one provider call).
+    assert.equal(calls.p1, 1, "retry was filtered out for the run → no retries");
+    assert.deepEqual(telemetry.events().map((e) => e.type).filter((t) => t.startsWith("retry.")), []);
+
+    // The global registry is byte-for-byte intact — nothing was removed or mutated.
+    const afterHooks = listExecutionHooks();
+    assert.deepEqual(afterHooks.map((h) => h.name), beforeNames, "global hook registry unchanged");
+    assert.ok(afterHooks.includes(retry), "the retry hook object remains globally registered");
+    assert.ok(afterHooks.includes(fakeCache));
+    assert.ok(afterHooks.includes(fakeFallback));
+    // The global retry policy store was never mutated by the bypass.
+    assert.equal(retryStore.current().mode, "enabled");
+  } finally {
+    clearExecutionHooks();
+  }
 });
 
 // ── Disabled no-op ───────────────────────────────────────────────────────────

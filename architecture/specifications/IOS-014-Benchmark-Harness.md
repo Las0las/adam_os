@@ -76,10 +76,15 @@ never mutates health).
 
 `BenchmarkPolicy` (immutable): enabled, eligibleProviders, eligibleModels,
 eligibleWorkloads, maxCasesPerRun, timeoutMs, bypassCache, bypassSemanticCache,
-disableFallback, disableRetry. The default policy is DISABLED. Bypass/disable flags
-are honored by dropping the corresponding middleware from the run's hook list — the
-harness NEVER mutates any global subsystem policy. (The cache platform exposes a
-single middleware entry point, so cache bypass is applied at that entry point.)
+disableFallback, disableRetry. The default policy is DISABLED.
+
+Bypass/disable flags SHALL be honored EXCLUSIVELY by filtering a fresh, per-run
+copy of the execution hook list (`listExecutionHooks()` returns a new array; the
+filter does not mutate it). They SHALL NOT modify middleware implementations,
+global bootstrap behavior, the installed hook registry, any subsystem policy store,
+or provider adapters — the filtered list is local to the run and discarded
+afterward. (The cache platform exposes a single middleware entry point, so cache
+bypass is applied at that entry point.)
 
 ## Events
 
@@ -121,7 +126,10 @@ routing, no optimization.
 6. Benchmark metrics SHALL be produced.
 7. A target routing does not select SHALL be recorded as `not_eligible` with NO
    provider invocation.
-8. Bypass/disable flags SHALL drop the corresponding middleware for the run only.
+8. Bypass/disable flags SHALL drop the corresponding middleware for the run only,
+   by filtering a per-run hook-list copy — the global hook registry, subsystem
+   policy stores, middleware implementations, and provider adapters SHALL remain
+   unmutated.
 9. Runs and results SHALL be immutable.
 10. A disabled policy SHALL be a no-op; all existing tests SHALL pass unchanged.
 

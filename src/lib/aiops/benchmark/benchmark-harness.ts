@@ -117,6 +117,12 @@ export class BenchmarkHarness {
     if (policy.mode !== "enabled") return [];
 
     const cases = suite.cases.slice(0, Math.max(0, policy.maxCasesPerRun));
+    // Bypass/disable flags act ONLY by filtering a fresh copy of the hook list for
+    // this run (`listExecutionHooks()` returns a new array; `.filter()` does not
+    // mutate it). This never modifies middleware implementations, global bootstrap
+    // behavior, the installed hook registry, any subsystem policy store, or
+    // provider adapters — the filtered list is local to this run's executeInference
+    // calls and is discarded afterward.
     const baseHooks = ctx.hooks ?? listExecutionHooks();
     const hooks = baseHooks.filter((h) => {
       if (policy.disableRetry && h.name === "retry") return false;
