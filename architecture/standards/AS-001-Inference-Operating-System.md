@@ -95,6 +95,7 @@ as they consume the IOS public contracts.
 | IOS-010 | Retry Policy | (Phase 2) |
 | IOS-011 | Circuit Breaker | (Phase 2) |
 | IOS-012 | Fallback Orchestrator | (Phase 2) |
+| IOS-013 | Provider Health Manager | (Phase 2) |
 
 ## 5. Conformance
 

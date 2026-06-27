@@ -17,6 +17,7 @@ import { installBatchScheduler } from "@/lib/aiops/batch/batch-bootstrap";
 import { installRetryMiddleware } from "@/lib/aiops/retry/retry-bootstrap";
 import { installCircuitBreaker } from "@/lib/aiops/circuit/circuit-bootstrap";
 import { installFallbackOrchestrator } from "@/lib/aiops/fallback/fallback-bootstrap";
+import { installProviderHealthManager } from "@/lib/aiops/health/health-bootstrap";
 import { registerSource, ingestAsset } from "@/lib/dataops/sources/source-service";
 import { runAssetPipeline } from "@/lib/dataops/pipelines/pipeline-runner";
 import { indexEvidence } from "@/lib/dataops/evidence/chunking-service";
@@ -128,6 +129,12 @@ async function initRuntime(): Promise<void> {
   // targets in deterministic policy order; it never re-runs routing, mutates the
   // RoutingDecision, or bypasses security/validation/telemetry/audit.
   installFallbackOrchestrator();
+  // Attach the Provider Health Manager (IOS-013) as a bus subscriber. Purely
+  // observational: it folds execution/retry/circuit/fallback events into immutable
+  // ProviderHealth snapshots and publishes health events. It registers NO
+  // execution hook and changes no execution behavior; default policy DISABLED
+  // (no-op). It never routes, invokes providers, or touches the Execution Plan.
+  installProviderHealthManager();
   if (shouldAutoSeedDemo()) {
     await bootstrap();
     return;
