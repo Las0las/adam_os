@@ -102,6 +102,7 @@ as they consume the IOS public contracts.
 | IOS-017 | Evaluation Engine | (Phase 2) |
 | IOS-018 | Model Capability Registry (impl of IOS-002) | (Phase 2) |
 | IOS-019 | Cost Optimization Engine | (Phase 2) |
+| IOS-020 | SLA Management | (Phase 2) |
 
 ## 5. Conformance
 
