@@ -17,6 +17,7 @@
 
 import { id } from "@/lib/lawrence-core/utils/ids";
 import { deepFreeze } from "@/lib/aiops/routing/routing-types";
+import { fingerprint } from "./observability/fingerprint";
 import type { CompletionRequest, CompletionResponse, ModelProvider } from "@/lib/aiops/models/model-provider";
 import {
   ExecutionFailedError,
@@ -78,16 +79,74 @@ interface LifecycleOutcome {
   error?: ExecutionError;
 }
 
-/** Run the before-hooks → invoke → after/failed-hooks lifecycle. `invoke`
- *  performs the single permitted provider call and returns a CompletionResponse. */
+/**
+ * Run the standard lifecycle:
+ *   BeforeExecute (observe) → resolveCompletion (cache lookup) →
+ *     interceptRequest (security: inspect/redact/reject) →
+ *     provider OR cached response → interceptResponse (validate/reject) →
+ *     recordCompletion (cache store, fresh only) → AfterExecute (observe)
+ *
+ * `resolveCompletion` (the prompt cache) runs first, on the ORIGINAL request, and
+ * may short-circuit the provider with a cached response — but it NEVER bypasses
+ * security: the request interceptors (firewall, PII) and the response interceptor
+ * (validator) still run around a cached response; only the provider call is
+ * skipped. `interceptRequest` folds the request (each returns the request the
+ * next sees), so a security middleware can hand the provider a transformed (e.g.
+ * PII-redacted) request; the caller's original request object is never mutated.
+ * A fresh (non-cached) response that passes validation is offered to
+ * `recordCompletion` — failures and invalid responses are never recorded. When
+ * no hook implements these (the common case), the request reaches `invoke`
+ * unchanged and behavior is identical to before Milestones 6.0/7.0.
+ */
 async function runLifecycle(
   ctx: InferenceExecutionContext,
   hooks: ExecutionHook[],
-  invoke: () => Promise<CompletionResponse>,
+  request: CompletionRequest,
+  invoke: (request: CompletionRequest) => Promise<CompletionResponse>,
 ): Promise<LifecycleOutcome> {
   try {
     for (const h of hooks) await h.beforeExecute?.(ctx);
-    const completion = await invoke();
+    // Cache lookup: first non-null short-circuits the provider (a cache hit).
+    let resolved: CompletionResponse | null = null;
+    for (const h of hooks) {
+      if (h.resolveCompletion) {
+        const hit = await h.resolveCompletion(request, ctx);
+        if (hit) { resolved = hit; break; }
+      }
+    }
+    // Security/request transforms still run, even on a cache hit.
+    let effectiveRequest = request;
+    for (const h of hooks) {
+      if (h.interceptRequest) effectiveRequest = await h.interceptRequest(effectiveRequest, ctx);
+    }
+    // Provider invocation, wrapped by any aroundInvoke middleware (ADR-0003).
+    // Composed as an onion in priority order (lowest priority = outermost). When
+    // no hook implements aroundInvoke, this reduces to a single invoke() call —
+    // identical to the prior behavior. Skipped entirely on a cache hit (no
+    // provider call), so retry/resilience only wraps real provider calls.
+    let completion: CompletionResponse;
+    if (resolved) {
+      completion = resolved;
+    } else {
+      let chain: (req: CompletionRequest) => Promise<CompletionResponse> = (req) => invoke(req);
+      const around = hooks.filter((h) => h.aroundInvoke);
+      for (let i = around.length - 1; i >= 0; i--) {
+        const h = around[i]!;
+        const next = chain;
+        chain = (req) => h.aroundInvoke!(req, ctx, next);
+      }
+      completion = await chain(effectiveRequest);
+    }
+    // Response validation runs on cached and fresh responses alike.
+    for (const h of hooks) {
+      if (h.interceptResponse) await h.interceptResponse(completion, ctx);
+    }
+    // Record only fresh, validated responses (never cache hits or failures).
+    if (!resolved) {
+      for (const h of hooks) {
+        if (h.recordCompletion) await h.recordCompletion(request, completion, ctx);
+      }
+    }
     const result = deepFreeze(successResult(ctx, completion));
     for (const h of hooks) await h.afterExecute?.(ctx, result);
     return { result, completion };
@@ -120,6 +179,7 @@ export async function executeInference(
     tenantId: params.tenantId ?? null,
     workloadType: params.workloadType ?? "inference",
     startTime: nowMs(),
+    requestFingerprint: fingerprint(params.request),
   });
 
   if (!routingDecision.selectedProvider || !routingDecision.selectedModel) {
@@ -128,13 +188,13 @@ export async function executeInference(
     return deepFreeze(failure(ctx, error));
   }
 
-  const { result } = await runLifecycle(ctx, hooks, async () => {
+  const { result } = await runLifecycle(ctx, hooks, params.request, async (req) => {
     const entry = params.registry.get(provider);
     if (!entry) throw new ProviderUnavailableError(`provider not registered: ${provider}`);
     if (!entry.isConfigured()) {
       throw new AuthenticationError(`provider '${provider}' is not configured (credentials missing)`);
     }
-    return entry.create(model).complete(params.request);
+    return entry.create(model).complete(req);
   });
   return result;
 }
@@ -168,9 +228,10 @@ export async function runModelCompletion(
     tenantId: opts.tenantId ?? null,
     workloadType: opts.workloadType ?? "inference",
     startTime: nowMs(),
+    requestFingerprint: fingerprint(opts.request),
   });
 
-  const { completion, error } = await runLifecycle(ctx, hooks, () => opts.provider.complete(opts.request));
+  const { completion, error } = await runLifecycle(ctx, hooks, opts.request, (req) => opts.provider.complete(req));
   if (completion) return completion;
   throw error ?? new ExecutionFailedError("inference failed");
 }

@@ -9,7 +9,10 @@ export type ExecutionErrorKind =
   | "rate_limit"
   | "provider_unavailable"
   | "cancelled"
-  | "execution_failed";
+  | "execution_failed"
+  // Milestone 6.0 — security middleware rejections (not provider faults).
+  | "security_violation"
+  | "validation_failed";
 
 export class ExecutionError extends Error {
   constructor(
@@ -58,6 +61,21 @@ export class ExecutionFailedError extends ExecutionError {
     this.name = "ExecutionFailedError";
   }
 }
+/** A security middleware rejected the request (prompt firewall / PII reject).
+ *  Raised before the provider is invoked — it is NOT a provider fault. */
+export class SecurityViolationError extends ExecutionError {
+  constructor(message: string, cause?: unknown) {
+    super("security_violation", message, cause);
+    this.name = "SecurityViolationError";
+  }
+}
+/** The response validator rejected a provider response. */
+export class ResponseValidationError extends ExecutionError {
+  constructor(message: string, cause?: unknown) {
+    super("validation_failed", message, cause);
+    this.name = "ResponseValidationError";
+  }
+}
 
 /** Serializable projection stored on InferenceExecutionResult.error. */
 export interface NormalizedExecutionError {
@@ -94,4 +112,17 @@ export function normalizeError(err: unknown): ExecutionError {
 
 export function toNormalized(err: ExecutionError): NormalizedExecutionError {
   return { kind: err.kind, name: err.name, message: err.message };
+}
+
+/** Transient kinds that a future retry/failover layer could safely re-attempt.
+ *  Pure classification — no retry is performed here (out of scope until later). */
+const RETRYABLE_KINDS: ReadonlySet<ExecutionErrorKind> = new Set([
+  "timeout",
+  "rate_limit",
+  "provider_unavailable",
+]);
+
+/** Whether a normalized error kind is transient (retryable in principle). */
+export function isRetryable(kind: ExecutionErrorKind): boolean {
+  return RETRYABLE_KINDS.has(kind);
 }

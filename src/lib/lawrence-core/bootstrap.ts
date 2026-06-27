@@ -9,6 +9,12 @@ import { id, now, resetClock } from "./utils/ids";
 import { systemActor } from "./permissions/permissions";
 import { setModelProvider } from "@/lib/aiops/models/model-provider";
 import { resolveDefaultProvider } from "@/lib/aiops/models/model-router";
+import { installExecutionObservability } from "@/lib/aiops/execution/observability/observability-bootstrap";
+import { installSecurityMiddleware } from "@/lib/aiops/security/security-bootstrap";
+import { installPromptCache } from "@/lib/aiops/cache/cache-bootstrap";
+import { installSemanticCache } from "@/lib/aiops/cache/semantic-bootstrap";
+import { installBatchScheduler } from "@/lib/aiops/batch/batch-bootstrap";
+import { installRetryMiddleware } from "@/lib/aiops/retry/retry-bootstrap";
 import { registerSource, ingestAsset } from "@/lib/dataops/sources/source-service";
 import { runAssetPipeline } from "@/lib/dataops/pipelines/pipeline-runner";
 import { indexEvidence } from "@/lib/dataops/evidence/chunking-service";
@@ -81,6 +87,32 @@ export function ensureBootstrapped(): Promise<void> {
 
 async function initRuntime(): Promise<void> {
   assertPersistenceReady();
+  // Attach the passive observability stack to the execution pipeline so every
+  // inference automatically produces telemetry, metrics, audit, and health
+  // observations. Idempotent and observation-only — it changes no behavior.
+  installExecutionObservability();
+  // Attach the security middleware (prompt firewall → PII redaction →
+  // provider → response validator). Idempotent; the default policy is
+  // non-disruptive (blocks only malicious prompts, detect-only PII, permissive
+  // validation), so legitimate traffic is unaffected.
+  installSecurityMiddleware();
+  // Attach the prompt cache as the outermost middleware. Idempotent; the
+  // default policy is DISABLED, so it is a no-op until a tenant enables it —
+  // and it never bypasses the security middleware on a hit.
+  installPromptCache();
+  // Register the Semantic Cache store (IOS-009) on the cache registry, after the
+  // exact-match store. Additive: the CacheManager/pipeline are unchanged. No-op
+  // unless caching is enabled.
+  installSemanticCache();
+  // Attach the batch scheduler (IOS-008) after the cache and before security.
+  // Idempotent; the default policy is DISABLED, so it is a no-op until a tenant
+  // enables it — and it never bypasses security, validation, telemetry, or audit.
+  installBatchScheduler();
+  // Attach the retry middleware (IOS-010) after security, wrapping the provider
+  // call via the ADR-0003 aroundInvoke hook. Idempotent; default policy DISABLED
+  // (no-op). It never bypasses security/validation/telemetry/audit or re-runs
+  // routing.
+  installRetryMiddleware();
   if (shouldAutoSeedDemo()) {
     await bootstrap();
     return;
