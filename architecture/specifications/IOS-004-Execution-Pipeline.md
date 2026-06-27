@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | Identifier | IOS-004 |
-| Version | 1.0 |
+| Version | 1.1 |
 | Status | Active |
 | Authority | Normative Specification |
 | Owner | LAWRENCE Architecture Council |
@@ -38,6 +38,10 @@ middleware (IOS-005/006/007).
   no raw exception SHALL escape.
 - Expose a priority-ordered hook registry (lower priority first; registration
   order as a stable tie-break).
+- Expose a provider-invocation extension point (`aroundInvoke`, added in v1.1 by
+  ADR-0003): hooks implementing it compose as an onion around the single provider
+  call (priority order, lowest = outermost). It wraps ONLY the provider call (not
+  cache hits) and the request/response interceptors still run around it.
 
 ## Public Interfaces
 
@@ -46,6 +50,8 @@ middleware (IOS-005/006/007).
 - `ExecutionError` taxonomy + `normalizeError`, `isRetryable`.
 - Hook registry: `registerExecutionHook`, `listExecutionHooks`,
   `clearExecutionHooks`.
+- `ExecutionHook.aroundInvoke?(request, ctx, next)` — provider-invocation
+  middleware (v1.1, ADR-0003).
 
 ## Invariants
 
@@ -70,10 +76,14 @@ middleware (IOS-005/006/007).
 3. The provider SHALL be invoked exactly once on the success path and zero times
    when a pre-provider interceptor rejects.
 4. No source outside the pipeline and provider layer SHALL call `.complete(`.
+5. (v1.1) The provider invocation SHALL be wrappable by `aroundInvoke` hooks in
+   priority order; with none registered it SHALL behave identically to a single
+   direct invocation (byte-for-byte unchanged). `aroundInvoke` SHALL NOT run on a
+   cache hit, and the request/response interceptors SHALL still run around it.
 
 ## Related ADRs
 
-- ADR-0001.
+- ADR-0001 (governance framework); ADR-0003 (v1.1 `aroundInvoke` extension point).
 
 ## Derived From
 

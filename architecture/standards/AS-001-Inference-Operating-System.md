@@ -75,6 +75,7 @@ as they consume the IOS public contracts.
 | IOS-007 | Cache Platform | 7.0, 7.5 |
 | IOS-008 | Batch Scheduler | (Phase 2) |
 | IOS-009 | Semantic Cache | (Phase 2) |
+| IOS-010 | Retry Policy | (Phase 2) |
 
 ## 5. Conformance
 

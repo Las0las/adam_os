@@ -90,6 +90,22 @@ export interface ExecutionHook {
    * resolved from cache. Keyed on the original request.
    */
   recordCompletion?(request: CompletionRequest, response: CompletionResponse, ctx: InferenceExecutionContext): void | Promise<void>;
+  /**
+   * Provider-invocation middleware (Milestone Phase 2 — IOS-010, added by
+   * ADR-0003). Wraps the single provider call as an onion: `next` invokes the
+   * downstream chain (ultimately the provider). A hook MAY call `next` more than
+   * once (e.g. retry) and returns the response. Hooks implementing this compose
+   * in priority order (lowest priority = outermost). It wraps ONLY the provider
+   * call — it does not run when the response is resolved from cache, and the
+   * request/response interceptors (security, validation) still run around it, so
+   * it cannot bypass security or validation. When no hook implements this, the
+   * pipeline invokes the provider exactly once (behavior is unchanged).
+   */
+  aroundInvoke?(
+    request: CompletionRequest,
+    ctx: InferenceExecutionContext,
+    next: (request: CompletionRequest) => Promise<CompletionResponse>,
+  ): Promise<CompletionResponse>;
 }
 
 export interface InferenceExecutionParams {
