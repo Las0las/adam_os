@@ -113,7 +113,9 @@ export const recruitingSeedPack: DomainSeedPack = {
       externalKey: "cand-marcus",
       title: "Marcus Chen",
       status: "active",
-      properties: {},
+      // ONT-001 Candidate requires fullName|email in properties (the name lives
+      // in `title` for display; the canonical contract reads it from properties).
+      properties: { fullName: "Marcus Chen", email: "marcus.chen@example.com" },
       evidence: ["10 years Power BI and DAX modeling", "Led Azure data warehouse migration"],
     },
     {
@@ -121,7 +123,8 @@ export const recruitingSeedPack: DomainSeedPack = {
       externalKey: "cand-priya",
       title: "Priya Shah",
       status: "active",
-      properties: {},
+      // ONT-001 Candidate requires fullName|email in properties.
+      properties: { fullName: "Priya Shah", email: "priya.shah@example.com" },
       evidence: ["Azure solutions architect, 8 years", "Kubernetes and Terraform"],
     },
     {
