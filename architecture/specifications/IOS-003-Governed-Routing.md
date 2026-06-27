@@ -56,6 +56,10 @@ or cost scoring (deferred to a future specification + ADR).
 - A `RoutingDecision` SHALL be deep-frozen (immutable) and deterministic for
   identical (request, policy, registry).
 - Routing SHALL depend only on the registry (IOS-001/002), never on adapters.
+- (v1.1) The emitted **Execution Plan** SHALL be an ordered, enumerable collection
+  of `ExecutionTarget`s with deterministic ordering, and SHALL be immutable
+  (deep-frozen) after creation. Only routing produces it; consumers SHALL NOT
+  modify, reorder, insert, remove, or authorize its targets.
 
 ## Dependencies
 

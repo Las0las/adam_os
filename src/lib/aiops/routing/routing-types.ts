@@ -55,13 +55,18 @@ export interface ExecutionTarget {
   model: string;
 }
 
-/** The immutable, ordered set of execution targets the routing layer authorized
- *  for an execution (ADR-0004). `targets[0]` is the primary (selected) target;
- *  the remainder are authorized alternates in routing-preference order. The
- *  Execution Pipeline SHALL invoke ONLY targets contained in this plan; execution
- *  middleware SHALL select among them but SHALL NOT add to or mutate them. */
+/** The Execution Plan (ADR-0004): an ORDERED, ENUMERABLE collection of the
+ *  execution targets the routing layer selected and authorized for an execution.
+ *  Ordering is DETERMINISTIC (the routing engine's total, stable preference key);
+ *  `targets[0]` is the primary (selected) target and the remainder are authorized
+ *  alternates in routing-preference order.
+ *
+ *  INVARIANT — the plan is IMMUTABLE after creation (deep-frozen). The Execution
+ *  Pipeline SHALL invoke ONLY targets contained in this plan. Execution middleware
+ *  MAY select or advance to another authorized target already present in the plan,
+ *  but SHALL NOT modify, reorder, insert, remove, or authorize execution targets. */
 export interface ExecutionPlan {
-  targets: readonly ExecutionTarget[];
+  readonly targets: readonly ExecutionTarget[];
 }
 
 /** Immutable result of a routing evaluation — the foundation for explainability. */

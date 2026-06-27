@@ -88,10 +88,16 @@ middleware (IOS-005/006/007).
   `runModelCompletion` returns the provider response unchanged or throws a
   normalized error.
 - Hooks SHALL run in deterministic priority order.
+- (v1.2) The **Execution Plan** is an ordered, enumerable collection of
+  `ExecutionTarget`s with deterministic ordering, and is IMMUTABLE after creation.
+  Execution middleware MAY select or advance to another authorized target already
+  present in the plan, but SHALL NOT modify, reorder, insert, remove, or authorize
+  execution targets. The pipeline SHALL invoke ONLY targets contained in the plan.
 
 ## Dependencies
 
-- IOS-001 (registry), IOS-003 (routing decision) · AS-001 · Constitution v1.0.
+- IOS-001 (registry), IOS-003 v1.1 (routing decision + Execution Plan) · AS-001 ·
+  Constitution v1.0.
 
 ## Conformance Requirements
 

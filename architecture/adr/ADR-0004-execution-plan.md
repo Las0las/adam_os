@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | Identifier | ADR-0004 |
-| Status | Accepted |
+| Status | Closed |
 | Date | 2026-06-27 |
 | Owner | LAWRENCE Architecture Council |
 | Affected Artifacts | IOS-003 Governed Routing (revised to v1.1), IOS-004 Execution Pipeline (revised to v1.2), IOS-012+ (consumers) |
@@ -21,10 +21,15 @@ Orchestrator (IOS-012) is its first consumer.
 
 ## Status
 
-**Accepted.** Implemented: IOS-003 additively emits the Execution Plan on the
-RoutingDecision; IOS-004 revised to v1.2 (the AroundInvoke `next` accepts an
-optional plan target, resolved and enforced by the pipeline); architecture
-conformance tests pass; IOS-012 ships as the first consumer.
+**Closed.** Accepted and implemented: IOS-003 (v1.1) additively emits the Execution
+Plan on the RoutingDecision; IOS-004 (v1.2) accepts an optional plan target on the
+AroundInvoke `next`, resolved and enforced by the pipeline against the immutable
+plan; architecture conformance tests pass; IOS-012 ships as the first consumer. The
+Execution Plan is now the **canonical contract** between Governed Routing and the
+Execution Pipeline. No additional execution-control abstraction SHALL be introduced;
+future specifications (Provider Health Manager, Benchmark Harness, Evaluation
+Engine, Adaptive Routing, Traffic Replay, Explainability, …) SHALL consume this
+contract rather than extend it.
 
 ## Separation of Responsibilities (constitutional boundary)
 
@@ -103,8 +108,24 @@ Benchmark Harness IOS-014, Evaluation Engine IOS-017, Adaptive Routing IOS-022).
 The following SHALL reuse this capability with **no additional architectural
 change**: **IOS-012 Fallback Orchestrator** (first consumer), **IOS-013 Provider
 Health Manager**, **IOS-014 Benchmark Harness**, **IOS-017 Evaluation Engine**,
-**IOS-022 Adaptive Routing**, and any other execution-governance middleware that
-must invoke an alternate routing-authorized target.
+**IOS-022 Adaptive Routing**, **Traffic Replay**, **Explainability**, and any other
+execution-governance specification. These SHALL **consume** the Execution Plan
+contract rather than extend it. No additional execution-control abstraction SHALL
+be introduced; the Execution Plan is the canonical contract between Governed
+Routing and the Execution Pipeline.
+
+## Invariants
+
+- **The Execution Plan is an ordered, enumerable collection of `ExecutionTarget`s
+  with deterministic ordering** (`targets[0]` = primary; alternates follow in the
+  routing engine's total, stable preference order).
+- **The Execution Plan is IMMUTABLE after creation** (deep-frozen with the
+  RoutingDecision). Execution middleware MAY select or advance to another
+  authorized target already present in the plan, but SHALL NOT modify, reorder,
+  insert, remove, or authorize execution targets.
+- The Execution Pipeline SHALL invoke ONLY targets contained in the plan, SHALL
+  NOT re-run routing, and SHALL NOT mutate the RoutingDecision or plan.
+- Routing is the SOLE authority that selects and authorizes invocation targets.
 
 ## Alternatives Considered
 
