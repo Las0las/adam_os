@@ -3,91 +3,101 @@
 | Field | Value |
 |-------|-------|
 | Identifier | RUN-003 |
-| Version | 0.1 |
+| Version | 0.2 |
 | Status | Draft |
-| Authority | Normative Specification |
+| Authority | Normative Specification (Constitutional Runtime Contract) |
 | Owner | LAWRENCE Architecture Council |
 | Effective Date | — (Draft) |
 | Superseded By | — |
-| Related Artifacts | AS-003, ADR-0005, RUN-001, RUN-004, RUN-006, RUN-009 |
+| Related Artifacts | AS-003, RUN-000, ADR-0005 |
 
-> Normative Specification skeleton. Terminology follows RFC-2119. No implementation
-> until ratified and ADR-0005 approved.
+> Constitutional runtime contract. Normative sections define **what must be true**, not
+> how. Implementation guidance appears only under Implementation Notes (non-normative).
+> Terminology follows RFC-2119. No implementation until ratified and ADR-0005 approved.
 
 ## Purpose
 
-Define **`ProcessorRunContext`**: the immutable context threaded through a single
-processor run. It binds processor identity, tenant/actor, resolved runtime profile,
-correlation identifiers, and governance context — without colliding with the IOS
-`InferenceExecutionContext`.
+Define the canonical **`ProcessorRunContext`**: the immutable context threaded through a
+single processor run, binding processor identity, tenant/actor, resolved runtime profile,
+incremental mode, governance/clearance context, and correlation identity — distinct from
+the IOS `InferenceExecutionContext`.
 
 ## Scope
 
-- The `ProcessorRunContext` fields and immutability rules.
-- Correlation to existing contexts (`ActorContext`, and — when a processor calls
-  inference — the downstream `InferenceExecutionContext`).
-- Propagation of run identity into observability and audit.
+**In scope:** the `ProcessorRunContext` and `ProcessorRunId` objects; their immutability
+and serializability obligations; correlation to `ActorContext` and (downstream) to the
+IOS inference context; propagation of run identity to observation and audit.
 
-## Non-Goals
+**Out of scope (Non-Goals):** defining, replacing, or aliasing the IOS
+`InferenceExecutionContext`, `FunctionExecutionContext`, or `TransformContext`;
+introducing the bare name `ExecutionContext`; carrying mutable state or live handles.
 
-- SHALL NOT define, replace, or alias the IOS `InferenceExecutionContext`,
-  `FunctionExecutionContext`, or `TransformContext`.
-- SHALL NOT introduce the bare name `ExecutionContext` (AS-003 R10).
-- SHALL NOT carry mutable state or live handles (transport-agnostic, RUN-004).
+## Canonical Object Contract
 
-## Normative Requirements
+### Objects Owned
+- `ProcessorRunContext` — immutable per-run context.
+- `ProcessorRunId` — stable run correlation identity.
 
-- **RUN-003/1.** A `ProcessorRunContext` SHALL be immutable once created (AS-003 R9).
-- **RUN-003/2.** It SHALL carry, at minimum: `runId`, `processorKey`, `processorVersion`,
-  `tenantId`, optional `actorUserId`, the resolved `RuntimeProfile` reference (RUN-004),
-  the active `IncrementalMode` (RUN-005), and a governance/clearance context (RUN-006).
-- **RUN-003/3.** It SHALL NOT contain non-serializable handles (DB clients, sockets,
-  provider clients); such resources SHALL be injected at the execution boundary, not the
-  context, to preserve runtime portability (RUN-004).
-- **RUN-003/4.** When a processor calls inference, it SHALL do so via `executeInference`;
-  the resulting `InferenceExecutionContext` is a **separate, downstream** context and
-  SHALL NOT be merged into or mutated by `ProcessorRunContext` (AS-003 R5).
-- **RUN-003/5.** Observation of a run SHALL read from `ProcessorRunContext` only; it
-  SHALL NOT mutate it or alter the run outcome (AS-003 R8).
-- **RUN-003/6.** `runId` SHALL be deterministic-friendly: stable correlation across
-  retries of the same logical run SHALL be expressible without perturbing deterministic
-  clocks or identifiers.
-- **RUN-003/7 (SHOULD).** `ProcessorRunContext` SHOULD be derivable from an
-  `ActorContext` to reuse existing tenant/permission resolution.
-- **RUN-003/8 (MAY).** It MAY carry an opaque trace-correlation id for linking to
-  `RuntimeTrace` and the execution event bus as a subscriber (never as a modifier).
+### Objects Consumed (and their authoritative producer)
+| Consumed object | Authoritative producer |
+|---|---|
+| `RuntimeProfile` (reference) | RUN-004 |
+| `IncrementalMode` | RUN-005 |
+| `ClearanceDecision` / clearance context | RUN-006 |
+| `ActorContext` | Platform / app (external) |
 
-## Proposed Public Surface (illustrative)
+### Objects Produced → Authorized Consumers
+| Produced object | Authorized consumers |
+|---|---|
+| `ProcessorRunContext` | RUN-001 entry point, RUN-008, observability subscribers |
+| `ProcessorRunId` | RUN-008, RUN-009, observability/audit |
 
-`ProcessorRunContext`, `ProcessorRunId`, `fromActorContext()` (adapter).
+## Normative Interfaces
 
-## Dependency Direction
+- **RUN-003/1.** A `ProcessorRunContext` SHALL carry at minimum: `runId`, `processorKey`,
+  `processorVersion`, `tenantId`, optional `actorUserId`, a `RuntimeProfile` reference
+  (RUN-004), the active `IncrementalMode` (RUN-005), and a clearance context (RUN-006).
+- **RUN-003/2.** A `ProcessorRunContext` SHALL be derivable from an `ActorContext` so that
+  existing tenant/permission resolution is reused, not re-implemented.
+- **RUN-003/3.** When a processor performs inference, it SHALL call `executeInference`; the
+  resulting `InferenceExecutionContext` is a separate downstream object and SHALL NOT be
+  merged into or mutate the `ProcessorRunContext`.
 
-Depends on RUN-004/005/006 contracts and `ActorContext`. Lower layers SHALL NOT depend
-on RUN-003.
+## Runtime Invariants
 
-## Compatibility with AS-001 / IOS
+- **INV-003.1 (Immutability).** A `ProcessorRunContext` SHALL be immutable once created
+  (AS-003 R9).
+- **INV-003.2 (Serializability / portability).** It SHALL contain no non-serializable
+  handle (DB client, socket, provider client); such resources SHALL be injected at the
+  execution boundary, preserving runtime portability (RUN-004).
+- **INV-003.3 (Observation safety).** Observation SHALL read the context only and SHALL
+  NOT mutate it or alter the run outcome (Art. IV).
+- **INV-003.4 (Context separation).** The processor context and any IOS inference context
+  SHALL remain distinct objects; neither mutates the other.
+- **INV-003.5 (Stable correlation).** `runId` SHALL allow stable correlation across
+  retries of the same logical run without perturbing deterministic clocks or identifiers.
 
-Strictly parallel to IOS contexts; no IOS context is referenced, extended, or renamed.
-The two contexts coexist; inference remains single-path.
+## Conformance Requirements
 
-## Additive-Only Constraints
-
-New context type; existing contexts untouched; opt-in.
-
-## Conformance Hooks
-
-- C1: `ProcessorRunContext` is frozen/immutable after creation.
-- C2: it contains no non-serializable handle.
-- C3: an inference call from within a processor produces a distinct
+- **RUN-003/C1.** `ProcessorRunContext` is frozen/immutable after creation.
+- **RUN-003/C2.** It contains no non-serializable handle.
+- **RUN-003/C3.** An inference call from within a processor yields a distinct
   `InferenceExecutionContext` and does not mutate the `ProcessorRunContext`.
-- C4: RUN-003 exports no bare `ExecutionContext` identifier.
+- **RUN-003/C4.** RUN-003 exports no bare `ExecutionContext` identifier (AS-003 R10).
 
-## Dependencies
+## Related Specifications
 
-Constitution v1.0; AS-003; RUN-001; RUN-004; RUN-005; RUN-006.
+RUN-000, RUN-001, RUN-004 (profile), RUN-005 (mode), RUN-006 (clearance), RUN-008.
 
-## Open Questions
+## Related ADRs
 
-- Exact `runId` derivation and retry-correlation scheme.
-- Whether clearance context is embedded by value or by reference (RUN-006).
+ADR-0005 (establishing); ADR-0003 (IOS context unchanged).
+
+## Implementation Notes (non-normative)
+
+- A `fromActorContext(actor, …): ProcessorRunContext` factory SHOULD bridge existing
+  `ActorContext`.
+- `runId` MAY be a deterministic-friendly id; an opaque trace-correlation id MAY link to
+  `RuntimeTrace` and the execution event bus as a read-only subscriber.
+- Resources (db, sinks) SHOULD be passed as explicit execution-boundary parameters, not
+  embedded in the context.
