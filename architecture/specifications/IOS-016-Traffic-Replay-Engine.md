@@ -58,6 +58,30 @@ which subscribe to the production bus — never receive replay events and cannot
 contaminated. Replays are observable through the same infrastructure TYPES (bus →
 explanation/metrics), scoped to replay.
 
+### Generalization — Isolated Execution Environment
+
+The replay-scoped execution environment (a dedicated IOS-005 event-bus instance
+with its own observers and stores, over which executions run through the public
+IOS-004 pipeline) is one INSTANCE of a more general **Isolated Execution
+Environment** pattern: a self-contained observation scope in which executions run
+through the public pipeline while their events, explanations, metrics, and derived
+state are fully isolated from production execution state.
+
+This isolated execution environment MAY be reused by future specifications,
+including:
+
+- offline evaluation (IOS-017),
+- benchmark execution (IOS-014),
+- regression verification,
+- migration validation,
+- provider comparison,
+- synthetic workload testing,
+
+each obtaining complete isolation from production execution state without any
+change to production wiring — preferred over filtering scoped events out of the
+production bus. Each such consumer instantiates its own bus + observers and drives
+the public pipeline; isolation is by construction, not by configuration.
+
 ## Replay Record / Run / Result
 
 - `ReplayRecord` (immutable fixture): recordId, sourceExecutionId?, inputMessages,
