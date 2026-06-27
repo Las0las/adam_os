@@ -2,6 +2,7 @@
 
 import { db } from "@/lib/lawrence-core/db";
 import { getModelProvider } from "../../models/model-provider";
+import { runModelCompletion } from "../../execution/inference-pipeline";
 import { recordTrace } from "../../observability/trace-service";
 import { id } from "@/lib/lawrence-core/utils/ids";
 import type { LawrenceFunction, FunctionExecutionResult } from "../function-types";
@@ -27,8 +28,10 @@ export const summarizeObject: LawrenceFunction<SummarizeInput, SummarizeOutput> 
       (c) => c.sourceObjectId === input.objectId,
     );
     const body = chunks.map((c) => c.text).join("\n\n").slice(0, 4000);
-    const completion = await getModelProvider().complete({
-      prompt: `Summarize the following ${input.objectType} concisely:\n${body}`,
+    const completion = await runModelCompletion({
+      provider: getModelProvider(),
+      request: { prompt: `Summarize the following ${input.objectType} concisely:\n${body}` },
+      workloadType: "summarize",
     });
     const traceId = id("trace");
     await recordTrace(ctx, "function_run", traceId, completion);

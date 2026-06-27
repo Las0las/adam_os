@@ -1,6 +1,7 @@
 // extract-structured-fields (§26). Typed extraction against an output schema.
 
 import { getModelProvider } from "../../models/model-provider";
+import { runModelCompletion } from "../../execution/inference-pipeline";
 import { recordTrace } from "../../observability/trace-service";
 import { id } from "@/lib/lawrence-core/utils/ids";
 import type { LawrenceFunction, FunctionExecutionResult } from "../function-types";
@@ -19,9 +20,13 @@ export const extractStructuredFields: LawrenceFunction<ExtractInput, ExtractOutp
   klass: "extract",
   outputSchema: { type: "object", properties: {} },
   async run(ctx: ActorContext, input: ExtractInput): Promise<FunctionExecutionResult<ExtractOutput>> {
-    const completion = await getModelProvider().complete({
-      prompt: `Extract fields as JSON from:\n${input.text.slice(0, 2000)}`,
-      outputSchema: input.schema,
+    const completion = await runModelCompletion({
+      provider: getModelProvider(),
+      request: {
+        prompt: `Extract fields as JSON from:\n${input.text.slice(0, 2000)}`,
+        outputSchema: input.schema,
+      },
+      workloadType: "extract",
     });
     const traceId = id("trace");
     await recordTrace(ctx, "function_run", traceId, completion);

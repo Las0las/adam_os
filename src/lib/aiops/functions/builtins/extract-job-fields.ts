@@ -3,6 +3,7 @@
 // extract_candidate_fields. Pure: it calls the model and returns fields.
 
 import { resolveModelProvider } from "@/lib/aiops/models/model-router";
+import { runModelCompletion } from "../../execution/inference-pipeline";
 import type { LawrenceFunction, FunctionExecutionResult } from "../function-types";
 import type { ActorContext } from "@/types/platform";
 
@@ -54,9 +55,13 @@ export interface ExtractedJobFields {
 
 export async function extractJobFields(ctx: ActorContext, text: string): Promise<ExtractedJobFields> {
   const provider = await resolveModelProvider(ctx, "extraction");
-  const completion = await provider.complete({
-    prompt: buildJobExtractionPrompt(text),
-    outputSchema: JOB_FIELD_SCHEMA,
+  const completion = await runModelCompletion({
+    provider,
+    request: {
+      prompt: buildJobExtractionPrompt(text),
+      outputSchema: JOB_FIELD_SCHEMA,
+    },
+    workloadType: "extraction",
   });
   return {
     fields: completion.json ?? {},

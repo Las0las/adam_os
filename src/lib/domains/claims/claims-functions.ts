@@ -8,6 +8,7 @@ import { registerFunction } from "@/lib/aiops/functions/function-registry";
 import { listObjects } from "@/lib/dataops/ontology/object-service";
 import { retrieve } from "@/lib/aiops/retrieval/retrieval-service";
 import { getModelProvider } from "@/lib/aiops/models/model-provider";
+import { runModelCompletion } from "@/lib/aiops/execution/inference-pipeline";
 import { validateOutput } from "@/lib/domains/domain-workflow-types";
 import type { LawrenceFunction, FunctionExecutionResult } from "@/lib/aiops/functions/function-types";
 import type { RetrievalHit } from "@/types/dataops";
@@ -159,13 +160,17 @@ const evidenceSummary: LawrenceFunction<EvidenceSummaryInput, EvidenceSummaryOut
         : "validated";
 
     const provider = getModelProvider();
-    const completion = await provider.complete({
-      prompt: [
-        `Summarize the validation of "${subject.title ?? validationCaseId}".`,
-        `Findings: ${findings.length === 0 ? "none" : findings.map((f) => `${f.findingType} (${f.severity})`).join(", ")}.`,
-        "Evidence excerpts:",
-        ...hits.map((h, i) => `(${i + 1}) [${h.objectType}] ${h.excerpt}`),
-      ].join("\n"),
+    const completion = await runModelCompletion({
+      provider,
+      request: {
+        prompt: [
+          `Summarize the validation of "${subject.title ?? validationCaseId}".`,
+          `Findings: ${findings.length === 0 ? "none" : findings.map((f) => `${f.findingType} (${f.severity})`).join(", ")}.`,
+          "Evidence excerpts:",
+          ...hits.map((h, i) => `(${i + 1}) [${h.objectType}] ${h.excerpt}`),
+        ].join("\n"),
+      },
+      workloadType: "claims.validation_summary",
     });
     const summary =
       completion.text.trim() ||
