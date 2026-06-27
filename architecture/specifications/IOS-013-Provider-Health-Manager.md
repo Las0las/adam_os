@@ -47,13 +47,31 @@ Execution Pipeline → Execution Event Bus → Provider Health Manager →
 - Publish health events and collect passive health metrics.
 - Expose the ProviderHealth store as the canonical, read-only health source.
 
-## ProviderHealth
+## ProviderHealthSnapshot (canonical platform object)
 
 `ProviderHealthSnapshot` (immutable; frozen on publication) contains: provider,
 model, status, availability, latencyMs, timeoutRate, errorRate, retrySuccessRate,
 circuitState, fallbackFrequency, healthScore, lastUpdated. (Named
 `ProviderHealthSnapshot` to distinguish it from the legacy Milestone-5.0
 `ProviderHealth` registry view.)
+
+`ProviderHealthSnapshot` is a **canonical platform object**:
+
+> ProviderHealthSnapshot SHALL be the canonical, immutable representation of
+> observed provider health. It SHALL be produced exclusively by the Provider Health
+> Manager and SHALL be consumed by Routing, Circuit Breaker, Fallback Orchestrator,
+> Explainability, Benchmark Harness, SLA Manager, and other observational
+> specifications. No consumer SHALL modify published ProviderHealthSnapshot
+> instances.
+
+### Authority
+
+- The Provider Health Manager **owns** `ProviderHealthSnapshot`.
+- Consumers **may observe** `ProviderHealthSnapshot`.
+- Consumers **SHALL NOT redefine or mutate** `ProviderHealthSnapshot`.
+- Routing **MAY consume** `ProviderHealthSnapshot` but remains the **sole authority
+  for ExecutionPlan production** (ADR-0004) — health informs, it never authorizes
+  or selects execution targets.
 
 ## Health States
 
