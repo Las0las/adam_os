@@ -4,30 +4,30 @@
   Normative Specification (Ontology family). Follows the LAWRENCE specification
   template and RFC-2119 terminology (SHALL, SHALL NOT, SHOULD, SHOULD NOT, MAY).
   A specification is an ARCHITECTURAL artifact — it defines contracts and
-  invariants, not implementation detail. This is a DRAFT: it documents the
-  canonical object model as it exists today and fixes the contract going forward.
-  It does NOT yet mandate runtime enforcement (see Conformance Requirements §C
-  and the companion design note architecture/design/canonical-schema-registry.md).
+  invariants, not implementation detail. ACTIVE (per ADR-0006): runtime
+  validation runs in warn mode by default and may be switched to fail-closed
+  enforce mode per tenant or globally (see Conformance Requirements §C and the
+  companion design note architecture/design/canonical-schema-registry.md).
 -->
 
 | Field | Value |
 |-------|-------|
 | Identifier | ONT-001 |
 | Version | 1.0 |
-| Status | Draft |
+| Status | Active |
 | Authority | Normative Specification (Ontology family) |
 | Owner | LAWRENCE Architecture Council |
 | Effective Date | 2026-06-27 |
 | Superseded By | — |
-| Related Artifacts | LAWRENCE Constitution v1.0; AS-004 (proposed — Canonical Ontology & Domain Runtime, pending); IOS-017 (Canonical Object Contract precedent) |
+| Related Artifacts | LAWRENCE Constitution v1.0; ADR-0006 (promotion to Active + enforcement); ASSESS-002 (warn-baseline); AS-004 (proposed — Canonical Ontology & Domain Runtime, pending); IOS-017 (Canonical Object Contract precedent) |
 
 > **Governance note.** The IOS/RUN specification families derive from AS-001
 > (Inference Operating System). ONT-001 governs the **business ontology** — the
 > canonical objects that represent staffing/recruiting reality — which AS-001
 > does **not** cover. Until the governing Architecture Standard **AS-004** is
-> ratified, ONT-001 derives authority directly from the Constitution and is held
-> at **Draft**. Ratifying AS-004 and promoting ONT-001 to Active SHALL proceed
-> through an ADR (Constitution Article VI).
+> ratified, ONT-001 derives authority directly from the Constitution. It was
+> promoted from Draft to **Active** by **ADR-0006** (Constitution Article VI),
+> on the evidence of a zero warn-baseline (ASSESS-002).
 
 ## Purpose
 
@@ -230,9 +230,9 @@ revision.
 3. **Append-only provenance** — `imports[]` and other ledgers SHALL only grow;
    prior entries SHALL NOT be mutated or dropped.
 4. **Status within domain** — `status` SHALL be a member of the object's lifecycle
-   domain (§Lifecycle). (Draft: violations are flagged, not rejected — see §C.)
+   domain (§Lifecycle). (Warn by default; rejected in enforce mode — see §C.)
 5. **Required shape** — each canonical object SHALL satisfy its Required
-   properties (§Public Interfaces). (Draft: flagged, not rejected.)
+   properties (§Public Interfaces). (Warn by default; rejected in enforce mode.)
 6. **Closed relationship set** — only the `linkType`/endpoint combinations in
    §Relationship Graph SHALL connect canonical objects.
 7. **Auditability** — every create/update SHALL emit an immutable audit event.
@@ -262,15 +262,24 @@ conformance suite under `tests/unit/` / `conformance/ontology/`.
 - B1. Only `linkType`/endpoint pairs from §Relationship Graph connect canonical
   objects; `linkObjects` is idempotent on `(linkType, from, to)`.
 
-**§C — Schema & lifecycle (Draft: WARN-ONLY, not yet enforced)**
+**§C — Schema & lifecycle (Active: warn by default, enforce when enabled — ADR-0006)**
 
 - C1. Each canonical object's required properties are present.
 - C2. `status` is within the object's lifecycle domain.
-- C3. Validation runs **inside `upsertObject`** and, in Draft, **emits a warning
-  signal** (audit/log) on violation **without rejecting** the write — preserving
-  all existing functionality. Promotion to reject-mode SHALL require an ADR and
-  promotion of ONT-001 to Active. The mechanism is specified in the companion
-  design note `architecture/design/canonical-schema-registry.md`.
+- C3. Validation runs **inside `upsertObject`** on the effective object. The
+  enforcement mode is resolved per tenant (precedence: per-tenant → global → env
+  → default):
+  - **warn** (DEFAULT): emit an `ontology.schema.warning` audit event on
+    violation and persist the write unchanged (fail-open). No behavior change for
+    tenants that have not opted in.
+  - **enforce**: emit an `ontology.schema.rejected` audit event and throw
+    `OntologySchemaError` before persistence (fail-closed). Enabled only by
+    explicit operator action (`ONTOLOGY_SCHEMA_ENFORCEMENT=enforce`, a global
+    override, or a per-tenant override).
+  Unregistered object types are unaffected in both modes. The mechanism is
+  specified in the companion design note
+  `architecture/design/canonical-schema-registry.md` and was authorized by
+  ADR-0006 on the evidence of a zero warn-baseline (ASSESS-002).
 
 **§D — Canonical Object Contract conformance (mandatory)**
 
@@ -284,8 +293,10 @@ conformance suite under `tests/unit/` / `conformance/ontology/`.
 
 ## Related ADRs
 
-- (none yet) — promotion to Active and ratification of AS-004 SHALL be recorded as
-  an ADR.
+- **ADR-0006** — Promote ONT-001 to Active and establish canonical schema
+  enforcement (warn by default; opt-in fail-closed enforce mode).
+- Ratification of AS-004 (the governing Architecture Standard) remains future work
+  to be recorded as a further ADR.
 
 ## Derived From
 

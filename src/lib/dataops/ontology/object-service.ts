@@ -7,7 +7,13 @@ import { requirePermission } from "@/lib/lawrence-core/permissions/permissions";
 import { emitAudit } from "@/lib/lawrence-core/audit/audit-service";
 import { schemaFor } from "./schemas/registry";
 import { validateCanonicalObject } from "./schemas/validate";
-import type { CanonicalObjectInput } from "./schemas/types";
+import { resolveEnforcementMode } from "./schemas/enforcement";
+import { OntologySchemaError } from "./schemas/errors";
+import { validateRelationship } from "./relationships/validate";
+import { relationshipsByLinkType } from "./relationships/registry";
+import { resolveRelationshipEnforcementMode } from "./relationships/enforcement";
+import { RelationshipSchemaError } from "./relationships/errors";
+import type { CanonicalObjectInput, Violation } from "./schemas/types";
 import type { ActorContext } from "@/types/platform";
 import type { OntologyObject, OntologyLink } from "@/types/dataops";
 
@@ -72,8 +78,9 @@ export async function upsertObject(ctx: ActorContext, input: UpsertObjectInput):
       existing.properties,
       input.appendLedger,
     );
-    // Warn-only canonical-schema check on the effective (post-merge) object.
-    await warnOnSchemaViolations(ctx, {
+    // Canonical-schema check on the effective (post-merge) object. Warns or
+    // rejects per the tenant's enforcement mode (default warn).
+    await checkCanonicalSchema(ctx, {
       objectType: input.objectType,
       externalKey: input.externalKey ?? existing.externalKey,
       title: effTitle,
@@ -92,8 +99,9 @@ export async function upsertObject(ctx: ActorContext, input: UpsertObjectInput):
 
   const ts = now();
   const createdProperties = applyLedgers(input.properties ?? {}, {}, input.appendLedger);
-  // Warn-only canonical-schema check on the object about to be created.
-  await warnOnSchemaViolations(ctx, {
+  // Canonical-schema check on the object about to be created. Warns or rejects
+  // per the tenant's enforcement mode (default warn).
+  await checkCanonicalSchema(ctx, {
     objectType: input.objectType,
     externalKey: input.externalKey ?? null,
     title: input.title ?? null,
@@ -116,22 +124,46 @@ export async function upsertObject(ctx: ActorContext, input: UpsertObjectInput):
 }
 
 /**
- * Warn-only canonical-object validation (ONT-001 §C). If a schema is registered
- * for the objectType and the effective object violates it, emit an
- * `ontology.schema.warning` audit event — but NEVER block, reject, or fail the
- * write. Fail-open: any error here is swallowed so schema observation can never
- * turn a successful write into a failure (Constitution Article IV). Promotion to
- * reject-mode is gated behind an ADR (see ONT-001 / the schema-registry design).
+ * Canonical-object schema check (ONT-001 §C, ADR-0006). Runs before persistence
+ * on the effective object:
+ *
+ *  - Unregistered objectType → no-op (unaffected).
+ *  - No violations → no-op.
+ *  - WARN mode (default): emit an `ontology.schema.warning` audit event and
+ *    proceed. Fail-open — the emit is best-effort and SHALL NOT turn a successful
+ *    write into a failure (Constitution Article IV).
+ *  - ENFORCE mode (explicitly enabled per tenant/global/env): emit an
+ *    `ontology.schema.rejected` audit event (best-effort) and THROW
+ *    OntologySchemaError, so the caller's write never persists. Fail-closed.
+ *
+ * Validation and mode resolution are total (never throw), so the only error this
+ * can raise is the deliberate OntologySchemaError in enforce mode.
  */
-async function warnOnSchemaViolations(ctx: ActorContext, effective: CanonicalObjectInput): Promise<void> {
+async function checkCanonicalSchema(ctx: ActorContext, effective: CanonicalObjectInput): Promise<void> {
+  const schema = schemaFor(effective.objectType);
+  if (!schema) return;
+  const violations = validateCanonicalObject(schema, effective);
+  if (violations.length === 0) return;
+
+  const mode = resolveEnforcementMode(ctx.tenantId);
+  if (mode === "enforce") {
+    await safeEmitSchemaEvent(ctx, "ontology.schema.rejected", effective, violations);
+    throw new OntologySchemaError(effective.objectType, effective.externalKey ?? null, violations);
+  }
+  await safeEmitSchemaEvent(ctx, "ontology.schema.warning", effective, violations);
+}
+
+/** Best-effort schema audit emit. Never throws, never alters the write outcome. */
+async function safeEmitSchemaEvent(
+  ctx: ActorContext,
+  action: "ontology.schema.warning" | "ontology.schema.rejected",
+  effective: CanonicalObjectInput,
+  violations: Violation[],
+): Promise<void> {
   try {
-    const schema = schemaFor(effective.objectType);
-    if (!schema) return;
-    const violations = validateCanonicalObject(schema, effective);
-    if (violations.length === 0) return;
     await emitAudit(
       ctx,
-      "ontology.schema.warning",
+      action,
       { type: effective.objectType, id: effective.externalKey ?? null },
       {
         objectType: effective.objectType,
@@ -140,7 +172,7 @@ async function warnOnSchemaViolations(ctx: ActorContext, effective: CanonicalObj
       },
     );
   } catch {
-    // Warn-only: schema validation SHALL NOT block or fail a write.
+    // Auditing the check SHALL NOT block or fail the operation.
   }
 }
 
@@ -163,6 +195,10 @@ export async function linkObjects(
   );
   if (existing) return existing;
 
+  // Canonical relationship check (ONT-002). Warns or rejects per the tenant's
+  // relationship enforcement mode (default warn). May throw in enforce mode.
+  await checkRelationship(ctx, input);
+
   return await db.ontologyLinks.insert({
     id: id("link"),
     tenantId: ctx.tenantId,
@@ -174,6 +210,79 @@ export async function linkObjects(
     properties: input.properties,
     createdAt: now(),
   });
+}
+
+/**
+ * Canonical relationship check (ONT-002 §Validation, ADR-0008). Runs before edge
+ * persistence:
+ *
+ *  - No violations → no-op.
+ *  - WARN mode (default): emit `ontology.relationship.warning` and persist the
+ *    edge (fail-open). Unchanged prior behavior.
+ *  - ENFORCE mode (explicitly enabled per tenant/global/env): for an invalid
+ *    REGISTERED relationship, emit `ontology.relationship.rejected` and THROW
+ *    RelationshipSchemaError before persistence (fail-closed). UNREGISTERED
+ *    relationship types (unknown linkType) are NOT rejected — they only warn, so
+ *    enabling enforcement never breaks edges the registry does not yet model.
+ *
+ * Validation infra errors fail open (return, never block); the only error this
+ * raises is the deliberate enforce-mode rejection.
+ */
+async function checkRelationship(
+  ctx: ActorContext,
+  input: { linkType: string; from: { objectType: string; objectId: string }; to: { objectType: string; objectId: string } },
+): Promise<void> {
+  let violations: ReturnType<typeof validateRelationship>;
+  let known: boolean;
+  try {
+    const all = await db.ontologyLinks.list(ctx.tenantId, (l) => l.linkType === input.linkType);
+    const sourceOutDegree = all.filter((l) => l.fromObjectId === input.from.objectId).length;
+    const targetInDegree = all.filter((l) => l.toObjectId === input.to.objectId).length;
+    violations = validateRelationship(
+      { linkType: input.linkType, sourceType: input.from.objectType, targetType: input.to.objectType },
+      { sourceOutDegree, targetInDegree },
+    );
+    known = relationshipsByLinkType(input.linkType).length > 0;
+  } catch {
+    return; // fail-open: validation infra error SHALL NOT block a write
+  }
+  if (violations.length === 0) return;
+
+  const mode = resolveRelationshipEnforcementMode(ctx.tenantId);
+  if (mode === "enforce" && known) {
+    await safeEmitRelationshipEvent(ctx, "ontology.relationship.rejected", input, violations);
+    throw new RelationshipSchemaError(
+      input.linkType,
+      input.from.objectType,
+      input.to.objectType,
+      violations,
+    );
+  }
+  await safeEmitRelationshipEvent(ctx, "ontology.relationship.warning", input, violations);
+}
+
+/** Best-effort relationship audit emit. Never throws, never alters the outcome. */
+async function safeEmitRelationshipEvent(
+  ctx: ActorContext,
+  action: "ontology.relationship.warning" | "ontology.relationship.rejected",
+  input: { linkType: string; from: { objectType: string; objectId: string }; to: { objectType: string; objectId: string } },
+  violations: Violation[],
+): Promise<void> {
+  try {
+    await emitAudit(
+      ctx,
+      action,
+      { type: input.linkType, id: `${input.from.objectId}->${input.to.objectId}` },
+      {
+        linkType: input.linkType,
+        sourceType: input.from.objectType,
+        targetType: input.to.objectType,
+        violations,
+      },
+    );
+  } catch {
+    // Auditing the check SHALL NOT block or fail the operation.
+  }
 }
 
 export async function listObjects(ctx: ActorContext, objectType?: string): Promise<OntologyObject[]> {
