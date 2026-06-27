@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/lawrence-core/permissions/permissions";
 import { emitAudit } from "@/lib/lawrence-core/audit/audit-service";
 import { schemaFor } from "./schemas/registry";
 import { validateCanonicalObject } from "./schemas/validate";
+import { validateRelationship } from "./relationships/validate";
 import type { CanonicalObjectInput } from "./schemas/types";
 import type { ActorContext } from "@/types/platform";
 import type { OntologyObject, OntologyLink } from "@/types/dataops";
@@ -163,6 +164,9 @@ export async function linkObjects(
   );
   if (existing) return existing;
 
+  // Warn-only canonical relationship check (ONT-002). Never blocks the write.
+  await warnOnRelationshipViolations(ctx, input);
+
   return await db.ontologyLinks.insert({
     id: id("link"),
     tenantId: ctx.tenantId,
@@ -174,6 +178,43 @@ export async function linkObjects(
     properties: input.properties,
     createdAt: now(),
   });
+}
+
+/**
+ * Warn-only canonical relationship validation (ONT-002 §Validation). Emits an
+ * `ontology.relationship.warning` audit event when a new edge is unknown, has an
+ * illegal source/target/direction, or violates a practical cardinality bound —
+ * but NEVER blocks the write. Fail-open: any error here is swallowed
+ * (Constitution Article IV). Cardinality degree counts exclude the exact edge
+ * being created (it was already shown not to exist by the caller).
+ */
+async function warnOnRelationshipViolations(
+  ctx: ActorContext,
+  input: { linkType: string; from: { objectType: string; objectId: string }; to: { objectType: string; objectId: string } },
+): Promise<void> {
+  try {
+    const all = await db.ontologyLinks.list(ctx.tenantId, (l) => l.linkType === input.linkType);
+    const sourceOutDegree = all.filter((l) => l.fromObjectId === input.from.objectId).length;
+    const targetInDegree = all.filter((l) => l.toObjectId === input.to.objectId).length;
+    const violations = validateRelationship(
+      { linkType: input.linkType, sourceType: input.from.objectType, targetType: input.to.objectType },
+      { sourceOutDegree, targetInDegree },
+    );
+    if (violations.length === 0) return;
+    await emitAudit(
+      ctx,
+      "ontology.relationship.warning",
+      { type: input.linkType, id: `${input.from.objectId}->${input.to.objectId}` },
+      {
+        linkType: input.linkType,
+        sourceType: input.from.objectType,
+        targetType: input.to.objectType,
+        violations,
+      },
+    );
+  } catch {
+    // Warn-only: relationship validation SHALL NOT block or fail a write.
+  }
 }
 
 export async function listObjects(ctx: ActorContext, objectType?: string): Promise<OntologyObject[]> {
