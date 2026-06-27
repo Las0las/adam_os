@@ -36,7 +36,16 @@
 <!-- NORMATIVE and MANDATORY for every IOS specification. It is a binding part of
      the specification (not just documentation): it fixes ownership and dependency
      direction so the specification library stays internally consistent as the
-     Intelligence Layer grows. Every specification SHALL populate all five fields. -->
+     Intelligence Layer grows. Every specification SHALL populate all five fields.
+
+     Two object classes:
+     - Shared Canonical Contracts define reusable object taxonomies and are NEVER
+       directly produced (they have NO canonical producer), e.g. `Recommendation`.
+     - Canonical Objects are concrete realizations owned by EXACTLY ONE
+       specification (their canonical producer), e.g. `CostRecommendation` (IOS-019).
+     A specification that produces a member of a taxonomy SHALL produce exactly one
+     concrete Canonical Object and SHALL reuse (not redefine) the Shared Canonical
+     Contract it specializes. -->
 
 - **Canonical Objects Consumed** — canonical platform objects this subsystem reads
   (by reference, never mutating), e.g. ExecutionPlan, RoutingDecision,

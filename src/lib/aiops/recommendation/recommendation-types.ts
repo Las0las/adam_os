@@ -14,17 +14,27 @@
 import { deepFreeze } from "@/lib/aiops/routing/routing-types";
 import type { Recommendation, RecommendationSubject } from "./recommendation-contract";
 
-// Re-export the abstract taxonomy contract for convenience (it is shared, not
-// owned by IOS-019).
-export type { Recommendation, RecommendationKind, RecommendationSubject } from "./recommendation-contract";
+// Re-export the abstract taxonomy contract for convenience (it is a Shared
+// Canonical Contract, not owned by IOS-019).
+export type {
+  Recommendation,
+  RecommendationType,
+  RecommendationPriority,
+  RecommendationStatus,
+  RecommendationSubject,
+  EvidenceReference,
+} from "./recommendation-contract";
 export { recommendationKey } from "./recommendation-contract";
 
 export type CostAction = "no_change" | "switch_model" | "reduce_usage" | "investigate";
 
-/** The first CONCRETE specialization of Recommendation — owned and produced solely
- *  by IOS-019 (canonical, immutable). */
+/** The first CONCRETE specialization of Recommendation — a Canonical Object owned
+ *  and produced solely by IOS-019 (immutable). It carries the shared base fields
+ *  plus the cost-specific fields below. */
 export interface CostRecommendation extends Recommendation {
-  kind: "cost";
+  recommendationType: "cost";
+  /** The model target this cost recommendation concerns. */
+  subject: RecommendationSubject;
   /** Observed blended cost per 1M tokens for the subject, or null. */
   observedCostPerMTok: number | null;
   /** Published blended price per 1M tokens for the subject, or null. */

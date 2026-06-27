@@ -31,22 +31,32 @@ PolicyRecommendation) — each future specification SHALL own only its specializ
 while reusing the abstract contract. Out of scope: routing, provider invocation,
 execution authorization, and automatic application of recommendations.
 
-## Recommendation Taxonomy
+## Recommendation Taxonomy v1.0 (FROZEN)
 
-A single platform-wide recommendation taxonomy, with ownership boundaries:
+A single platform-wide recommendation taxonomy, with ownership boundaries.
 
-- **Recommendation** — the **abstract**, shared canonical contract
-  (recommendationId, kind, subject, rationale, confidence, createdAt, advisory). It
-  is never produced directly and is NOT owned by IOS-019; every concrete
-  specialization extends it.
-- **CostRecommendation** — the first **concrete** specialization (kind `cost`),
-  owned and produced solely by IOS-019: observed/published cost per 1M tokens, an
-  action (no_change / switch_model / reduce_usage / investigate), an optional
-  cheaper no-worse alternative, and projected savings.
+**Recommendation** is a **Shared Canonical Contract** — an abstract, reusable
+object taxonomy that is NEVER directly produced and has NO canonical producer. It
+defines ONLY the common semantics shared by all recommendations (no domain-specific
+fields):
 
-Future concrete specializations (sla, routing, provider, capacity, policy) reuse
-the abstract contract; each is owned by its own specification. IOS-019 implements
-none of them.
+- recommendationId, recommendationType, priority, confidence, rationale,
+  evidenceReferences, estimatedImpact, estimatedCost, estimatedBenefit, createdAt,
+  producerSpecification, recommendationStatus.
+
+Concrete recommendation types are **Canonical Objects**, each extending
+Recommendation and owned/produced by exactly one specification:
+
+- **CostRecommendation** → IOS-019 (implemented). Adds: subject, observed/published
+  cost per 1M tokens, action (no_change / switch_model / reduce_usage /
+  investigate), an optional cheaper no-worse alternative, projected savings.
+- Reserved: **SLARecommendation** → IOS-020; and **ProviderRecommendation**,
+  **CapacityRecommendation**, **PolicyRecommendation**, **RoutingRecommendation**,
+  **SchedulingRecommendation**, **OptimizationRecommendation** → future
+  specifications.
+
+No future specification SHALL redefine the Recommendation base contract; taxonomy
+v1.0 is FROZEN. Each future specification owns only its concrete specialization.
 
 ## Responsibilities
 

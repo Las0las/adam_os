@@ -1,50 +1,77 @@
-// Recommendation — the ABSTRACT canonical contract (platform recommendation
-// taxonomy).
+// Recommendation Taxonomy v1.0 — the abstract, SHARED canonical contract.
 //
-// This base contract is taxonomy-level and SHARED: it is NOT owned by any single
-// IOS specification. `Recommendation` is abstract — it is never produced directly;
-// only concrete specializations are. Each concrete recommendation type is OWNED and
-// produced by exactly one specification, while reusing this common contract:
-//   - CostRecommendation       → IOS-019 Cost Optimization Engine (first concrete)
-//   - SLARecommendation        → (future)
-//   - RoutingRecommendation    → (future)
-//   - ProviderRecommendation   → (future)
-//   - CapacityRecommendation   → (future)
-//   - PolicyRecommendation     → (future)
+// `Recommendation` is a SHARED CANONICAL CONTRACT: a reusable object taxonomy that
+// is NEVER directly produced and has NO canonical producer. It defines ONLY the
+// common semantics shared by all recommendations — no domain-specific fields.
 //
-// This preserves ownership boundaries (one producer per specialization) under a
-// single recommendation taxonomy.
+// Concrete recommendation types extend it; each CONCRETE type is a Canonical Object
+// with exactly ONE canonical producer:
+//   Recommendation (abstract, shared) →
+//     CostRecommendation        → IOS-019  (implemented)
+//     SLARecommendation         → IOS-020  (reserved)
+//     ProviderRecommendation    → (reserved)
+//     CapacityRecommendation    → (reserved)
+//     PolicyRecommendation      → (reserved)
+//     RoutingRecommendation     → (reserved)
+//     SchedulingRecommendation  → (reserved)
+//     OptimizationRecommendation→ (reserved)
+//
+// No future specification SHALL redefine this base contract. Taxonomy v1.0 is FROZEN.
 
-/** The recommendation taxonomy kinds. One concrete type per kind, each owned by
- *  exactly one specification. */
-export type RecommendationKind =
+/** The concrete recommendation kinds in the taxonomy. */
+export type RecommendationType =
   | "cost"
   | "sla"
-  | "routing"
   | "provider"
   | "capacity"
-  | "policy";
+  | "policy"
+  | "routing"
+  | "scheduling"
+  | "optimization";
 
-/** The subject a recommendation is about (a model target). */
+export type RecommendationPriority = "low" | "medium" | "high" | "critical";
+
+/** Lifecycle status of a recommendation (advisory throughout). */
+export type RecommendationStatus = "proposed" | "acknowledged" | "applied" | "dismissed" | "expired";
+
+/** A reference (never an embedded copy) to a canonical object that is evidence for
+ *  a recommendation — e.g. a ModelCapability key, a ProviderHealthSnapshot key. */
+export interface EvidenceReference {
+  /** The kind of canonical object referenced (e.g. "modelCapability", "benchmark",
+   *  "providerHealth", "evaluation", "executionHistory"). */
+  kind: string;
+  /** A stable identifier/key for the referenced object. */
+  ref: string;
+}
+
+/** The subject a recommendation concerns. Provided by concrete specializations
+ *  that target a model (NOT part of the abstract base's required semantics). */
 export interface RecommendationSubject {
   provider: string;
   model: string;
 }
 
-/** The ABSTRACT base contract every concrete recommendation extends. It is never
- *  produced directly; producing a recommendation is always done through a concrete
- *  specialization owned by a single specification. Recommendations are immutable
- *  and ALWAYS advisory. */
+/** The ABSTRACT base contract. Common semantics only — no domain-specific fields.
+ *  Never produced directly; only concrete specializations are produced. */
 export interface Recommendation {
   recommendationId: string;
-  kind: RecommendationKind;
-  subject: RecommendationSubject;
-  rationale: string;
+  recommendationType: RecommendationType;
+  priority: RecommendationPriority;
   /** 0..1 confidence derived deterministically from available evidence. */
   confidence: number;
+  rationale: string;
+  /** References to the canonical objects that justify the recommendation. */
+  evidenceReferences: EvidenceReference[];
+  /** Normalized 0..1 magnitude of the recommendation's impact, or null. */
+  estimatedImpact: number | null;
+  /** Estimated cost dimension (e.g. current/blended cost rate), or null. */
+  estimatedCost: number | null;
+  /** Estimated benefit dimension (e.g. projected savings), or null. */
+  estimatedBenefit: number | null;
   createdAt: number;
-  /** Recommendations never act; they advise. */
-  advisory: true;
+  /** The specification id of the producing engine (e.g. "IOS-019"). */
+  producerSpecification: string;
+  recommendationStatus: RecommendationStatus;
 }
 
 /** Stable identity for a subject within the taxonomy. */
