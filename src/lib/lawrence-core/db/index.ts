@@ -57,6 +57,7 @@ import type {
   RollbackRecord,
 } from "@/lib/mission-control/runtime/mission-control-hardening-types";
 import type { ApprovalPolicy } from "@/lib/mission-control/approvals/approval-policy-types";
+import type { MissionExecutionRecord } from "@/lib/missions/mission-types";
 import type {
   RuntimeTrace,
   AiUsageEvent,
@@ -136,6 +137,7 @@ export interface Database {
   // mission control
   actionDefinitions: Collection<ActionDefinition>;
   actionExecutions: Collection<ActionExecution>;
+  missionExecutions: Collection<MissionExecutionRecord>;
   reviewCases: Collection<ReviewCase>;
   reviewCaseEvents: Collection<ReviewCaseEvent>;
   notificationRules: Collection<NotificationRule>;
@@ -214,6 +216,7 @@ function createDatabase(): Database {
     modelTraces: coll("model_traces"),
     actionDefinitions: coll("action_definitions"),
     actionExecutions: coll("action_executions"),
+    missionExecutions: coll("mission_executions"),
     reviewCases: coll("review_cases"),
     reviewCaseEvents: coll("review_case_events"),
     notificationRules: coll("notification_rules"),

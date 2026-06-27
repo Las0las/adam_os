@@ -113,6 +113,16 @@ export interface MissionExecutionReport {
   auditExecutionId: string;
 }
 
+/** Durable, tenant-scoped record of one mission execution (MS-011). The full
+ *  report is retained verbatim for observability and audit traceability. */
+export interface MissionExecutionRecord {
+  /** Equals report.executionId. */
+  id: string;
+  tenantId: string;
+  createdAt: string;
+  report: MissionExecutionReport;
+}
+
 export interface ExecuteMissionOptions {
   /** Governance + runtime enforcement mode override (else resolved per tenant). */
   mode?: GovernanceEnforcementMode;

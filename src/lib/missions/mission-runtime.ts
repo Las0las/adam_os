@@ -15,6 +15,7 @@ import { planMission, MissionPlanError } from "./execution-planner";
 import { getExecutor, type TaskExecutionContext } from "./executor-registry";
 import { effectiveRetry, runWithRetry } from "./retry-manager";
 import { makeMissionEvent, publishMissionEvent } from "./mission-events";
+import { persistMissionExecution } from "./mission-execution-store";
 import type {
   MissionDefinition,
   MissionExecutionReport,
@@ -150,10 +151,17 @@ export async function executeMission(
   const byId = new Map(records.map((r) => [r.id, r]));
   const taskById = new Map(mission.tasks.map((t) => [t.id, t]));
 
+  // Every exit path produces a durable, observable execution record (MS-011).
+  const finalize = async (state: MissionExecutionState): Promise<MissionExecutionReport> => {
+    const report = buildReport({ executionId, mission, state, decision, records, events, pendingApprovals, startedAtMs });
+    await persistMissionExecution(ctx, report);
+    return report;
+  };
+
   if (decision.executionDecision === "BLOCKED") {
     METRICS.blocked += 1;
     await emit("mission.failed", { detail: { reason: "governance_blocked", codes: decision.blockingFindings.map((f) => f.code) } });
-    return buildReport({ executionId, mission, state: "blocked", decision, records, events, pendingApprovals, startedAtMs });
+    return finalize("blocked");
   }
 
   // ── Stage 1: plan (Execution Planner + Dependency Resolver + cycle detection).
@@ -164,7 +172,7 @@ export async function executeMission(
     if (err instanceof MissionPlanError) {
       METRICS.failed += 1;
       await emit("mission.failed", { detail: { reason: "plan_error", code: err.code, detail: err.detail } });
-      return buildReport({ executionId, mission, state: "failed", decision, records, events, pendingApprovals, startedAtMs });
+      return finalize("failed");
     }
     throw err;
   }
@@ -257,23 +265,23 @@ export async function executeMission(
     }
     METRICS.cancelled += 1;
     await emit("mission.cancelled");
-    return buildReport({ executionId, mission, state: "cancelled", decision, records, events, pendingApprovals, startedAtMs });
+    return finalize("cancelled");
   }
 
   if (paused) {
     METRICS.waiting += 1;
     await emit("mission.paused", { detail: { pendingApprovals: [...pendingApprovals].sort() } });
-    return buildReport({ executionId, mission, state: "waiting", decision, records, events, pendingApprovals, startedAtMs });
+    return finalize("waiting");
   }
 
   const anyFailed = records.some((r) => r.state === "failed");
   if (anyFailed) {
     METRICS.failed += 1;
     await emit("mission.failed", { detail: { reason: "task_failure" } });
-    return buildReport({ executionId, mission, state: "failed", decision, records, events, pendingApprovals, startedAtMs });
+    return finalize("failed");
   }
 
   METRICS.completed += 1;
   await emit("mission.completed");
-  return buildReport({ executionId, mission, state: "completed", decision, records, events, pendingApprovals, startedAtMs });
+  return finalize("completed");
 }
