@@ -109,7 +109,7 @@ test("the semantic store registers through the CacheRegistry after exact-match",
 test("a semantically similar request hits without invoking the provider", async () => {
   const { reg, calls } = counting();
   const h = harness({ threshold: 0.9 });
-  const r1 = await executeInference(params(reg, "tell me about my CAR"), h.hooks); // miss → provider → stored
+  await executeInference(params(reg, "tell me about my CAR"), h.hooks); // miss → provider → stored
   const r2 = await executeInference(params(reg, "tell me about my AUTO"), h.hooks); // semantic hit
   assert.equal(calls(), 1, "the similar request is served from the semantic cache");
   assert.equal(r2.response, "r:tell me about my CAR", "returns the cached (matched) response");
