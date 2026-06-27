@@ -73,7 +73,7 @@ test("a single breached dimension → investigate / medium", () => {
   assert.equal(r.action, "investigate");
   assert.equal(r.priority, "medium");
   assert.deepEqual(r.breachedDimensions, ["availability"]);
-  assert.ok(r.estimatedImpact > 0);
+  assert.ok((r.estimatedImpact ?? 0) > 0);
 });
 
 // ── No change when the objective is met ──────────────────────────────────────
