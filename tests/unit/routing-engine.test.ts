@@ -7,7 +7,7 @@ import { defineProvider } from "@/lib/aiops/providers/define-provider";
 import type { ModelDescriptor } from "@/lib/aiops/providers/provider-registry-types";
 import { MockModelProvider } from "@/lib/aiops/models/model-provider";
 import { route } from "@/lib/aiops/routing/routing-engine";
-import type { RoutingPolicy, RoutingRequest } from "@/lib/aiops/routing/routing-types";
+import type { ExecutionTarget, RoutingPolicy, RoutingRequest } from "@/lib/aiops/routing/routing-types";
 
 function desc(provider: string, model: string, family: string, over: Partial<ModelDescriptor> = {}): ModelDescriptor {
   return {
@@ -173,4 +173,42 @@ test("the RoutingDecision is immutable", () => {
   assert.equal(Object.isFrozen(d.rejectionReasons), true);
   assert.equal(Object.isFrozen(d.policySnapshot), true);
   assert.throws(() => (d.evaluatedProviders as string[]).push("x"), TypeError);
+});
+
+// ── Execution Plan (ADR-0004) ────────────────────────────────────────────────
+
+test("routing emits an ordered Execution Plan with the primary first", () => {
+  // Three vision models; alpha & gamma tie on priority (alpha wins on id), beta last.
+  const r = reg(
+    { id: "gamma", priority: 10, descriptors: [desc("gamma", "g-vision", "g", { supportsVision: true })] },
+    { id: "alpha", priority: 10, descriptors: [desc("alpha", "a-vision", "a", { supportsVision: true })] },
+    { id: "beta", priority: 20, descriptors: [desc("beta", "b-vision", "b", { supportsVision: true })] },
+  );
+  const d = route(VISION, {}, r);
+  const plan = d.executionPlan!;
+  assert.ok(plan, "a plan is emitted");
+  // Deterministic order: alpha (id tie-break) → gamma → beta (priority).
+  assert.deepEqual(plan.targets.map((t) => `${t.provider}|${t.model}`), ["alpha|a-vision", "gamma|g-vision", "beta|b-vision"]);
+  // targets[0] is the selected/primary target.
+  assert.deepEqual(plan.targets[0], { provider: d.selectedProvider, model: d.selectedModel });
+});
+
+test("the Execution Plan is immutable (frozen, ordered, enumerable)", () => {
+  const d = route(VISION, {}, fixture());
+  const plan = d.executionPlan!;
+  assert.equal(Object.isFrozen(plan), true);
+  assert.equal(Object.isFrozen(plan.targets), true);
+  assert.ok(Array.isArray(plan.targets), "an ordered, enumerable collection");
+  assert.equal(Object.isFrozen(plan.targets[0]), true);
+  // Middleware may iterate/select but SHALL NOT modify, insert, remove, or reorder.
+  assert.throws(() => (plan.targets as ExecutionTarget[]).push({ provider: "x", model: "y" }), TypeError);
+  assert.throws(() => { (plan.targets[0] as { provider: string }).provider = "z"; }, TypeError);
+});
+
+test("Execution Plan ordering is deterministic across repeated evaluations", () => {
+  const first = route(VISION, {}, fixture()).executionPlan!.targets.map((t) => `${t.provider}|${t.model}`);
+  for (let i = 0; i < 5; i += 1) {
+    const again = route(VISION, {}, fixture()).executionPlan!.targets.map((t) => `${t.provider}|${t.model}`);
+    assert.deepEqual(again, first);
+  }
 });

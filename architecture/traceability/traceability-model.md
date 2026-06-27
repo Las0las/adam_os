@@ -71,8 +71,8 @@ governance feedback loop that keeps the architecture stable yet improvable.
 |------|--------------|------|----------------|
 | IOS-001 | Constitution v1.0, AS-001 | ADR-0001 | `src/lib/aiops/providers/*` |
 | IOS-002 | Constitution v1.0, AS-001 | ADR-0001 | `provider-registry-types.ts` |
-| IOS-003 | Constitution v1.0, AS-001 | ADR-0001 | `src/lib/aiops/routing/*` |
-| IOS-004 | Constitution v1.0, AS-001 | ADR-0001 | `src/lib/aiops/execution/*` |
+| IOS-003 | Constitution v1.0, AS-001 | ADR-0001, ADR-0004 | `src/lib/aiops/routing/*` |
+| IOS-004 | Constitution v1.0, AS-001 | ADR-0001, ADR-0003, ADR-0004 | `src/lib/aiops/execution/*` |
 | IOS-005 | Constitution v1.0, AS-001 | ADR-0001 | `execution/observability/*` |
 | IOS-006 | Constitution v1.0, AS-001 | ADR-0001 | `src/lib/aiops/security/*` |
 | IOS-007 | Constitution v1.0, AS-001 | ADR-0001 | `src/lib/aiops/cache/*` |
@@ -81,3 +81,4 @@ governance feedback loop that keeps the architecture stable yet improvable.
 | IOS-010 | Constitution v1.0, AS-001 | ADR-0001, ADR-0002, ADR-0003 | `src/lib/aiops/retry/*` |
 | IOS-011 | Constitution v1.0, AS-001 | ADR-0001, ADR-0002, ADR-0003 | `src/lib/aiops/circuit/*` |
 | IOS-012 | Constitution v1.0, AS-001 | ADR-0001, ADR-0002, ADR-0003, ADR-0004 | `src/lib/aiops/fallback/*` |
+| IOS-013 | Constitution v1.0, AS-001 | ADR-0001 | `src/lib/aiops/health/*` |

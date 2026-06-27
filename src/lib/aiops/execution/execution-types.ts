@@ -2,8 +2,7 @@
 
 import type { CompletionRequest, CompletionResponse } from "@/lib/aiops/models/model-provider";
 import type { ProviderRegistry } from "@/lib/aiops/providers/provider-registry";
-import type { RoutingDecision } from "@/lib/aiops/routing/routing-types";
-import type { InvocationTarget } from "./invocation-target";
+import type { ExecutionPlan, ExecutionTarget, RoutingDecision } from "@/lib/aiops/routing/routing-types";
 import type { ExecutionError, NormalizedExecutionError } from "./execution-errors";
 
 /** Immutable context that follows a request through execution (deliverable #1). */
@@ -22,6 +21,10 @@ export interface InferenceExecutionContext {
    *  audit middleware record request identity without retaining prompt text.
    *  Additive and observation-only — nothing in execution/routing reads it. */
   requestFingerprint: string;
+  /** The immutable, routing-authorized Execution Plan (ADR-0004). Execution
+   *  middleware MAY select an alternate target from this plan to invoke; it SHALL
+   *  NOT invent, authorize, or mutate targets. `targets[0]` is the primary. */
+  executionPlan: ExecutionPlan;
 }
 
 export interface InferenceUsage {
@@ -106,21 +109,22 @@ export interface ExecutionHook {
    * When no hook implements this, the pipeline invokes the provider exactly once
    * — behavior is byte-for-byte unchanged.
    *
-   * `next` accepts an OPTIONAL invocation target (ADR-0004). Called with only a
-   * request, it invokes the routing-selected target — byte-for-byte identical to
-   * before. Called with a target, it asks the PIPELINE to invoke an ALTERNATE
-   * (provider, model) — but only one already authorized by the routing layer for
-   * this execution (see `isAuthorizedTarget`). This is not routing: middleware
-   * never computes, mutates, or re-runs a RoutingDecision; it only names a target
-   * the routing layer already authorized, and the pipeline resolves and invokes
-   * it. A target the routing layer did not authorize is rejected by the pipeline.
-   * A supplied target propagates through inner middleware to the provider unless
-   * an inner middleware supplies its own. First consumer: IOS-012 Fallback.
+   * `next` accepts an OPTIONAL execution target (ADR-0004). Called with only a
+   * request, it invokes the primary (routing-selected) target — byte-for-byte
+   * identical to before. Called with a target, it asks the PIPELINE to invoke an
+   * ALTERNATE target — but ONLY one already present in this execution's immutable
+   * Execution Plan (`ctx.executionPlan`), which the routing layer selected and
+   * authorized. This is not routing: middleware never computes, authorizes,
+   * mutates, or re-runs a RoutingDecision, and never invents provider/model pairs;
+   * it only selects a target the plan already contains, and the pipeline resolves
+   * and invokes it. A target absent from the plan is rejected by the pipeline. A
+   * supplied target propagates through inner middleware to the provider unless an
+   * inner middleware supplies its own. First consumer: IOS-012 Fallback.
    */
   aroundInvoke?(
     request: CompletionRequest,
     ctx: InferenceExecutionContext,
-    next: (request: CompletionRequest, target?: InvocationTarget) => Promise<CompletionResponse>,
+    next: (request: CompletionRequest, target?: ExecutionTarget) => Promise<CompletionResponse>,
   ): Promise<CompletionResponse>;
 }
 

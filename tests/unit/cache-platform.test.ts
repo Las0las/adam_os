@@ -75,6 +75,7 @@ function ctx(): InferenceExecutionContext {
   return {
     executionId: "e", requestId: "r", routingDecision: null, provider: "p", model: "m",
     tenantId: "tnt", workloadType: "chat", startTime: 0, requestFingerprint: "fp",
+    executionPlan: { targets: [{ provider: "p", model: "m" }] },
   };
 }
 

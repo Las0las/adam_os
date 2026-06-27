@@ -10,7 +10,7 @@
 
 import type { CompletionRequest, CompletionResponse } from "@/lib/aiops/models/model-provider";
 import type { InferenceExecutionContext } from "@/lib/aiops/execution/execution-types";
-import type { InvocationTarget } from "@/lib/aiops/execution/invocation-target";
+import type { ExecutionTarget } from "@/lib/aiops/routing/routing-types";
 import { normalizeError } from "@/lib/aiops/execution/execution-errors";
 import { guard } from "@/lib/aiops/execution/observability/execution-middleware";
 import { observedNowMs } from "@/lib/aiops/execution/observability/observability-clock";
@@ -46,8 +46,8 @@ export class FallbackCoordinator {
     request: CompletionRequest,
     ctx: InferenceExecutionContext,
     primaryError: unknown,
-    targets: InvocationTarget[],
-    next: (request: CompletionRequest, target?: InvocationTarget) => Promise<CompletionResponse>,
+    targets: ExecutionTarget[],
+    next: (request: CompletionRequest, target?: ExecutionTarget) => Promise<CompletionResponse>,
   ): Promise<CompletionResponse> {
     const start = this.now();
     guard(() => this.bus.publish(fallbackStarted(ctx, normalizeError(primaryError).kind)));

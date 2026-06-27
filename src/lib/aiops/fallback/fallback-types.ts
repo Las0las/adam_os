@@ -1,12 +1,13 @@
 // IOS-012 — Fallback Orchestrator (per AS-001) — policy + contracts.
 //
 // Composes ENTIRELY through the AS-001 R9 / IOS-004 AroundInvoke contract and its
-// ADR-0004 Invocation Target Override capability — no new execution seam. After
-// the primary path (retry/circuit) fails with a transient/unavailable error, the
-// orchestrator redirects the invocation to an ALTERNATE target that the routing
-// layer already authorized — deterministically, in policy order. It never re-runs
-// routing, mutates the RoutingDecision, or selects an un-routed target (the
-// pipeline rejects unauthorized overrides). Behavior is governed by immutable
+// ADR-0004 Execution Plan capability — no new execution seam. After the primary
+// path (retry/circuit) fails with a transient/unavailable error, the orchestrator
+// redirects the invocation to an ALTERNATE target SELECTED FROM the immutable
+// Execution Plan that the routing layer authorized (`ctx.executionPlan`) —
+// deterministically, in plan order. It never re-runs routing, mutates the
+// RoutingDecision, or invents/authorizes targets; the fallback policy may only
+// restrict/order among plan members. Behavior is governed by immutable
 // FallbackPolicy objects; the default policy is DISABLED (no-op).
 
 import { deepFreeze } from "@/lib/aiops/routing/routing-types";
@@ -17,13 +18,13 @@ export type FallbackMode = "disabled" | "enabled";
 
 export interface FallbackPolicy {
   mode: FallbackMode;
-  /** Ordered alternate providers to try (by registry id). */
+  /** OPTIONAL ordered restriction over the Execution Plan's alternates: when
+   *  non-empty, only plan targets whose provider is listed are eligible, tried in
+   *  this provider order. Empty = all plan alternates in plan (routing) order.
+   *  This is execution POLICY over routing-authorized targets — it can never add
+   *  a target that is not already in the plan. */
   fallbackProviders: string[];
-  /** Ordered alternate models, paired by index with fallbackProviders; when a
-   *  provider has no paired model the primary model is used. When
-   *  fallbackProviders is empty, these models are tried on the primary provider. */
-  fallbackModels: string[];
-  /** Maximum number of fallback attempts (alternate targets to try). */
+  /** Maximum number of fallback attempts (alternate plan targets to try). */
   maxFallbackAttempts: number;
   /** Error kinds that make the primary failure fallback-eligible. */
   fallbackErrorClasses: ExecutionErrorKind[];
@@ -41,7 +42,6 @@ export function defaultFallbackPolicy(): FallbackPolicy {
   return {
     mode: "disabled",
     fallbackProviders: [],
-    fallbackModels: [],
     maxFallbackAttempts: 2,
     fallbackErrorClasses: ["timeout", "rate_limit", "provider_unavailable"],
     eligibleProviders: [],

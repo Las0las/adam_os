@@ -12,8 +12,8 @@
 
 import type { CompletionRequest, CompletionResponse } from "@/lib/aiops/models/model-provider";
 import type { InferenceExecutionContext, ExecutionHook } from "@/lib/aiops/execution/execution-types";
+import type { ExecutionTarget } from "@/lib/aiops/routing/routing-types";
 import { normalizeError } from "@/lib/aiops/execution/execution-errors";
-import { isAuthorizedTarget, type InvocationTarget } from "@/lib/aiops/execution/invocation-target";
 import { guard } from "@/lib/aiops/execution/observability/execution-middleware";
 import type { ExecutionEventBus } from "@/lib/aiops/execution/observability/execution-event-bus";
 import { fallbackBypassed } from "./fallback-events";
@@ -39,11 +39,11 @@ export class FallbackOrchestrator implements ExecutionHook {
   async aroundInvoke(
     request: CompletionRequest,
     ctx: InferenceExecutionContext,
-    next: (request: CompletionRequest, target?: InvocationTarget) => Promise<CompletionResponse>,
+    next: (request: CompletionRequest, target?: ExecutionTarget) => Promise<CompletionResponse>,
   ): Promise<CompletionResponse> {
     const policy = this.store.current();
-    // Fallback requires a routing plan to know which alternate targets are
-    // authorized; without one (already-resolved provider path) it cannot run.
+    // Fallback requires a routing plan to know which alternate targets exist;
+    // without one (already-resolved provider path) it cannot run.
     if (policy.mode !== "enabled" || ctx.routingDecision === null || !fallbackEligible(policy, ctx)) {
       return next(request);
     }
@@ -56,11 +56,10 @@ export class FallbackOrchestrator implements ExecutionHook {
       return await next(request);
     } catch (err) {
       if (!isFallbackEligible(normalizeError(err).kind, policy)) throw err;
-      // Only targets the routing layer already authorized are eligible — reading
-      // the immutable RoutingDecision, never re-running routing.
-      const targets = orderedFallbackTargets(policy, ctx).filter((t) =>
-        isAuthorizedTarget(ctx.routingDecision, t),
-      );
+      // Targets are SELECTED FROM the immutable, routing-authorized Execution
+      // Plan (ctx.executionPlan) — never invented or authorized here. The pipeline
+      // independently enforces plan membership when invoking each target.
+      const targets = orderedFallbackTargets(ctx.executionPlan, policy, ctx);
       if (targets.length === 0) throw err;
       return this.coordinator.run(request, ctx, err, targets, next);
     }
