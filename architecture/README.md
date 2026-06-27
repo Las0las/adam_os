@@ -68,6 +68,7 @@ a specification disagree, the specification governs.
 | IOS-010 | Retry Policy | Phase 2 (spec-driven) |
 | IOS-011 | Circuit Breaker | Phase 2 (spec-driven) |
 | IOS-012 | Fallback Orchestrator | Phase 2 (spec-driven) |
+| IOS-013 | Provider Health Manager | Phase 2 (spec-driven) |
 
 ## Working Under Governance (from Milestone 8.0 onward)
 
