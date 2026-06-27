@@ -141,6 +141,32 @@ test("an IOS-016 replay run can be evaluated; production health is not contamina
   assert.equal(healthStore.get("p1", "m1"), null, "production health never saw replay/evaluation");
 });
 
+// ── Canonical Object Contract conformance ────────────────────────────────────
+
+test("evaluating a ReplayRun does not mutate the consumed (canonical) run", async () => {
+  const reg = registry(echo);
+  const replayBus = new ExecutionEventBus();
+  const replay = new TrafficReplayEngine(replayBus, new ReplayStore(), new ReplayPolicyStore({ ...defaultReplayPolicy(), mode: "enabled" }), { now: () => 0, newReplayId: () => "replay-1" });
+  const run = (await replay.replay([{ recordId: "rec1", inputMessages: [{ role: "user", content: "hi" }], provider: "p1", model: "m1", workloadType: "chat" }], { registry: reg }))!;
+
+  const snapshot = JSON.stringify(run);
+  const e = engineWith(enabled());
+  e.engine.evaluateReplayRun(run);
+  // Consumed object is read-only: frozen and byte-for-byte unchanged.
+  assert.equal(Object.isFrozen(run), true);
+  assert.equal(Object.isFrozen(run.results[0]), true);
+  assert.equal(JSON.stringify(run), snapshot, "the consumed ReplayRun is unchanged after evaluation");
+});
+
+test("the engine produces results without any provider/registry (no invocation, no authority inversion)", () => {
+  // evaluate() over pre-completed subjects needs no registry — the engine never
+  // invokes providers or routes; it only scores observations.
+  const e = engineWith(enabled());
+  const report = e.engine.evaluate([subject({ subjectId: "a" })])!;
+  assert.equal(report.total, 1);
+  assert.equal(Object.isFrozen(report), true);
+});
+
 // ── Eligibility + disabled no-op ─────────────────────────────────────────────
 
 test("ineligible providers are not evaluated", () => {

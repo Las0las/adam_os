@@ -107,6 +107,23 @@ Execution Pipeline. The Evaluation Engine only observes and scores.
 6. Ineligible providers/workloads SHALL be excluded.
 7. A disabled policy SHALL be a no-op; all existing tests SHALL pass unchanged.
 
+### Canonical Object Contract conformance (mandatory)
+
+8. **Read-only consumption** — evaluating a ReplayRun (and any consumed Explanation)
+   SHALL NOT mutate it; the consumed objects SHALL be byte-for-byte unchanged after
+   evaluation.
+9. **Exclusive production** — EvaluationResult/EvaluationReport SHALL be produced
+   ONLY by the Evaluation Engine, and SHALL be immutable once produced.
+10. **No authority inversion** — the engine SHALL NOT route, authorize execution
+    targets, or invoke providers directly; producing EvaluationResult never confers
+    any execution/routing authority.
+11. **Dependency direction (AS-001)** — the engine SHALL depend only on equal/upper
+    layers (IOS-003/004/005 contracts and the IOS-013/014/015/016 objects it
+    consumes); it SHALL NOT be depended upon by those producers.
+12. **No mutation of unowned objects** — the engine SHALL NOT mutate RoutingDecision,
+    ExecutionPlan, ProviderHealthSnapshot, Explanation, BenchmarkResult, or
+    ReplayResult (objects it does not own).
+
 ## Related ADRs
 
 - ADR-0001 (governance framework); ADR-0004 (Execution Plan — referenced).
