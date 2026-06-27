@@ -5,6 +5,9 @@ authoritative description of the architecture; it contains no runtime code and h
 no runtime dependency. Established by Milestone 8.0 (ADR-0001). Terminology
 throughout follows RFC-2119 (SHALL, SHALL NOT, SHOULD, SHOULD NOT, MAY).
 
+> **Released:** LAWRENCE Architecture **v1.0** (`LAWRENCE-ARCH-1.0`) — see
+> `releases/LAWRENCE-ARCH-1.0.md` (approved by ADR-0002).
+>
 > **Architecture v1.0 is FROZEN** (normative baseline). Architecture Phase 1 is
 > **COMPLETE**; Platform Phase 2 is **ACTIVE**. Development is now
 > **specification-driven**: future work is identified by specification id (e.g.
@@ -39,7 +42,9 @@ a specification disagree, the specification governs.
 | `constitution/` | The frozen LAWRENCE Constitution v1.0 (supreme authority). |
 | `standards/` | Architecture Standards (AS-001 Inference Operating System). |
 | `specifications/` | Normative Specifications (IOS-001 … IOS-007) + `_TEMPLATE.md`. |
+| `directives/` | Development Directives (DD-001 Specification-First Development) + `_TEMPLATE.md`. |
 | `adr/` | Architecture Decision Records + `_TEMPLATE.md`. |
+| `releases/` | Architectural release manifests (LAWRENCE-ARCH-1.0). |
 | `contracts/` | Public Contract index (interfaces consumers depend on). |
 | `conformance/` | The Conformance Framework definition. |
 | `governance/` | Governance metadata schema. |
@@ -58,8 +63,17 @@ a specification disagree, the specification governs.
 | IOS-005 | Execution Event Bus & Observability | 5.0, 5.5 |
 | IOS-006 | Security Middleware | 6.0 |
 | IOS-007 | Cache Platform | 7.0, 7.5 |
+| IOS-008 | Batch Scheduler | Phase 2 (spec-driven) |
+| IOS-009 | Semantic Cache | Phase 2 (spec-driven) |
+| IOS-010 | Retry Policy | Phase 2 (spec-driven) |
 
 ## Working Under Governance (from Milestone 8.0 onward)
+
+Day-to-day development is governed by **DD-001 — Specification-First Development**
+(`directives/DD-001-specification-first-development.md`): implementation
+originates from an approved specification, references a specification identifier
+(not a milestone), preserves conformance, and never redesigns architecture without
+an approved ADR.
 
 Every significant change SHALL begin with a versioned Specification and, where it
 establishes or changes architecture, an ADR — **before** code. The flow is:

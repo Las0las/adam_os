@@ -119,7 +119,24 @@ async function runLifecycle(
     for (const h of hooks) {
       if (h.interceptRequest) effectiveRequest = await h.interceptRequest(effectiveRequest, ctx);
     }
-    const completion = resolved ?? await invoke(effectiveRequest);
+    // Provider invocation, wrapped by any aroundInvoke middleware (ADR-0003).
+    // Composed as an onion in priority order (lowest priority = outermost). When
+    // no hook implements aroundInvoke, this reduces to a single invoke() call —
+    // identical to the prior behavior. Skipped entirely on a cache hit (no
+    // provider call), so retry/resilience only wraps real provider calls.
+    let completion: CompletionResponse;
+    if (resolved) {
+      completion = resolved;
+    } else {
+      let chain: (req: CompletionRequest) => Promise<CompletionResponse> = (req) => invoke(req);
+      const around = hooks.filter((h) => h.aroundInvoke);
+      for (let i = around.length - 1; i >= 0; i--) {
+        const h = around[i]!;
+        const next = chain;
+        chain = (req) => h.aroundInvoke!(req, ctx, next);
+      }
+      completion = await chain(effectiveRequest);
+    }
     // Response validation runs on cached and fresh responses alike.
     for (const h of hooks) {
       if (h.interceptResponse) await h.interceptResponse(completion, ctx);

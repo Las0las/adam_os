@@ -90,6 +90,26 @@ export interface ExecutionHook {
    * resolved from cache. Keyed on the original request.
    */
   recordCompletion?(request: CompletionRequest, response: CompletionResponse, ctx: InferenceExecutionContext): void | Promise<void>;
+  /**
+   * General provider-invocation middleware extension point (ADR-0003). This is a
+   * permanent execution-middleware seam — NOT a retry-specific hook. A middleware
+   * receives `next` (the downstream invocation chain, ultimately the provider)
+   * and MAY call it zero, one, or many times, returning the response — covering
+   * retry (IOS-010), circuit breaking (IOS-011), fallback (IOS-012), health
+   * gating (IOS-013), and future execution-governance middleware. Hooks
+   * implementing this compose as an onion in priority order (lowest priority =
+   * outermost), with registration order as a stable tie-break — deterministic.
+   * It wraps ONLY the provider call: it does not run when the response is
+   * resolved from cache, and the request/response interceptors (security,
+   * validation) still run around it, so it cannot bypass security or validation.
+   * When no hook implements this, the pipeline invokes the provider exactly once
+   * — behavior is byte-for-byte unchanged.
+   */
+  aroundInvoke?(
+    request: CompletionRequest,
+    ctx: InferenceExecutionContext,
+    next: (request: CompletionRequest) => Promise<CompletionResponse>,
+  ): Promise<CompletionResponse>;
 }
 
 export interface InferenceExecutionParams {
