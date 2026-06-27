@@ -15,6 +15,8 @@ import { installPromptCache } from "@/lib/aiops/cache/cache-bootstrap";
 import { installSemanticCache } from "@/lib/aiops/cache/semantic-bootstrap";
 import { installBatchScheduler } from "@/lib/aiops/batch/batch-bootstrap";
 import { installRetryMiddleware } from "@/lib/aiops/retry/retry-bootstrap";
+import { installCircuitBreaker } from "@/lib/aiops/circuit/circuit-bootstrap";
+import { installFallbackOrchestrator } from "@/lib/aiops/fallback/fallback-bootstrap";
 import { registerSource, ingestAsset } from "@/lib/dataops/sources/source-service";
 import { runAssetPipeline } from "@/lib/dataops/pipelines/pipeline-runner";
 import { indexEvidence } from "@/lib/dataops/evidence/chunking-service";
@@ -113,6 +115,19 @@ async function initRuntime(): Promise<void> {
   // (no-op). It never bypasses security/validation/telemetry/audit or re-runs
   // routing.
   installRetryMiddleware();
+  // Attach the circuit breaker (IOS-011) after security, OUTSIDE retry (priority
+  // 2.4 < retry 2.5), wrapping the provider call via the ADR-0003 aroundInvoke
+  // hook. Idempotent; default policy DISABLED (no-op). When tripped it fast-fails
+  // without invoking the provider or consuming retry attempts, and never re-runs
+  // routing or bypasses security/validation/telemetry/audit.
+  installCircuitBreaker();
+  // Attach the fallback orchestrator (IOS-012) after the circuit breaker and
+  // outside retry (priority 2.45), via the ADR-0003 aroundInvoke hook + ADR-0004
+  // invocation-target override. Idempotent; default policy DISABLED (no-op). On a
+  // transient/unavailable primary failure it redirects to alternate AUTHORIZED
+  // targets in deterministic policy order; it never re-runs routing, mutates the
+  // RoutingDecision, or bypasses security/validation/telemetry/audit.
+  installFallbackOrchestrator();
   if (shouldAutoSeedDemo()) {
     await bootstrap();
     return;
