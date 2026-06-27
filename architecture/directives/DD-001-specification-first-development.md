@@ -105,6 +105,19 @@ that prove:
 The Canonical Object Contract is thus a binding part of each specification, not
 merely documentation.
 
+### Shared Canonical Contracts vs Canonical Objects
+
+The governance model distinguishes two object classes:
+
+- **Shared Canonical Contracts** define reusable object taxonomies and are NEVER
+  directly produced; they have NO canonical producer (e.g. `Recommendation`).
+- **Canonical Objects** are concrete realizations owned by EXACTLY ONE
+  specification — their canonical producer (e.g. `CostRecommendation` → IOS-019).
+
+A specification producing a member of a taxonomy SHALL produce exactly one concrete
+Canonical Object and SHALL reuse — never redefine — the Shared Canonical Contract it
+specializes.
+
 ## Architecture Decision Rules
 
 If implementation requires changing Architecture, Standards, Public Contracts, or

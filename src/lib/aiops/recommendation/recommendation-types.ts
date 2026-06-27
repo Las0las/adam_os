@@ -1,56 +1,40 @@
-// IOS-019 — Cost Optimization Engine (per AS-001) — the canonical Recommendation
-// taxonomy + CostRecommendation, the first specialization.
+// IOS-019 — Cost Optimization Engine — the CostRecommendation specialization.
 //
-// IOS-019 establishes the BASE Recommendation contract (a single platform-wide
-// recommendation taxonomy) and becomes the canonical producer of CostRecommendation
-// — the first specialization. It does NOT introduce a generic recommendation engine
-// and does NOT implement the future specializations (SLARecommendation,
-// RoutingRecommendation, ProviderRecommendation, CapacityRecommendation,
-// PolicyRecommendation); each future specification owns only its own specialization
-// while reusing this base contract.
+// IOS-019 is the canonical producer of CostRecommendation ONLY. It does NOT own the
+// Recommendation hierarchy: the abstract `Recommendation` contract is taxonomy-level
+// and shared (see recommendation-contract.ts), reused by every future specialization
+// (SLA/routing/provider/capacity/policy), each owned by its own specification.
 //
-// The Cost Optimization Engine is PURELY ADVISORY: it consumes published metadata
-// (IOS-018), execution history, benchmark results, provider health, and evaluation
-// results BY REFERENCE and produces immutable CostRecommendation objects. It never
-// influences routing, authorizes execution targets, or mutates anything it consumes.
+// The Cost Optimization Engine is PURELY ADVISORY: it consumes published model
+// metadata (IOS-018), execution history, benchmark results, provider health, and
+// evaluation results BY REFERENCE and produces immutable CostRecommendation objects.
+// It never influences routing, authorizes execution targets, invokes providers, or
+// mutates anything it consumes.
 
 import { deepFreeze } from "@/lib/aiops/routing/routing-types";
+import type { Recommendation, RecommendationSubject } from "./recommendation-contract";
 
-/** The recommendation taxonomy. IOS-019 produces only "cost"; the others are
- *  reserved for future specifications that own their own specialization. */
-export type RecommendationKind =
-  | "cost"
-  | "sla"
-  | "routing"
-  | "provider"
-  | "capacity"
-  | "policy";
-
-/** The subject a recommendation is about (a model target). */
-export interface RecommendationSubject {
-  provider: string;
-  model: string;
-}
-
-/** The BASE canonical Recommendation contract. Every specialization extends this
- *  and reuses it unchanged. Recommendations are immutable and ALWAYS advisory. */
-export interface Recommendation {
-  recommendationId: string;
-  kind: RecommendationKind;
-  subject: RecommendationSubject;
-  rationale: string;
-  /** 0..1 confidence derived deterministically from available evidence. */
-  confidence: number;
-  createdAt: number;
-  /** Recommendations never act; they advise. */
-  advisory: true;
-}
+// Re-export the abstract taxonomy contract for convenience (it is a Shared
+// Canonical Contract, not owned by IOS-019).
+export type {
+  Recommendation,
+  RecommendationType,
+  RecommendationPriority,
+  RecommendationStatus,
+  RecommendationSubject,
+  EvidenceReference,
+} from "./recommendation-contract";
+export { recommendationKey } from "./recommendation-contract";
 
 export type CostAction = "no_change" | "switch_model" | "reduce_usage" | "investigate";
 
-/** The first specialization: a cost recommendation (canonical, immutable). */
+/** The first CONCRETE specialization of Recommendation — a Canonical Object owned
+ *  and produced solely by IOS-019 (immutable). It carries the shared base fields
+ *  plus the cost-specific fields below. */
 export interface CostRecommendation extends Recommendation {
-  kind: "cost";
+  recommendationType: "cost";
+  /** The model target this cost recommendation concerns. */
+  subject: RecommendationSubject;
   /** Observed blended cost per 1M tokens for the subject, or null. */
   observedCostPerMTok: number | null;
   /** Published blended price per 1M tokens for the subject, or null. */
@@ -98,8 +82,4 @@ export class CostOptimizationPolicyStore {
   configure(policy: CostOptimizationPolicy): void {
     this.policy = deepFreeze(policy);
   }
-}
-
-export function recommendationKey(provider: string, model: string): string {
-  return `${provider}|${model}`;
 }

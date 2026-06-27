@@ -50,10 +50,13 @@ test("recommends switching to a cheaper, no-worse alternative", () => {
   const recs = e.engine.recommend(input);
   assert.equal(recs.length, 1);
   const r = recs[0]!;
-  assert.equal(r.kind, "cost");
-  assert.equal(r.advisory, true);
+  assert.equal(r.recommendationType, "cost");
+  assert.equal(r.producerSpecification, "IOS-019");
+  assert.equal(r.recommendationStatus, "proposed");
   assert.equal(r.subject.model, "expensive");
   assert.equal(r.action, "switch_model");
+  assert.ok((r.estimatedBenefit ?? 0) > 0, "savings benefit estimated");
+  assert.ok(r.evidenceReferences.length > 0);
   assert.deepEqual(r.alternative?.model, "cheap");
   assert.ok((r.projectedSavingsPct ?? 0) > 80);
 });
@@ -86,12 +89,12 @@ test("a cheaper alternative that is unavailable (health) is not recommended", ()
   assert.equal(r.action, "no_change", "an unavailable alternative is excluded");
 });
 
-// ── Immutability + advisory ──────────────────────────────────────────────────
+// ── Immutability ─────────────────────────────────────────────────────────────
 
-test("produced CostRecommendations are immutable and advisory", () => {
+test("produced CostRecommendations are immutable", () => {
   const input: CostAnalysisInput = { capabilities: [cap("p1", "m", 1, 1)], observations: [obs("p1", "m", 1, 1_000_000)] };
   const r = engineWith(enabled()).engine.recommend(input)[0]!;
-  assert.equal(r.advisory, true);
+  assert.equal(r.recommendationType, "cost");
   assert.equal(Object.isFrozen(r), true);
   assert.throws(() => { (r as { action: string }).action = "switch_model"; }, TypeError);
 });
@@ -115,11 +118,31 @@ test("CostRecommendation is a specialization of the base Recommendation contract
   const e = engineWith(enabled());
   e.engine.recommend(input);
   // Stored under the canonical taxonomy, retrievable as a base Recommendation.
-  const base = e.store.byKind("cost");
+  const base = e.store.byType("cost");
   assert.equal(base.length, 1);
-  assert.equal(base[0]!.kind, "cost");
-  assert.ok("recommendationId" in base[0]! && "rationale" in base[0]! && "confidence" in base[0]!);
+  assert.equal(base[0]!.recommendationType, "cost");
+  assert.ok("recommendationId" in base[0]! && "rationale" in base[0]! && "confidence" in base[0]! && "producerSpecification" in base[0]!);
   assert.equal(e.store.costRecommendations().length, 1);
+});
+
+// ── Abstract Recommendation contract is shared, not IOS-019-owned ────────────
+
+test("the abstract Recommendation contract lives in the shared taxonomy module", async () => {
+  // The base taxonomy (Recommendation/RecommendationKind/RecommendationSubject) is
+  // importable from the shared contract module — it is not owned by IOS-019.
+  const contract = await import("@/lib/aiops/recommendation/recommendation-contract");
+  assert.equal(typeof contract.recommendationKey, "function");
+  assert.equal(contract.recommendationKey("p", "m"), "p|m");
+
+  // CostRecommendation (IOS-019's concrete specialization) extends the base
+  // contract: a produced cost recommendation carries the base fields and kind.
+  const input: CostAnalysisInput = { capabilities: [cap("p1", "m", 1, 1)], observations: [obs("p1", "m", 1, 1_000_000)] };
+  const r = engineWith(enabled()).engine.recommend(input)[0]!;
+  assert.equal(r.recommendationType, "cost");
+  // Every v1.0 abstract base field is present on the concrete specialization.
+  for (const f of ["recommendationId", "recommendationType", "priority", "confidence", "rationale", "evidenceReferences", "estimatedImpact", "estimatedCost", "estimatedBenefit", "createdAt", "producerSpecification", "recommendationStatus"]) {
+    assert.ok(f in r, `base contract field "${f}" present`);
+  }
 });
 
 // ── Eligibility + disabled no-op ─────────────────────────────────────────────

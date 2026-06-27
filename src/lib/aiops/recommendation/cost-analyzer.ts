@@ -107,12 +107,14 @@ export function analyzeCost(
     let projectedSavingsPct: number | null = null;
     let alternative: CostRecommendation["alternative"] = null;
     let rationale = "subject is cost-competitive among eligible alternatives";
+    let estimatedBenefit: number | null = null;
 
     if (best && pricedCostPerMTok != null && pricedCostPerMTok > 0) {
       projectedSavingsPct = ((pricedCostPerMTok - best.price) / pricedCostPerMTok) * 100;
       if (projectedSavingsPct >= policy.savingsThresholdPct) {
         action = "switch_model";
         alternative = { provider: best.subject.provider, model: best.subject.model, pricedCostPerMTok: best.price };
+        estimatedBenefit = pricedCostPerMTok - best.price; // savings per 1M tokens
         rationale = `a cheaper, no-worse alternative is available (~${projectedSavingsPct.toFixed(1)}% lower published price)`;
       }
     } else if (pricedCostPerMTok == null && observedCostPerMTok != null) {
@@ -127,14 +129,32 @@ export function analyzeCost(
     if (pricedCostPerMTok != null) confidence += 0.1;
     confidence = Math.min(1, confidence);
 
+    // Priority derives from the recommendation strength (deterministic).
+    const priority =
+      action === "switch_model"
+        ? ((projectedSavingsPct ?? 0) >= 50 ? "high" : "medium")
+        : action === "investigate" ? "medium" : "low";
+
+    // Evidence references (by key — never embedded copies).
+    const evidenceReferences = [{ kind: "modelCapability", ref: key }, { kind: "executionHistory", ref: key }];
+    if (subjectBench != null) evidenceReferences.push({ kind: "benchmark", ref: key });
+    if (subjectEval != null) evidenceReferences.push({ kind: "evaluation", ref: key });
+    if (input.health) evidenceReferences.push({ kind: "providerHealth", ref: key });
+
     out.push({
       recommendationId: idFor(key),
-      kind: "cost",
-      subject: { provider: g.provider, model: g.model },
-      rationale,
+      recommendationType: "cost",
+      priority,
       confidence,
+      rationale,
+      evidenceReferences,
+      estimatedImpact: projectedSavingsPct != null ? Math.min(1, Math.max(0, projectedSavingsPct / 100)) : null,
+      estimatedCost: pricedCostPerMTok,
+      estimatedBenefit,
       createdAt: now(),
-      advisory: true,
+      producerSpecification: "IOS-019",
+      recommendationStatus: "proposed",
+      subject: { provider: g.provider, model: g.model },
       observedCostPerMTok,
       pricedCostPerMTok,
       action,
