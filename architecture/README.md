@@ -5,6 +5,14 @@ authoritative description of the architecture; it contains no runtime code and h
 no runtime dependency. Established by Milestone 8.0 (ADR-0001). Terminology
 throughout follows RFC-2119 (SHALL, SHALL NOT, SHOULD, SHOULD NOT, MAY).
 
+> **Architecture v1.0 is FROZEN** (normative baseline). Architecture Phase 1 is
+> **COMPLETE**; Platform Phase 2 is **ACTIVE**. Development is now
+> **specification-driven**: future work is identified by specification id (e.g.
+> "Implement IOS-008 according to AS-001"), not by milestone number. See
+> `governance/architecture-v1.0-freeze-declaration.md` (recorded by ADR-0002).
+> The topology SHALL change only via an Architecture Standard revision, an
+> approved ADR, or a Constitutional Amendment — never through implementation.
+
 ## Authority Hierarchy
 
 ```
