@@ -65,6 +65,7 @@ a specification disagree, the specification governs.
 | IOS-007 | Cache Platform | 7.0, 7.5 |
 | IOS-008 | Batch Scheduler | Phase 2 (spec-driven) |
 | IOS-009 | Semantic Cache | Phase 2 (spec-driven) |
+| IOS-010 | Retry Policy | Phase 2 (spec-driven) |
 
 ## Working Under Governance (from Milestone 8.0 onward)
 
