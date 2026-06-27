@@ -101,6 +101,7 @@ as they consume the IOS public contracts.
 | IOS-016 | Traffic Replay Engine | (Phase 2) |
 | IOS-017 | Evaluation Engine | (Phase 2) |
 | IOS-018 | Model Capability Registry (impl of IOS-002) | (Phase 2) |
+| IOS-019 | Cost Optimization Engine | (Phase 2) |
 
 ## 5. Conformance
 

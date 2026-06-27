@@ -23,6 +23,7 @@ import { installExplainabilityEngine } from "@/lib/aiops/explainability/explaina
 import { installTrafficReplay } from "@/lib/aiops/replay/replay-bootstrap";
 import { installEvaluationEngine } from "@/lib/aiops/evaluation/evaluation-bootstrap";
 import { installModelCapabilityRegistry } from "@/lib/aiops/capability/capability-bootstrap";
+import { installCostOptimizationEngine } from "@/lib/aiops/recommendation/cost-bootstrap";
 import { registerSource, ingestAsset } from "@/lib/dataops/sources/source-service";
 import { runAssetPipeline } from "@/lib/dataops/pipelines/pipeline-runner";
 import { indexEvidence } from "@/lib/dataops/evidence/chunking-service";
@@ -173,6 +174,12 @@ async function initRuntime(): Promise<void> {
   // via the existing IOS-001/002 contracts). Populated on demand from published
   // provider declarations.
   installModelCapabilityRegistry();
+  // Install the Cost Optimization Engine (IOS-019) — the canonical producer of
+  // CostRecommendation (first specialization of the Recommendation family). Purely
+  // advisory: it registers NO execution hook, changes no execution behavior, never
+  // influences routing or authorizes targets. Default policy DISABLED; it consumes
+  // published metadata + execution/benchmark/health/evaluation evidence on demand.
+  installCostOptimizationEngine();
   if (shouldAutoSeedDemo()) {
     await bootstrap();
     return;
