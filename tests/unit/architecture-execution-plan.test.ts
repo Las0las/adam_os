@@ -1,21 +1,21 @@
-// Architecture conformance for the IOS-004 v1.2 Invocation Target Override
-// (ADR-0004). Proves the general capability is additive and routing stays
-// authoritative: with no override execution is byte-for-byte identical; a valid
-// override invokes the alternate AUTHORIZED target deterministically; an
-// unauthorized override is rejected by the pipeline (no provider call); routing
-// is never re-executed and the RoutingDecision is never mutated; and target
-// overrides thread through inner middleware while composition order is preserved.
+// Architecture conformance for the IOS-004 v1.2 Execution Plan (ADR-0004). Proves
+// the routing/execution boundary: routing owns the immutable, authorized plan;
+// execution invokes ONLY plan members; middleware may select among plan targets
+// but cannot invent/authorize/mutate them. With no override execution is
+// byte-for-byte identical; a valid plan target is invoked deterministically; a
+// target absent from the plan is rejected (no provider call); routing is never
+// re-executed and the RoutingDecision/plan is never mutated; overrides thread
+// through inner middleware while composition order is preserved.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createProviderRegistry, type ProviderRegistry } from "@/lib/aiops/providers/provider-registry";
 import { defineProvider } from "@/lib/aiops/providers/define-provider";
 import type { ModelDescriptor } from "@/lib/aiops/providers/provider-registry-types";
 import type { CompletionResponse, ModelProvider } from "@/lib/aiops/models/model-provider";
-import type { RoutingDecision } from "@/lib/aiops/routing/routing-types";
-import { deepFreeze } from "@/lib/aiops/routing/routing-types";
+import { deepFreeze, type ExecutionTarget, type RoutingDecision } from "@/lib/aiops/routing/routing-types";
+import { buildExecutionPlan, planContains, primaryTarget } from "@/lib/aiops/routing/execution-plan";
 import { executeInference } from "@/lib/aiops/execution/inference-pipeline";
 import type { ExecutionHook } from "@/lib/aiops/execution/execution-types";
-import type { InvocationTarget } from "@/lib/aiops/execution/invocation-target";
 
 const OK: CompletionResponse = {
   text: "hello", json: null, promptTokens: 5, completionTokens: 3,
@@ -30,10 +30,7 @@ function descriptor(provider: string, model: string): ModelDescriptor {
     supportsEmbeddings: false, pricing: null, deprecated: false,
   };
 }
-
 interface Spec { id: string; model: string; complete: ModelProvider["complete"] }
-
-/** Registry with multiple providers; each provider's adapter labels itself. */
 function multiRegistry(specs: Spec[]): { reg: ProviderRegistry; calls: Record<string, number> } {
   const reg = createProviderRegistry();
   const calls: Record<string, number> = {};
@@ -51,10 +48,9 @@ function multiRegistry(specs: Spec[]): { reg: ProviderRegistry; calls: Record<st
   }
   return { reg, calls };
 }
-
 const echo = (tag: string): ModelProvider["complete"] => async (req) => ({ ...OK, text: `${tag}:${req.prompt}` });
 
-/** p (primary) + p2 (authorized alternate) + p3 (NOT evaluated → unauthorized). */
+/** p (primary) + p2 (authorized plan alternate) + p3 (NOT in the plan). */
 function fixture() {
   return multiRegistry([
     { id: "p", model: "m", complete: echo("p") },
@@ -63,23 +59,39 @@ function fixture() {
   ]);
 }
 function decision(): RoutingDecision {
-  // Routing evaluated p and p2 (authorizing both); p3 was never evaluated.
+  // Routing authorized a plan of [p, p2]; p3 is absent from the plan.
   return deepFreeze({
     selectedProvider: "p", selectedModel: "m",
     evaluatedProviders: ["p", "p2"], rejectionReasons: [], policySnapshot: {},
+    executionPlan: { targets: [{ provider: "p", model: "m" }, { provider: "p2", model: "m2" }] },
   });
 }
-function params(reg: ProviderRegistry, routingDecision: RoutingDecision, prompt = "x") {
-  return { request: { prompt }, routingDecision, registry: reg, requestId: "req", tenantId: "tnt", workloadType: "chat" };
+function params(reg: ProviderRegistry, d: RoutingDecision, prompt = "x") {
+  return { request: { prompt }, routingDecision: d, registry: reg, requestId: "req", tenantId: "tnt", workloadType: "chat" };
 }
 function stable(r: Awaited<ReturnType<typeof executeInference>>) {
   return { response: r.response, json: r.json, usage: r.usage, finishReason: r.finishReason, success: r.success, error: r.error };
 }
-const retarget = (target: InvocationTarget): ExecutionHook => ({ name: "retarget", aroundInvoke: (req, _ctx, next) => next(req, target) });
+const retarget = (target: ExecutionTarget): ExecutionHook => ({ name: "retarget", aroundInvoke: (req, _ctx, next) => next(req, target) });
+
+// ── buildExecutionPlan / membership ──────────────────────────────────────────
+
+test("buildExecutionPlan returns the routing-supplied plan, else the single selected target", () => {
+  const withPlan = buildExecutionPlan(decision());
+  assert.deepEqual(withPlan.targets.map((t) => `${t.provider}|${t.model}`), ["p|m", "p2|m2"]);
+  assert.deepEqual(primaryTarget(withPlan), { provider: "p", model: "m" });
+
+  const noPlan = buildExecutionPlan(deepFreeze({
+    selectedProvider: "x", selectedModel: "y", evaluatedProviders: ["x"], rejectionReasons: [], policySnapshot: {},
+  }));
+  assert.deepEqual(noPlan.targets, [{ provider: "x", model: "y" }]);
+  assert.equal(planContains(noPlan, { provider: "x", model: "y" }), true);
+  assert.equal(planContains(noPlan, { provider: "z", model: "y" }), false);
+});
 
 // ── No override → byte-for-byte identical ────────────────────────────────────
 
-test("with no invocation target override, execution is identical to the prior pipeline", async () => {
+test("with no override, execution is identical to the prior pipeline", async () => {
   const a = fixture();
   const bare = await executeInference(params(a.reg, decision()), []);
   const b = fixture();
@@ -90,21 +102,19 @@ test("with no invocation target override, execution is identical to the prior pi
   assert.deepEqual(stable(wrapped), stable(bare));
   assert.equal(a.calls.p, 1);
   assert.equal(b.calls.p, 1);
-  assert.equal(b.calls.p2, 0, "the alternate is never touched without an override");
+  assert.equal(b.calls.p2, 0, "no alternate touched without an override");
 });
 
-// ── Valid override → alternate authorized target invoked deterministically ───
+// ── Valid plan target → invoked deterministically ────────────────────────────
 
-test("a valid override invokes the alternate authorized target (provider not re-routed)", async () => {
+test("a valid override (a plan member) invokes that alternate target", async () => {
   const f = fixture();
   const res = await executeInference(params(f.reg, decision()), [retarget({ provider: "p2", model: "m2" })]);
   assert.equal(res.success, true);
-  assert.equal(res.response, "p2:x", "the alternate authorized provider answered");
-  assert.equal(f.calls.p, 0, "the primary was not invoked");
-  assert.equal(f.calls.p2, 1, "the alternate was invoked exactly once");
-  // The result still reports the routing-selected provider/model in ctx-derived
-  // fields (routing identity is preserved; the override only redirects invocation).
-  assert.equal(res.provider, "p");
+  assert.equal(res.response, "p2:x");
+  assert.equal(f.calls.p, 0, "primary not invoked");
+  assert.equal(f.calls.p2, 1, "the plan alternate was invoked once");
+  assert.equal(res.provider, "p", "routing identity preserved (override only redirects invocation)");
   assert.equal(res.model, "m");
 });
 
@@ -117,44 +127,31 @@ test("override selection is deterministic across repeated executions", async () 
   }
 });
 
-// ── Unauthorized override → rejected by the pipeline ─────────────────────────
+// ── Target absent from the plan → rejected ───────────────────────────────────
 
-test("an override the routing layer did not authorize is rejected (no provider call)", async () => {
+test("an override not contained in the execution plan is rejected (no provider call)", async () => {
   const f = fixture();
-  // p3 was never evaluated by routing → not authorized.
+  // p3 is not in the plan → the pipeline rejects it, even though it is registered.
   const res = await executeInference(params(f.reg, decision()), [retarget({ provider: "p3", model: "m3" })]);
   assert.equal(res.success, false);
   assert.equal(res.error?.kind, "provider_unavailable");
-  assert.equal(f.calls.p3, 0, "an unauthorized target is never invoked");
+  assert.equal(f.calls.p3, 0, "a non-plan target is never invoked");
   assert.equal(f.calls.p, 0);
 });
 
-test("a rejected (provider, model) pair is not an authorized override target", async () => {
-  const f = fixture();
-  const d = deepFreeze({
-    selectedProvider: "p", selectedModel: "m",
-    evaluatedProviders: ["p", "p2"],
-    rejectionReasons: [{ provider: "p2", model: "m2", reason: "capability" }],
-    policySnapshot: {},
-  });
-  const res = await executeInference(params(f.reg, d), [retarget({ provider: "p2", model: "m2" })]);
-  assert.equal(res.success, false);
-  assert.equal(res.error?.kind, "provider_unavailable");
-  assert.equal(f.calls.p2, 0);
-});
+// ── Routing not re-executed; plan immutable ──────────────────────────────────
 
-// ── Routing not re-executed; RoutingDecision immutable ───────────────────────
-
-test("the RoutingDecision is never mutated by an override and remains frozen", async () => {
+test("the RoutingDecision and its execution plan are never mutated by an override", async () => {
   const f = fixture();
   const d = decision();
   const snapshot = JSON.parse(JSON.stringify(d));
   await executeInference(params(f.reg, d), [retarget({ provider: "p2", model: "m2" })]);
   assert.ok(Object.isFrozen(d), "RoutingDecision stays frozen");
-  assert.deepEqual(JSON.parse(JSON.stringify(d)), snapshot, "RoutingDecision is byte-for-byte unchanged");
+  assert.ok(Object.isFrozen(d.executionPlan), "execution plan stays frozen");
+  assert.deepEqual(JSON.parse(JSON.stringify(d)), snapshot, "byte-for-byte unchanged");
 });
 
-// ── Target threads through inner middleware; ordering preserved ───────────────
+// ── Threading through inner middleware; ordering preserved ────────────────────
 
 test("an outer override threads through inner middleware to the provider; order preserved", async () => {
   const f = fixture();

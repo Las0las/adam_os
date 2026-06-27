@@ -47,19 +47,22 @@ middleware (IOS-005/006/007).
   registration order as a stable tie-break). A middleware MAY call `next` zero,
   one, or many times. It wraps ONLY the provider call (not cache hits) and the
   request/response interceptors still run around it.
-- Resolve the **invocation target** (added in v1.2 by ADR-0004) — a general
-  execution capability of the AroundInvoke contract. By default the pipeline
-  invokes the routing-selected (provider, model). An `aroundInvoke` middleware MAY
-  pass `next` an optional `InvocationTarget` to invoke an **alternate** target
-  instead; the pipeline resolves and invokes it. The pipeline SHALL invoke an
-  override only if it is **authorized by the immutable RoutingDecision** (the
-  selected target, or a provider routing evaluated whose (provider, model) pair was
-  not rejected); an unauthorized override SHALL be rejected (`provider_unavailable`)
-  and the provider SHALL NOT be invoked. The pipeline SHALL NOT re-run routing or
-  mutate the RoutingDecision. A target supplied by an outer middleware threads
-  through inner middleware unless an inner middleware supplies its own. This is a
-  general capability — not fallback-specific — reused by IOS-012 Fallback (first
-  consumer), IOS-013 Provider Health, adaptive selection, and beyond.
+- Carry and honor the immutable **Execution Plan** (added in v1.2 by ADR-0004) —
+  a general execution capability of the AroundInvoke contract. The plan is the
+  ordered set of execution targets the **routing layer** selected and authorized
+  (IOS-003 v1.1, `RoutingDecision.executionPlan`; `targets[0]` = primary); the
+  pipeline exposes it on `ctx.executionPlan`. By default the pipeline invokes the
+  primary target. An `aroundInvoke` middleware MAY pass `next` an optional
+  `ExecutionTarget` to invoke an **alternate target that is contained in the plan**;
+  the pipeline resolves and invokes it. A target NOT in the plan SHALL be rejected
+  (`provider_unavailable`) and the provider SHALL NOT be invoked. The pipeline
+  SHALL NOT authorize or construct targets, re-run routing, or mutate the
+  RoutingDecision/plan — membership in the routing-produced plan IS the
+  authorization. A target supplied by an outer middleware threads through inner
+  middleware unless an inner middleware supplies its own. This is a general
+  capability — not fallback-specific — reused by IOS-012 Fallback (first consumer),
+  IOS-013 Provider Health, IOS-014 Benchmark Harness, IOS-017 Evaluation Engine,
+  IOS-022 Adaptive Routing, and beyond.
 
 ## Public Interfaces
 
@@ -70,8 +73,10 @@ middleware (IOS-005/006/007).
   `clearExecutionHooks`.
 - `ExecutionHook.aroundInvoke?(request, ctx, next)` — provider-invocation
   middleware (v1.1, ADR-0003). `next(request, target?)` accepts an optional
-  `InvocationTarget` (v1.2, ADR-0004).
-- `InvocationTarget { provider, model }`, `isAuthorizedTarget(decision, target)`
+  `ExecutionTarget` from the plan (v1.2, ADR-0004).
+- `ExecutionTarget { provider, model }`, `ExecutionPlan { targets }`,
+  `InferenceExecutionContext.executionPlan`; `buildExecutionPlan(decision)`,
+  `planContains(plan, target)`
   (v1.2, ADR-0004).
 
 ## Invariants
@@ -83,10 +88,16 @@ middleware (IOS-005/006/007).
   `runModelCompletion` returns the provider response unchanged or throws a
   normalized error.
 - Hooks SHALL run in deterministic priority order.
+- (v1.2) The **Execution Plan** is an ordered, enumerable collection of
+  `ExecutionTarget`s with deterministic ordering, and is IMMUTABLE after creation.
+  Execution middleware MAY select or advance to another authorized target already
+  present in the plan, but SHALL NOT modify, reorder, insert, remove, or authorize
+  execution targets. The pipeline SHALL invoke ONLY targets contained in the plan.
 
 ## Dependencies
 
-- IOS-001 (registry), IOS-003 (routing decision) · AS-001 · Constitution v1.0.
+- IOS-001 (registry), IOS-003 v1.1 (routing decision + Execution Plan) · AS-001 ·
+  Constitution v1.0.
 
 ## Conformance Requirements
 
@@ -106,21 +117,21 @@ middleware (IOS-005/006/007).
    (first = outermost).
 8. (v1.1) `aroundInvoke` SHALL NOT run on a cache hit, and the request/response
    interceptors (security, validation) SHALL still run around it.
-9. (v1.2) With **no** invocation-target override supplied, execution SHALL be
+9. (v1.2) With **no** execution-target override supplied, execution SHALL be
    byte-for-byte identical to the prior pipeline.
-10. (v1.2) A valid override SHALL invoke the alternate **authorized** target
-    deterministically (`.complete()` still only in the pipeline).
-11. (v1.2) An override NOT authorized by the immutable RoutingDecision SHALL be
-    rejected (`provider_unavailable`) and the provider SHALL NOT be invoked.
-12. (v1.2) Routing SHALL NOT be re-executed and the RoutingDecision SHALL NOT be
-    mutated by an override.
+10. (v1.2) A valid override (a target **contained in the Execution Plan**) SHALL be
+    invoked deterministically (`.complete()` still only in the pipeline).
+11. (v1.2) A target NOT contained in the Execution Plan SHALL be rejected
+    (`provider_unavailable`) and the provider SHALL NOT be invoked.
+12. (v1.2) Routing SHALL NOT be re-executed and the RoutingDecision / Execution
+    Plan SHALL NOT be mutated by an override.
 13. (v1.2) An override supplied by an outer middleware SHALL thread through inner
     middleware while composition order is preserved.
 
 ## Related ADRs
 
 - ADR-0001 (governance framework); ADR-0003 (v1.1 `aroundInvoke` extension point);
-  ADR-0004 (v1.2 invocation-target override).
+  ADR-0004 (v1.2 Execution Plan / routing-authorized targets).
 
 ## Derived From
 
@@ -134,7 +145,9 @@ middleware (IOS-005/006/007).
 ## Implementation References
 
 - `src/lib/aiops/execution/inference-pipeline.ts`, `execution-types.ts`,
-  `execution-errors.ts`, `execution-hooks.ts`, `invocation-target.ts` (v1.2);
+  `execution-errors.ts`, `execution-hooks.ts`;
+  `src/lib/aiops/routing/execution-plan.ts` + `routing-types.ts` (Execution Plan,
+  v1.2);
   `tests/unit/architecture-execution.test.ts` (single-path enforcement),
   `tests/unit/architecture-around-invoke.test.ts` (v1.1 conformance),
-  `tests/unit/architecture-invocation-target.test.ts` (v1.2 conformance).
+  `tests/unit/architecture-execution-plan.test.ts` (v1.2 conformance).
