@@ -15,10 +15,17 @@
 
 IOS-018 IMPLEMENTS and operationalizes the **IOS-002 Model Capability Registry**
 contract. IOS-002 remains the normative architectural definition; IOS-018 becomes
-the canonical producer of **ModelCapability** and **ModelDescriptor** metadata,
-derived declaratively from published provider declarations. It is observational and
-declarative; it SHALL NOT influence routing. Governed Routing continues to consume
-published capability metadata through the existing IOS-001/002 contracts.
+the **canonical metadata authority for models** — the authoritative producer of
+ModelDescriptor, ModelCapability, ModelLimits, ModelFeatures, ModelPricingMetadata,
+ModelLifecycleState, and ModelPublisherMetadata — derived declaratively from
+published provider declarations. Future specifications SHALL consume these
+published metadata objects through IOS-018's contracts rather than maintaining
+provider-specific metadata. The registry is declarative only.
+
+It SHALL NOT: perform routing; execute providers; authorize execution; evaluate
+models; or calculate health. Governed Routing, Evaluation, Benchmarking,
+Explainability, Health, Cost Optimization, SLA Management, and Adaptive Routing
+SHALL all consume model metadata from IOS-018 through published contracts.
 
 ## Scope
 
@@ -39,7 +46,10 @@ ModelDescriptor/CapabilitySet contracts — it reuses them.
 
 ## Public Interfaces
 
-- `ModelCapability`, `deriveCapability(descriptor)`, `capabilityKey(provider,model)`.
+- `ModelCapability` (carrying all metadata facets: `limits` (ModelLimits),
+  `features` (ModelFeatures), `pricingMetadata` (ModelPricingMetadata), `lifecycle`
+  (ModelLifecycleState), `publisherMetadata` (ModelPublisherMetadata)),
+  `deriveCapability(descriptor)`, `capabilityKey(provider,model)`.
 - `ModelCapabilityRegistry` (producer): `buildFrom(providerRegistry)`,
   `enrichFromBenchmark(results)`, `enrichFromEvaluation(reports)`, `capabilities()`.
 - `ModelCapabilityStore` (read-only access: `get`, `descriptor`, `all`,
@@ -52,9 +62,12 @@ ModelDescriptor/CapabilitySet contracts — it reuses them.
   provider declarations / provider metadata (RegisteredProvider, ModelDescriptor —
   IOS-001/002), BenchmarkResult (IOS-014), EvaluationReport/evaluation metadata
   (IOS-017).
-- **Canonical Objects Produced**: ModelCapability (new canonical object) and
-  ModelDescriptor metadata — IOS-018 is their canonical producer, implementing the
-  IOS-002 contract.
+- **Canonical Objects Produced** (IOS-018 is their authoritative producer): the
+  full model metadata set — **ModelDescriptor**, **ModelCapability**,
+  **ModelLimits**, **ModelFeatures**, **ModelPricingMetadata**,
+  **ModelLifecycleState**, **ModelPublisherMetadata** — implementing the IOS-002
+  contract. Future specifications consume these published objects rather than
+  maintaining provider-specific metadata.
 - **Existing Contracts Reused**: IOS-002 canonical contracts (`ModelDescriptor`,
   `CapabilitySet`, `capabilitySetOf`); IOS-001 Provider Registry.
 - **Implements**: IOS-002 Model Capability Registry (operationalization; IOS-002
@@ -63,10 +76,12 @@ ModelDescriptor/CapabilitySet contracts — it reuses them.
   (IOS-001/002) owns provider declarations + ModelDescriptor; Benchmark Harness
   (IOS-014) owns BenchmarkResult; Evaluation Engine (IOS-017) owns EvaluationReport.
   This registry SHALL NOT mutate any of them.
-- **Authorized Consumers** (of produced objects): Governed Routing MAY consume
-  published capability metadata (through the existing IOS-001/002 contracts);
-  explainability, benchmark, evaluation, and operator/UI surfaces MAY read
-  ModelCapability. Consumers SHALL NOT mutate published records.
+- **Authorized Consumers** (of produced objects): Governed Routing (via the
+  existing IOS-001/002 contracts), Evaluation (IOS-017), Benchmarking (IOS-014),
+  Explainability (IOS-015), Provider Health (IOS-013), Cost Optimization (IOS-019),
+  SLA Management, Adaptive Routing, and operator/UI surfaces MAY read the published
+  metadata objects. Consumers SHALL NOT mutate published records, and SHALL NOT
+  maintain provider-specific metadata that duplicates this canonical source.
 
 ## Invariants
 
