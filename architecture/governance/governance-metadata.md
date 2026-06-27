@@ -45,15 +45,21 @@ retained for traceability (never deleted).
 
 - Constitution: `CONST-LAWRENCE`
 - Architecture Standard: `AS-NNN`
-- Normative Specification: `IOS-NNN` (and future standard prefixes)
+- Normative Specification: `<DOMAIN>-NNN` (e.g. `IOS-NNN`, `ONT-NNN`, `MIS-NNN`)
 - Architecture Decision Record: `ADR-NNNN`
-- Public Contract: `CONTRACT-<spec>-<name>`
-- Conformance Suite: `CONF-<spec>`
+- Development Directive: `DD-NNN`
+- Public Contract: `CON-NNN` (or `CONTRACT-<spec>-<name>`)
+- Conformance Suite: `CONF-<DOMAIN>`
 
 ## 4. Authority Field Values (ascending authority)
 
 `Conformance Suite` < `Implementation` < `Public Contract` <
 `Normative Specification` < `Architecture Standard` < `Constitution (Supreme)`.
+
+A **Development Directive** (`DD-NNN`) is a process-governance artifact: it governs
+*how* development proceeds rather than *what* is built. It derives authority from
+the Constitution and an Architecture Standard, and SHALL NOT override a
+Specification's normative content.
 
 An artifact SHALL NOT claim authority above the layer that defines it, and SHALL
 NOT make a lower layer authoritative over it.

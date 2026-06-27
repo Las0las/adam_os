@@ -39,6 +39,7 @@ a specification disagree, the specification governs.
 | `constitution/` | The frozen LAWRENCE Constitution v1.0 (supreme authority). |
 | `standards/` | Architecture Standards (AS-001 Inference Operating System). |
 | `specifications/` | Normative Specifications (IOS-001 … IOS-007) + `_TEMPLATE.md`. |
+| `directives/` | Development Directives (DD-001 Specification-First Development) + `_TEMPLATE.md`. |
 | `adr/` | Architecture Decision Records + `_TEMPLATE.md`. |
 | `contracts/` | Public Contract index (interfaces consumers depend on). |
 | `conformance/` | The Conformance Framework definition. |
@@ -60,6 +61,12 @@ a specification disagree, the specification governs.
 | IOS-007 | Cache Platform | 7.0, 7.5 |
 
 ## Working Under Governance (from Milestone 8.0 onward)
+
+Day-to-day development is governed by **DD-001 — Specification-First Development**
+(`directives/DD-001-specification-first-development.md`): implementation
+originates from an approved specification, references a specification identifier
+(not a milestone), preserves conformance, and never redesigns architecture without
+an approved ADR.
 
 Every significant change SHALL begin with a versioned Specification and, where it
 establishes or changes architecture, an ADR — **before** code. The flow is:
