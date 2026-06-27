@@ -167,6 +167,11 @@ Unregistered relationship types are never rejected.
   ONT-002, AS-005, the registry, and warn-only validation).
 - **ADR-0008** — Relationship enforce-mode (opt-in, fail-closed; default warn;
   parallel to the object enforcement of ADR-0006).
+- **ADR-0009** — Enterprise Graph Integrity Engine. Validates the whole graph
+  (required relationships, cardinality, orphans, cycles, duplicate edges, illegal
+  paths, reachability, policy) *above* per-edge relationship validation; same
+  warn/enforce posture, on-demand. Per-relationship validation (ONT-002) and
+  graph-level validation (ADR-0009) are complementary layers.
 
 ## Conformance requirements
 
