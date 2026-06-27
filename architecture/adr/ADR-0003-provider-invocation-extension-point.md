@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | Identifier | ADR-0003 |
-| Status | Accepted |
+| Status | Closed |
 | Date | 2026-06-27 |
 | Owner | LAWRENCE Architecture Council |
 | Affected Artifacts | IOS-004 Execution Pipeline (revised to v1.1), IOS-010+ (consumers) |
@@ -19,9 +19,12 @@ mechanism. Retry Policy (IOS-010) is merely its first consumer.
 
 ## Status
 
-Accepted. (Approved by the LAWRENCE Architecture Council under the Architectural
-Evolution Policy — a change to a Public Contract proceeds through an ADR +
-Specification revision.)
+**Closed.** Accepted and implemented (IOS-004 revised to v1.1; AS-001 R9 established
+the general AroundInvoke execution contract; IOS-010 ships as the first consumer;
+architecture conformance tests pass). The IOS execution-extension architecture is
+considered complete: no further execution extension point SHALL be introduced
+unless a future specification demonstrates, through constitutional governance, that
+an existing published extension contract is insufficient.
 
 ## Context
 
