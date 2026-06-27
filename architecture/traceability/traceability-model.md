@@ -87,3 +87,4 @@ governance feedback loop that keeps the architecture stable yet improvable.
 | IOS-016 | Constitution v1.0, AS-001 | ADR-0001 | `src/lib/aiops/replay/*` |
 | IOS-017 | Constitution v1.0, AS-001 | ADR-0001 | `src/lib/aiops/evaluation/*` |
 | IOS-018 | Constitution v1.0, AS-001 (impl IOS-002) | ADR-0001 | `src/lib/aiops/capability/*` |
+| IOS-019 | Constitution v1.0, AS-001 | ADR-0001 | `src/lib/aiops/recommendation/*` |
