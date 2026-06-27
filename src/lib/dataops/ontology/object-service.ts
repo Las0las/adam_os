@@ -7,7 +7,9 @@ import { requirePermission } from "@/lib/lawrence-core/permissions/permissions";
 import { emitAudit } from "@/lib/lawrence-core/audit/audit-service";
 import { schemaFor } from "./schemas/registry";
 import { validateCanonicalObject } from "./schemas/validate";
-import type { CanonicalObjectInput } from "./schemas/types";
+import { resolveEnforcementMode } from "./schemas/enforcement";
+import { OntologySchemaError } from "./schemas/errors";
+import type { CanonicalObjectInput, Violation } from "./schemas/types";
 import type { ActorContext } from "@/types/platform";
 import type { OntologyObject, OntologyLink } from "@/types/dataops";
 
@@ -72,8 +74,9 @@ export async function upsertObject(ctx: ActorContext, input: UpsertObjectInput):
       existing.properties,
       input.appendLedger,
     );
-    // Warn-only canonical-schema check on the effective (post-merge) object.
-    await warnOnSchemaViolations(ctx, {
+    // Canonical-schema check on the effective (post-merge) object. Warns or
+    // rejects per the tenant's enforcement mode (default warn).
+    await checkCanonicalSchema(ctx, {
       objectType: input.objectType,
       externalKey: input.externalKey ?? existing.externalKey,
       title: effTitle,
@@ -92,8 +95,9 @@ export async function upsertObject(ctx: ActorContext, input: UpsertObjectInput):
 
   const ts = now();
   const createdProperties = applyLedgers(input.properties ?? {}, {}, input.appendLedger);
-  // Warn-only canonical-schema check on the object about to be created.
-  await warnOnSchemaViolations(ctx, {
+  // Canonical-schema check on the object about to be created. Warns or rejects
+  // per the tenant's enforcement mode (default warn).
+  await checkCanonicalSchema(ctx, {
     objectType: input.objectType,
     externalKey: input.externalKey ?? null,
     title: input.title ?? null,
@@ -116,22 +120,46 @@ export async function upsertObject(ctx: ActorContext, input: UpsertObjectInput):
 }
 
 /**
- * Warn-only canonical-object validation (ONT-001 §C). If a schema is registered
- * for the objectType and the effective object violates it, emit an
- * `ontology.schema.warning` audit event — but NEVER block, reject, or fail the
- * write. Fail-open: any error here is swallowed so schema observation can never
- * turn a successful write into a failure (Constitution Article IV). Promotion to
- * reject-mode is gated behind an ADR (see ONT-001 / the schema-registry design).
+ * Canonical-object schema check (ONT-001 §C, ADR-0006). Runs before persistence
+ * on the effective object:
+ *
+ *  - Unregistered objectType → no-op (unaffected).
+ *  - No violations → no-op.
+ *  - WARN mode (default): emit an `ontology.schema.warning` audit event and
+ *    proceed. Fail-open — the emit is best-effort and SHALL NOT turn a successful
+ *    write into a failure (Constitution Article IV).
+ *  - ENFORCE mode (explicitly enabled per tenant/global/env): emit an
+ *    `ontology.schema.rejected` audit event (best-effort) and THROW
+ *    OntologySchemaError, so the caller's write never persists. Fail-closed.
+ *
+ * Validation and mode resolution are total (never throw), so the only error this
+ * can raise is the deliberate OntologySchemaError in enforce mode.
  */
-async function warnOnSchemaViolations(ctx: ActorContext, effective: CanonicalObjectInput): Promise<void> {
+async function checkCanonicalSchema(ctx: ActorContext, effective: CanonicalObjectInput): Promise<void> {
+  const schema = schemaFor(effective.objectType);
+  if (!schema) return;
+  const violations = validateCanonicalObject(schema, effective);
+  if (violations.length === 0) return;
+
+  const mode = resolveEnforcementMode(ctx.tenantId);
+  if (mode === "enforce") {
+    await safeEmitSchemaEvent(ctx, "ontology.schema.rejected", effective, violations);
+    throw new OntologySchemaError(effective.objectType, effective.externalKey ?? null, violations);
+  }
+  await safeEmitSchemaEvent(ctx, "ontology.schema.warning", effective, violations);
+}
+
+/** Best-effort schema audit emit. Never throws, never alters the write outcome. */
+async function safeEmitSchemaEvent(
+  ctx: ActorContext,
+  action: "ontology.schema.warning" | "ontology.schema.rejected",
+  effective: CanonicalObjectInput,
+  violations: Violation[],
+): Promise<void> {
   try {
-    const schema = schemaFor(effective.objectType);
-    if (!schema) return;
-    const violations = validateCanonicalObject(schema, effective);
-    if (violations.length === 0) return;
     await emitAudit(
       ctx,
-      "ontology.schema.warning",
+      action,
       { type: effective.objectType, id: effective.externalKey ?? null },
       {
         objectType: effective.objectType,
@@ -140,7 +168,7 @@ async function warnOnSchemaViolations(ctx: ActorContext, effective: CanonicalObj
       },
     );
   } catch {
-    // Warn-only: schema validation SHALL NOT block or fail a write.
+    // Auditing the check SHALL NOT block or fail the operation.
   }
 }
 
