@@ -35,7 +35,7 @@ suite) SHALL declare a metadata header with:
 ```
 Draft → Active ┬→ Superseded
                └→ Frozen        (Constitution only)
-ADR: Proposed → Accepted | Rejected → Superseded
+ADR: Proposed → Accepted → Closed (implemented & merged) | Rejected | Superseded
 ```
 
 A `Superseded` artifact SHALL name its successor in `supersededBy` and SHALL be

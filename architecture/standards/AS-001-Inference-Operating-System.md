@@ -61,6 +61,14 @@ as they consume the IOS public contracts.
 - **R8 (Specification-First).** Each IOS subsystem SHALL be defined by a versioned
   Normative Specification; implementations SHALL derive authority only through the
   Constitution and this Standard.
+- **R9 (Provider-Invocation Contract).** Execution middleware MAY participate in
+  provider invocation through the general **AroundInvoke** execution contract
+  defined by IOS-004. This contract is provider-independent and SHALL be used by
+  execution-control middleware that requires provider invocation governance. It is
+  a permanent, general execution extension point — not a retry-specific mechanism:
+  IOS-010 (Retry Policy) is its first consumer, and execution-control middleware
+  such as IOS-011 (Circuit Breaker), IOS-012 (Fallback Orchestrator), and IOS-013
+  (Provider Health Manager) SHALL reuse it without further architectural change.
 
 ## 4. Governed Specifications
 
