@@ -22,6 +22,7 @@ import { installBenchmarkHarness } from "@/lib/aiops/benchmark/benchmark-bootstr
 import { installExplainabilityEngine } from "@/lib/aiops/explainability/explainability-bootstrap";
 import { installTrafficReplay } from "@/lib/aiops/replay/replay-bootstrap";
 import { installEvaluationEngine } from "@/lib/aiops/evaluation/evaluation-bootstrap";
+import { installModelCapabilityRegistry } from "@/lib/aiops/capability/capability-bootstrap";
 import { registerSource, ingestAsset } from "@/lib/dataops/sources/source-service";
 import { runAssetPipeline } from "@/lib/dataops/pipelines/pipeline-runner";
 import { indexEvidence } from "@/lib/dataops/evidence/chunking-service";
@@ -165,6 +166,13 @@ async function initRuntime(): Promise<void> {
   // contaminated. Observational: no routing, no target authorization, no direct
   // provider invocation. Default policy DISABLED.
   installEvaluationEngine();
+  // Install the Model Capability Registry (IOS-018) — the canonical producer of
+  // ModelCapability/ModelDescriptor metadata, implementing the IOS-002 contract.
+  // Declarative: it registers NO execution hook, changes no execution behavior,
+  // and does NOT influence routing (routing keeps consuming capability metadata
+  // via the existing IOS-001/002 contracts). Populated on demand from published
+  // provider declarations.
+  installModelCapabilityRegistry();
   if (shouldAutoSeedDemo()) {
     await bootstrap();
     return;
