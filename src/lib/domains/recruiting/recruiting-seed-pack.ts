@@ -129,7 +129,15 @@ export const recruitingSeedPack: DomainSeedPack = {
       externalKey: "sub-marcus-powerbi",
       title: "Marcus Chen → Sr. Power BI Developer",
       status: "submitted",
-      properties: { candidateId: "cand-marcus", jobId: "job-powerbi" },
+      properties: {
+        // Canonical ONT-001 keys.
+        jobKey: "job-powerbi",
+        candidateKey: "cand-marcus",
+        stage: "submitted",
+        // Legacy aliases retained for backward compatibility (documented shim).
+        candidateId: "cand-marcus",
+        jobId: "job-powerbi",
+      },
     },
   ],
 };

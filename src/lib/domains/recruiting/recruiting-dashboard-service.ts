@@ -33,8 +33,10 @@ export async function getRecruitingDashboard(ctx: ActorContext): Promise<DomainD
       nextAction: "needs_review",
     }));
 
-  // Shortlist recommendations: Submissions in the shortlisted stage.
-  const shortlisted = submissions.filter((s) => s.status === "shortlisted");
+  // Shortlist recommendations: shortlist-originated Submissions. Marked by the
+  // shortlist action's `shortlisted` property (their canonical ONT-001 status is
+  // the CandidateStage "submitted", so we filter on the marker, not the status).
+  const shortlisted = submissions.filter((s) => s.properties?.shortlisted === true);
   const shortlistItems: DomainDashboardCard["items"] = shortlisted.map((s) => ({
     objectId: s.id,
     title: s.title ?? s.id,
