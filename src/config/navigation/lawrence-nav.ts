@@ -37,6 +37,7 @@ export const lawrenceNav: NavSection[] = [
   {
     title: "Studios",
     items: [
+      { label: "LIS Workspace (Consolidated)", href: "/lis" },
       { label: "Enterprise Object Runtime", href: "/runtime-console" },
       { label: "Workspace Shell (Canvas · Shelf)", href: "/workspace-shell" },
       { label: "Navigation Mesh (Rail · Tabs · Omnibar)", href: "/nav-mesh" },

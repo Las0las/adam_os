@@ -13,13 +13,21 @@
 import { useEffect, useId, useRef, useState } from "react";
 import "./nav-mesh.css";
 import { Icon } from "./icons";
-import { InlineProjector, type InlineStatus } from "./inline-projector";
+import { InlineProjector } from "./inline-projector";
+import { LiveGrid } from "./live-grid";
+import {
+  runtimeStore,
+  useRuntimeInstance,
+  useRuntimeObject,
+  useRuntimeProjection,
+} from "./runtime-store";
 import {
   ALL_SURFACES,
   OBJECTS,
   SURFACE_META,
   useNavStore,
   type CanonicalSurface,
+  type EnterpriseObject,
 } from "./nav-store";
 
 export function NavMesh() {
@@ -29,6 +37,15 @@ export function NavMesh() {
   const mountedInstances = useNavStore((s) => s.mountedInstances);
   const activeId = useNavStore((s) => s.activeId);
   const setSurface = useNavStore((s) => s.setSurface);
+
+  const [toast, setToast] = useState<string | null>(null);
+  const [compareIds, setCompareIds] = useState<string[] | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = (msg: string) => {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 4200);
+  };
 
   // Global hotkeys: Alt+1..6 cycle the pinned surfaces.
   useEffect(() => {
@@ -77,7 +94,14 @@ export function NavMesh() {
               surfaceId={surface}
               active={activeSurface === surface}
             >
-              <SurfaceContent surface={surface} instanceId={activeId} label={activeLabel} />
+              <SurfaceContent
+                surface={surface}
+                instanceId={activeId}
+                label={activeLabel}
+                object={activeObject}
+                onCompare={(ids) => setCompareIds(ids)}
+                onToast={showToast}
+              />
             </SurfaceProjectionContainer>
           ))}
           <div className="lis-mesh-cachenote">
@@ -85,6 +109,77 @@ export function NavMesh() {
             {ALL_SURFACES.length} surfaces mounted (state preserved)
           </div>
         </main>
+      </div>
+
+      {toast && (
+        <div className="lis-mesh-toast" role="status">
+          <Icon name="check" size={15} /> {toast}
+          <button
+            type="button"
+            className="lis-mesh-toast-undo"
+            onClick={() => {
+              const rev = runtimeStore.revertLast();
+              showToast(rev ? rev.summary : "Nothing to revert");
+            }}
+          >
+            Undo
+          </button>
+        </div>
+      )}
+
+      {compareIds && <CompareOverlay ids={compareIds} onClose={() => setCompareIds(null)} />}
+    </div>
+  );
+}
+
+// ── Compare overlay (multi-select → side-by-side) ────────────────────────────
+function CompareOverlay({ ids, onClose }: { ids: string[]; onClose: () => void }) {
+  const all = useRuntimeProjection();
+  const items = all.filter((i) => ids.includes(i.id));
+  return (
+    <div className="lis-cmp-scrim" onClick={onClose}>
+      <div
+        className="lis-cmp"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Compare objects"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="lis-cmp-head">
+          <span>Compare · {items.length} objects</span>
+          <button type="button" className="lis-cmp-x lis-focusable" onClick={onClose} aria-label="Close">
+            <Icon name="close" size={16} />
+          </button>
+        </header>
+        <div className="lis-cmp-grid" style={{ gridTemplateColumns: `160px repeat(${items.length}, 1fr)` }}>
+          <span className="lis-cmp-rowlabel">Instance</span>
+          {items.map((i) => (
+            <span key={i.id} className="lis-cmp-cell lis-cmp-name">{i.label}</span>
+          ))}
+          <span className="lis-cmp-rowlabel">Detail</span>
+          {items.map((i) => (
+            <span key={i.id} className="lis-cmp-cell">{i.detail}</span>
+          ))}
+          <span className="lis-cmp-rowlabel">Stage</span>
+          {items.map((i) => (
+            <span key={i.id} className="lis-cmp-cell">{i.stage ?? "—"}</span>
+          ))}
+          <span className="lis-cmp-rowlabel">{items[0]?.metricLabel ?? "Metric"}</span>
+          {items.map((i) => (
+            <span key={i.id} className={`lis-cmp-cell t-${i.tone}`}>
+              {i.metricValue}
+              {i.metricUnit}
+            </span>
+          ))}
+          <span className="lis-cmp-rowlabel">Approved</span>
+          {items.map((i) => (
+            <span key={i.id} className="lis-cmp-cell">{i.approved ? "Yes" : "No"}</span>
+          ))}
+          <span className="lis-cmp-rowlabel">Tags</span>
+          {items.map((i) => (
+            <span key={i.id} className="lis-cmp-cell">{i.tags.join(", ") || "—"}</span>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -99,24 +194,44 @@ function LeftWorkspaceRail() {
       <div className="lis-rail-mark" title="LAWRENCE">
         <Icon name="command" size={18} />
       </div>
-      {OBJECTS.map((o) => {
-        const active = activeObject === o.id;
-        return (
-          <button
-            key={o.id}
-            type="button"
-            className={`lis-rail-btn lis-focusable${active ? " active" : ""}`}
-            title={o.label}
-            aria-label={o.label}
-            aria-current={active ? "true" : undefined}
-            onClick={() => pivotTo(o.id, o.rootId, o.rootLabel)}
-          >
-            <Icon name={o.icon} size={20} />
-            {active && <span className="lis-rail-active" aria-hidden />}
-          </button>
-        );
-      })}
+      {OBJECTS.map((o) => (
+        <RailButton key={o.id} object={o.id} icon={o.icon} label={o.label} rootId={o.rootId} rootLabel={o.rootLabel} active={activeObject === o.id} onPivot={pivotTo} />
+      ))}
     </nav>
+  );
+}
+
+function RailButton({
+  object,
+  icon,
+  label,
+  rootId,
+  rootLabel,
+  active,
+  onPivot,
+}: {
+  object: EnterpriseObject;
+  icon: import("./icons").IconName;
+  label: string;
+  rootId: string;
+  rootLabel: string;
+  active: boolean;
+  onPivot: (o: EnterpriseObject, id: string, label: string) => void;
+}) {
+  const count = useRuntimeObject(object).length;
+  return (
+    <button
+      type="button"
+      className={`lis-rail-btn lis-focusable${active ? " active" : ""}`}
+      title={`${label} · ${count}`}
+      aria-label={`${label}, ${count} objects`}
+      aria-current={active ? "true" : undefined}
+      onClick={() => onPivot(object, rootId, rootLabel)}
+    >
+      <Icon name={icon} size={20} />
+      {count > 0 && <span className="lis-rail-count">{count}</span>}
+      {active && <span className="lis-rail-active" aria-hidden />}
+    </button>
   );
 }
 
@@ -336,23 +451,23 @@ function SurfaceContent({
   surface,
   instanceId,
   label,
+  object,
+  onCompare,
+  onToast,
 }: {
   surface: CanonicalSurface;
   instanceId: string;
   label: string;
+  object: EnterpriseObject;
+  onCompare: (ids: string[]) => void;
+  onToast: (msg: string) => void;
 }) {
   if (surface === "overview") {
-    return (
-      <div className="lis-pane lis-pane-pad">
-        <h2 className="lis-pane-h">{label} · Overview</h2>
-        <p className="lis-pane-sub">Projected from the canonical graph — read-only.</p>
-        <div className="lis-pane-card">Status: synced via Core Ledger · contract {instanceId}</div>
-      </div>
-    );
+    return <OverviewSurface instanceId={instanceId} label={label} />;
   }
 
   if (surface === "grid") {
-    return <StreamingGrid />;
+    return <LiveGrid object={object} onCompare={onCompare} onToast={onToast} />;
   }
 
   if (surface === "document") {
@@ -369,45 +484,38 @@ function SurfaceContent({
   );
 }
 
-// Grid that demonstrates Pattern 2 ghost/optimistic streaming inline.
-function StreamingGrid() {
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setTick((n) => (n + 1) % 4), 1400);
-    return () => clearInterval(t);
-  }, []);
-  const status: InlineStatus = (["idle", "streaming", "optimistic", "idle"] as const)[tick]!;
-  const rows = [
-    { field: "Pipeline throughput", base: "1,420 items/sec", proj: "1,512 items/sec", delta: "+4.2%", tone: "good" },
-    { field: "Skills match", base: "91%", proj: "94%", delta: "+3.0%", tone: "good" },
-    { field: "Memory heap", base: "412.8 MB", proj: "412.8 MB", delta: "Stable", tone: "muted" },
-  ];
+// Overview reads the active instance live from the event-sourced store.
+function OverviewSurface({ instanceId, label }: { instanceId: string; label: string }) {
+  const inst = useRuntimeInstance(instanceId);
   return (
     <div className="lis-pane lis-pane-pad">
-      <div className="lis-grid">
-        <div className="lis-grid-head">
-          <span>Metric field</span>
-          <span>Runtime aggregation</span>
-          <span>Delta</span>
-        </div>
-        {rows.map((r, i) => (
-          <div className="lis-grid-row" key={r.field}>
-            <span>{r.field}</span>
-            <span className="lis-grid-val">
-              <InlineProjector
-                baseValue={r.base}
-                projectedValue={r.proj}
-                status={i === 2 ? "idle" : status}
-              />
+      <h2 className="lis-pane-h">{label} · Overview</h2>
+      <p className="lis-pane-sub">Projected live from the append-only event log — read-only here.</p>
+      {inst ? (
+        <div className="lis-ov-cards">
+          <div className="lis-ov-card">
+            <span className="lis-ov-k">{inst.metricLabel}</span>
+            <span className={`lis-ov-v t-${inst.tone}`}>
+              {inst.metricValue}
+              {inst.metricUnit}
             </span>
-            <span className={`lis-grid-delta t-${r.tone}`}>{r.delta}</span>
           </div>
-        ))}
-      </div>
-      <p className="lis-pane-sub" style={{ marginTop: 12 }}>
-        Live: values stream in as ghost text, then project as a speculative diff — zero layout
-        thrash. Scroll position and this ticker survive a lens switch.
-      </p>
+          <div className="lis-ov-card">
+            <span className="lis-ov-k">Stage</span>
+            <span className="lis-ov-v">{inst.stage ?? "—"}</span>
+          </div>
+          <div className="lis-ov-card">
+            <span className="lis-ov-k">Status</span>
+            <span className="lis-ov-v">{inst.approved ? "Approved" : "In flight"}</span>
+          </div>
+          <div className="lis-ov-card lis-ov-card-wide">
+            <span className="lis-ov-k">Tags</span>
+            <span className="lis-ov-v">{inst.tags.join(" · ") || "None"}</span>
+          </div>
+        </div>
+      ) : (
+        <div className="lis-pane-card">Status: synced via Core Ledger · contract {instanceId}</div>
+      )}
     </div>
   );
 }
