@@ -1,0 +1,338 @@
+/* ───────────────────────────────────────────────────────────────────────────
+   LIS-002 — Canvas vs. Shelf layout shell
+   IDE-grade layout engine. The Canvas owns the viewport; the Shelf (rails) keep
+   a 40px icon-only baseline and expand either as an OVERLAY (floats over the
+   canvas, no reflow) or in FLEX (grid tracks grow, hard overflow containment).
+   Self-contained: re-declares the LIS motion tokens so the shell works anywhere.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Registered so grid-track length vars animate smoothly between 40px ↔ open. */
+@property --lis-lc {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 40px;
+}
+@property --lis-rc {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 40px;
+}
+@property --lis-br {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 40px;
+}
+
+.lis-shell {
+  /* Motion tokens (mirror LIS-001 so the shell is self-contained). */
+  --lis-dur-fast: 140ms;
+  --lis-dur-base: 220ms;
+  --lis-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --lis-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* Surfaces */
+  --shell-bg: #06141f;
+  --shell-canvas: #08202e;
+  --shell-rail: #081a27;
+  --shell-line: rgba(120, 170, 190, 0.16);
+  --shell-line-strong: rgba(120, 170, 190, 0.32);
+  --shell-ink: #dce8ef;
+  --shell-muted: #7d99a8;
+  --shell-accent: #44b0b1;
+
+  /* Track + panel sizing (driven inline from React state). */
+  --lis-lc: 40px;
+  --lis-rc: 40px;
+  --lis-br: 40px;
+  --lis-l-size: 264px;
+  --lis-r-size: 340px;
+  --lis-b-size: 220px;
+
+  position: relative;
+  inline-size: 100%;
+  block-size: 100%;
+  display: grid;
+  grid-template-columns: var(--lis-lc) minmax(0, 1fr) var(--lis-rc);
+  grid-template-rows: minmax(0, 1fr) var(--lis-br);
+  grid-template-areas:
+    "left canvas right"
+    "left bottom right";
+  background: var(--shell-bg);
+  color: var(--shell-ink);
+  overflow: hidden;
+  font-family: var(--font-poppins, "Poppins", system-ui, sans-serif);
+  transition:
+    --lis-lc var(--lis-dur-base) var(--lis-ease-in-out),
+    --lis-rc var(--lis-dur-base) var(--lis-ease-in-out),
+    --lis-br var(--lis-dur-base) var(--lis-ease-in-out);
+}
+
+/* During an active drag, tracking must be 1:1 — kill the easing. */
+.lis-shell[data-dragging="true"] {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lis-shell,
+  .lis-shell * {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+  }
+}
+
+/* ── Canvas ──────────────────────────────────────────────────────────────── */
+.lis-canvas {
+  grid-area: canvas;
+  position: relative;
+  min-inline-size: 0;
+  min-block-size: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden; /* hard structural containment */
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(68, 176, 177, 0.06), transparent 60%),
+    var(--shell-canvas);
+  padding: 18px;
+}
+.lis-canvas-frame {
+  inline-size: 100%;
+  block-size: 100%;
+  min-inline-size: 0;
+  min-block-size: 0;
+  display: flex;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+/* ── Rails (shared) ──────────────────────────────────────────────────────── */
+.lis-rail {
+  position: relative;
+  display: flex;
+  background: var(--shell-rail);
+  overflow: hidden;
+  min-inline-size: 0;
+}
+.lis-rail-left {
+  grid-area: left;
+  flex-direction: row;
+  border-inline-end: 1px solid var(--shell-line);
+}
+.lis-rail-right {
+  grid-area: right;
+  flex-direction: row; /* panel first, strip flush to the right edge */
+  border-inline-start: 1px solid var(--shell-line);
+}
+
+/* Icon strip — the always-on 40px Shelf baseline. */
+.lis-strip {
+  flex: 0 0 40px;
+  inline-size: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  background: var(--shell-rail);
+  z-index: 2;
+}
+.lis-rail-left .lis-strip {
+  border-inline-end: 1px solid var(--shell-line);
+}
+.lis-rail-right {
+  flex-direction: row-reverse;
+}
+.lis-rail-right .lis-strip {
+  border-inline-start: 1px solid var(--shell-line);
+}
+
+.lis-strip-btn {
+  inline-size: 28px;
+  block-size: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--shell-muted);
+  cursor: pointer;
+  transition:
+    background var(--lis-dur-fast) var(--lis-ease-out),
+    color var(--lis-dur-fast) var(--lis-ease-out),
+    border-color var(--lis-dur-fast) var(--lis-ease-out);
+}
+.lis-strip-btn:hover {
+  background: rgba(68, 176, 177, 0.12);
+  color: var(--shell-ink);
+}
+.lis-strip-btn[data-active="true"] {
+  background: rgba(68, 176, 177, 0.16);
+  color: var(--shell-accent);
+  border-color: rgba(68, 176, 177, 0.4);
+}
+.lis-strip-btn:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--shell-rail),
+    0 0 0 4px rgba(68, 176, 177, 0.9);
+}
+.lis-strip-spacer {
+  flex: 1 1 auto;
+}
+.lis-strip-tick {
+  inline-size: 4px;
+  block-size: 4px;
+  border-radius: 50%;
+  background: var(--shell-accent);
+  opacity: 0.5;
+}
+
+/* Expanding panel — holds the caller's rail node. */
+.lis-panel {
+  position: relative;
+  overflow: hidden;
+  background: var(--shell-rail);
+  min-inline-size: 0;
+}
+.lis-panel-inner {
+  block-size: 100%;
+  overflow: auto;
+}
+.lis-panel-left {
+  inline-size: var(--lis-l-size);
+}
+.lis-panel-right {
+  inline-size: var(--lis-r-size);
+}
+.lis-rail[data-open="false"] .lis-panel {
+  display: none;
+}
+
+/* OVERLAY mode: rail track stays 40px, panel floats over the canvas. */
+.lis-rail[data-overlay="true"][data-open="true"] {
+  overflow: visible;
+}
+.lis-rail-left[data-overlay="true"][data-open="true"] .lis-panel {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 40px;
+  z-index: 40;
+  border-inline-end: 1px solid var(--shell-line-strong);
+  box-shadow: 18px 0 40px -12px rgba(0, 0, 0, 0.6);
+  animation: lis-slide-in-l var(--lis-dur-base) var(--lis-ease-out);
+}
+.lis-rail-right[data-overlay="true"][data-open="true"] .lis-panel {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 40px;
+  z-index: 40;
+  border-inline-start: 1px solid var(--shell-line-strong);
+  box-shadow: -18px 0 40px -12px rgba(0, 0, 0, 0.6);
+  animation: lis-slide-in-r var(--lis-dur-base) var(--lis-ease-out);
+}
+
+/* ── Bottom terminal ─────────────────────────────────────────────────────── */
+.lis-rail-bottom {
+  grid-area: bottom;
+  flex-direction: column;
+  border-block-start: 1px solid var(--shell-line);
+}
+.lis-bar {
+  flex: 0 0 40px;
+  block-size: 40px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  background: var(--shell-rail);
+  z-index: 2;
+}
+.lis-bar-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--shell-muted);
+}
+.lis-rail-bottom .lis-panel {
+  order: -1; /* content sits above the bar so it grows upward */
+  block-size: var(--lis-b-size);
+  inline-size: 100%;
+  border-block-end: 1px solid var(--shell-line);
+}
+.lis-rail-bottom[data-overlay="true"][data-open="true"] {
+  overflow: visible;
+}
+.lis-rail-bottom[data-overlay="true"][data-open="true"] .lis-panel {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 40px;
+  z-index: 40;
+  box-shadow: 0 -18px 40px -12px rgba(0, 0, 0, 0.6);
+  animation: lis-slide-in-b var(--lis-dur-base) var(--lis-ease-out);
+}
+
+/* ── Resize handles ──────────────────────────────────────────────────────── */
+.lis-resize {
+  position: absolute;
+  z-index: 6;
+  background: transparent;
+  transition: background var(--lis-dur-fast) var(--lis-ease-out);
+}
+.lis-resize:hover,
+.lis-resize[data-dragging="true"] {
+  background: rgba(68, 176, 177, 0.5);
+}
+.lis-resize-x {
+  inset-block: 0;
+  inline-size: 6px;
+  cursor: col-resize;
+}
+.lis-resize-y {
+  inset-inline: 0;
+  block-size: 6px;
+  cursor: row-resize;
+}
+.lis-panel-left .lis-resize-x {
+  inset-inline-end: -3px;
+}
+.lis-panel-right .lis-resize-x {
+  inset-inline-start: -3px;
+}
+.lis-rail-bottom .lis-resize-y {
+  inset-block-start: -3px;
+}
+
+/* ── Overlay scrim (overlay mode only) ───────────────────────────────────── */
+.lis-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: rgba(3, 12, 20, 0.32);
+  border: 0;
+  cursor: pointer;
+  animation: lis-fade-in var(--lis-dur-fast) var(--lis-ease-out);
+}
+
+@keyframes lis-slide-in-l {
+  from {
+    transform: translateX(-12px);
+    opacity: 0;
+  }
+}
+@keyframes lis-slide-in-r {
+  from {
+    transform: translateX(12px);
+    opacity: 0;
+  }
+}
+@keyframes lis-slide-in-b {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+}
+@keyframes lis-fade-in {
+  from {
+    opacity: 0;
+  }
+}
