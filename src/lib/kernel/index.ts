@@ -66,3 +66,11 @@ export type {
   ConformanceFinding,
   ReplaySupport,
 } from "./runtime-conformance";
+export { verifyReconstructability } from "./reconstructability";
+export type {
+  ReconstructionReport,
+  CanonicalSource,
+  CanonicalSourceId,
+  HiddenStateRisk,
+  ReconstructabilityInput,
+} from "./reconstructability";

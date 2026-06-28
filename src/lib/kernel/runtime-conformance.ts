@@ -49,6 +49,16 @@ export interface RuntimeDescriptor {
   recovery: string;
   /** Whether its effects can be replayed from the journal. */
   replaySupport: ReplaySupport;
+  /** Whether the runtime is a pure function of its inputs. A nondeterministic
+   *  runtime cannot be replayed bit-for-bit and is flagged as a hidden-state
+   *  risk by the SB-7 reconstructability verifier. */
+  determinism: "deterministic" | "nondeterministic";
+  /** Host capabilities the runtime requires to execute (e.g. "clock", "network",
+   *  "none"). Declared so installers can reason about portability. */
+  hostRequirements: string[];
+  /** Named conformance assertions this runtime claims to satisfy. The validator
+   *  checks the contract is non-empty; a real suite would execute each one. */
+  conformanceSuite: string[];
   /** Current health. */
   health: "healthy" | "degraded" | "down";
 }
@@ -96,6 +106,9 @@ export const RUNTIME_DESCRIPTORS: RuntimeDescriptor[] = [
     failureModes: ["unratified article", "missing evidence"],
     recovery: "fail closed — deny",
     replaySupport: "full",
+    determinism: "deterministic",
+    hostRequirements: ["none"],
+    conformanceSuite: ["evaluates without side effects", "denies on missing evidence"],
     health: "healthy",
   },
   {
@@ -110,6 +123,9 @@ export const RUNTIME_DESCRIPTORS: RuntimeDescriptor[] = [
     failureModes: ["denied authority", "expired token"],
     recovery: "fail closed — throw AuthorityDeniedError",
     replaySupport: "full",
+    determinism: "deterministic",
+    hostRequirements: ["clock"],
+    conformanceSuite: ["never issues without a constitutional decision", "journals every grant and denial"],
     health: "healthy",
   },
   {
@@ -124,6 +140,9 @@ export const RUNTIME_DESCRIPTORS: RuntimeDescriptor[] = [
     failureModes: ["plan for ungranted authority"],
     recovery: "fail closed — throw before planning",
     replaySupport: "full",
+    determinism: "deterministic",
+    hostRequirements: ["none"],
+    conformanceSuite: ["plan is a pure function of intent + authority", "refuses to plan ungranted authority"],
     health: "healthy",
   },
   {
@@ -138,6 +157,9 @@ export const RUNTIME_DESCRIPTORS: RuntimeDescriptor[] = [
     failureModes: ["missing projection definition", "missing authority"],
     recovery: "fail closed — deny resolution",
     replaySupport: "full",
+    determinism: "deterministic",
+    hostRequirements: ["none"],
+    conformanceSuite: ["resolves only registered projections", "carries authority onto the plan"],
     health: "healthy",
   },
   {
@@ -152,6 +174,9 @@ export const RUNTIME_DESCRIPTORS: RuntimeDescriptor[] = [
     failureModes: ["missing authority", "snapshot drift"],
     recovery: "gate intents disabled when authority withheld",
     replaySupport: "full",
+    determinism: "deterministic",
+    hostRequirements: ["none"],
+    conformanceSuite: ["composeRenderPlan is pure", "identical inputs yield identical plan fingerprint"],
     health: "healthy",
   },
 ];
@@ -175,6 +200,20 @@ export function validateConformance(now: string = new Date().toISOString()): Con
       article: "Runtime Conformance",
       ok: Boolean(d.runtimeVersion && d.inputs.length >= 0 && d.outputs.length > 0 && d.recovery),
       detail: `version ${d.runtimeVersion}, ${d.outputs.length} output(s), replay=${d.replaySupport}`,
+    });
+
+    // Article: Runtime Contract Completeness — the formal contract (v1.3 #6) must
+    // declare determinism, host requirements, and a conformance suite, so a
+    // runtime is independently replaceable and reasoned about before install.
+    const contractComplete =
+      Boolean(d.determinism) && d.hostRequirements.length > 0 && d.conformanceSuite.length > 0;
+    findings.push({
+      runtimeId: d.runtimeId,
+      article: "Runtime Contract Completeness",
+      ok: contractComplete,
+      detail: contractComplete
+        ? `${d.determinism}, host=[${d.hostRequirements.join(", ")}], ${d.conformanceSuite.length} assertion(s)`
+        : "incomplete contract — missing determinism, host requirements, or conformance suite",
     });
 
     // Article: Acyclic hierarchy — every dependency must resolve and point

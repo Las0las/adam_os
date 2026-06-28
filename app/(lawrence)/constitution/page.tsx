@@ -6,8 +6,14 @@
 
 import { getConstitution, projectHeadline, toConstitutionView } from "@/lib/constitution";
 import { liveSampleDecisions } from "@/lib/constitution/sample-decisions";
-import { liveSampleAuthorities, liveSampleDecision, validateConformance, getJournalDescending } from "@/lib/kernel";
-import { proveReplayDeterminism } from "@/lib/projection-runtime";
+import {
+  liveSampleAuthorities,
+  liveSampleDecision,
+  validateConformance,
+  verifyReconstructability,
+  getJournalDescending,
+} from "@/lib/kernel";
+import { proveReplayDeterminism, listEnterpriseObjects, listProjections } from "@/lib/projection-runtime";
 import { ConstitutionLenses } from "@/components/lawrence/constitution/ConstitutionLenses";
 import { PageHeader } from "@/components/lawrence/shared/widgets";
 
@@ -31,6 +37,15 @@ export default function ConstitutionPage() {
   const conformance = validateConformance();
   const decisionPlan = liveSampleDecision();
   const replay = proveReplayDeterminism();
+  // SB-7 — prove the platform can rebuild its complete executable state from the
+  // five canonical sources alone. Run LAST, after the runtime exercises above
+  // have populated the journal, and inject the sources the kernel can't read
+  // upward (the Enterprise Object + projection definitions).
+  const reconstruction = verifyReconstructability({
+    objectDefinitions: listEnterpriseObjects().map((o) => ({ objectType: o.objectType })),
+    projectionDefinitions: listProjections().map((p) => ({ id: p.id })),
+    journalDurable: false,
+  });
   const journal = getJournalDescending(36);
 
   return (
@@ -46,6 +61,7 @@ export default function ConstitutionPage() {
         authorities={authorities}
         decisionPlan={decisionPlan}
         conformance={conformance}
+        reconstruction={reconstruction}
         journal={journal}
         replay={replay}
       />

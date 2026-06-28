@@ -8,7 +8,7 @@ import {
   type ConstitutionView,
   type DecisionSummary,
 } from "@/lib/constitution";
-import type { AuthoritySummary, JournalEntry, SampleDecision, ConformanceReport } from "@/lib/kernel";
+import type { AuthoritySummary, JournalEntry, SampleDecision, ConformanceReport, ReconstructionReport } from "@/lib/kernel";
 import type { ReplayProof } from "@/lib/projection-runtime";
 
 interface Props {
@@ -18,11 +18,12 @@ interface Props {
   authorities: AuthoritySummary[];
   decisionPlan: SampleDecision;
   conformance: ConformanceReport;
+  reconstruction: ReconstructionReport;
   journal: JournalEntry[];
   replay: ReplayProof;
 }
 
-export function ConstitutionLenses({ constitution: c, headline, decisions, authorities, decisionPlan, conformance, journal, replay }: Props) {
+export function ConstitutionLenses({ constitution: c, headline, decisions, authorities, decisionPlan, conformance, reconstruction, journal, replay }: Props) {
   const [lens, setLens] = useState<ConstitutionLens>("document");
 
   return (
@@ -54,6 +55,7 @@ export function ConstitutionLenses({ constitution: c, headline, decisions, autho
           authorities={authorities}
           decisionPlan={decisionPlan}
           conformance={conformance}
+          reconstruction={reconstruction}
           journal={journal}
           replay={replay}
         />
@@ -231,6 +233,7 @@ function AuditLens({
   authorities,
   decisionPlan,
   conformance,
+  reconstruction,
   journal,
   replay,
 }: {
@@ -239,12 +242,60 @@ function AuditLens({
   authorities: AuthoritySummary[];
   decisionPlan: SampleDecision;
   conformance: ConformanceReport;
+  reconstruction: ReconstructionReport;
   journal: JournalEntry[];
   replay: ReplayProof;
 }) {
   const failed = conformance.findings.filter((f) => !f.ok);
+  const blockers = reconstruction.hiddenStateRisks.filter((r) => r.severity === "blocker");
   return (
     <div className="stack">
+      <section>
+        <h3 className="const-section-title">Self-hosting · SB-7 reconstructability</h3>
+        <p className="const-section-note">
+          The defining property of a self-hosting OS: the platform must be able to reconstruct its complete
+          executable state from five canonical sources alone — Enterprise Objects, Runtime Definitions, the
+          Execution Journal, the Version Graph, and the Constitution — with no hidden implementation state.
+        </p>
+        <Card className="const-row">
+          <div className="const-item-head">
+            <span className={`badge ${reconstruction.reconstructable ? "good" : "bad"}`}>
+              {reconstruction.reconstructable ? "reconstructable" : "NOT RECONSTRUCTABLE"}
+            </span>
+            <h4>state root {reconstruction.stateRootHash}</h4>
+            <span className="spacer" />
+            <span className={`badge ${reconstruction.replayDeterministic ? "good" : "bad"}`} title="journal folds identically when replayed">
+              replay {reconstruction.replayDeterministic ? "deterministic" : "drift"}
+            </span>
+          </div>
+          <div className="const-enforces">
+            {reconstruction.sources.map((s) => (
+              <span
+                key={s.id}
+                className={`badge ${s.present ? "neutral" : "bad"}`}
+                title={`${s.role} · ${s.itemCount} item(s) · fp ${s.fingerprint}`}
+              >
+                {s.label} ({s.itemCount})
+              </span>
+            ))}
+          </div>
+          {reconstruction.hiddenStateRisks.length > 0 && (
+            <div className="const-enforces">
+              {reconstruction.hiddenStateRisks.map((r, i) => (
+                <span key={i} className={`badge ${r.severity === "blocker" ? "bad" : "warn"}`} title={r.detail}>
+                  {r.severity === "blocker" ? "blocks" : "advisory"}: {r.subject}
+                </span>
+              ))}
+            </div>
+          )}
+          <p className="const-derived">
+            {blockers.length === 0
+              ? "No blocking hidden state — the executable state is fully derivable from the canonical sources."
+              : `${blockers.length} blocking risk(s) must be resolved before the platform is fully self-hosting.`}
+          </p>
+        </Card>
+      </section>
+
       <section>
         <h3 className="const-section-title">Constitutional validation</h3>
         <p className="const-section-note">
