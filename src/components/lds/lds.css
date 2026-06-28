@@ -1,0 +1,383 @@
+/* ============================================================================
+   LDS-001 — LAWRENCE / Aberdeen Design System
+   Canonical visual foundation for every LAWRENCE artifact.
+   Source of truth: Aberdeen Style Guide v1.02.
+
+   Everything is scoped under `.lds` so adopting the system is opt-in and never
+   disturbs legacy dark surfaces. Wrap any LDS surface in <div class="lds">.
+
+   Aesthetic target: Linear / Stripe Dashboard / Palantir Foundry / Fluent —
+   modern, executive, technical. Never warm, rustic, or document-like.
+   ========================================================================== */
+
+.lds {
+  /* ---- Brand (primary) ---------------------------------------------------- */
+  --ab-blue: #09375f;       /* Aberdeen Blue — primary brand */
+  --ab-verdigris: #44b0b1;  /* Verdigris — accent / interaction */
+  --ab-white: #ffffff;
+  --ab-onyx: #404040;       /* Onyx — body text */
+
+  /* ---- Brand (secondary — charts, status) -------------------------------- */
+  --ab-sky: #5cc8ff;        /* Deep Sky Blue — info */
+  --ab-jasper: #db504a;     /* Jasper — danger */
+  --ab-jade: #00a676;       /* Jade — success */
+  --ab-gold: #f7d002;       /* Gold — warning */
+
+  /* ---- Derived blue scale ------------------------------------------------- */
+  --ab-blue-900: #04223d;
+  --ab-blue-800: #072b4c;
+  --ab-blue-700: #09375f;
+  --ab-blue-600: #0f4677;
+  --ab-blue-500: #1b5a92;
+  --ab-blue-200: #b9cede;
+  --ab-blue-100: #e4edf4;
+
+  /* ---- Workspace surfaces (light, executive) ------------------------------ */
+  --lds-canvas: #eef2f6;
+  --lds-surface: #ffffff;
+  --lds-surface-2: #f6f9fb;
+  --lds-surface-3: #eaf1f6;
+  --lds-border: #dde5ec;
+  --lds-border-strong: #c6d3de;
+
+  /* ---- Ink ---------------------------------------------------------------- */
+  --lds-ink: #14283a;       /* headings (blue-leaning onyx) */
+  --lds-body: #404040;      /* Onyx body */
+  --lds-muted: #66747f;
+  --lds-faint: #98a6b2;
+
+  /* ---- Shell chrome (Aberdeen Blue) --------------------------------------- */
+  --lds-shell: var(--ab-blue-700);
+  --lds-shell-2: var(--ab-blue-900);
+  --lds-shell-line: rgba(255, 255, 255, 0.1);
+  --lds-shell-ink: #eaf2f7;
+  --lds-shell-muted: #93b3c8;
+  --lds-shell-active: rgba(68, 176, 177, 0.18);
+
+  /* ---- Interaction -------------------------------------------------------- */
+  --lds-accent: var(--ab-verdigris);
+  --lds-accent-ink: #06403f;
+  --lds-accent-soft: rgba(68, 176, 177, 0.12);
+  --lds-accent-line: rgba(68, 176, 177, 0.45);
+  --lds-ring: rgba(68, 176, 177, 0.5);
+
+  /* ---- Status soft fills -------------------------------------------------- */
+  --lds-good-soft: rgba(0, 166, 118, 0.13);
+  --lds-warn-soft: rgba(187, 150, 0, 0.16);
+  --lds-bad-soft: rgba(219, 80, 74, 0.13);
+  --lds-info-soft: rgba(46, 150, 210, 0.14);
+
+  /* ---- Geometry ----------------------------------------------------------- */
+  --lds-r-sm: 7px;
+  --lds-r: 10px;
+  --lds-r-lg: 14px;
+  --lds-shadow: 0 1px 2px rgba(9, 55, 95, 0.06), 0 6px 20px rgba(9, 55, 95, 0.06);
+  --lds-shadow-lg: 0 12px 40px rgba(9, 55, 95, 0.18);
+
+  /* ---- Type --------------------------------------------------------------- */
+  --lds-font: "Poppins", "Arial", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --lds-mono: "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+
+  font-family: var(--lds-font);
+  color: var(--lds-body);
+  background: var(--lds-canvas);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.lds *,
+.lds *::before,
+.lds *::after { box-sizing: border-box; }
+
+.lds h1, .lds h2, .lds h3, .lds h4 { color: var(--lds-ink); margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+.lds p { margin: 0; }
+
+/* ---- Mono section labels -------------------------------------------------- */
+.lds-label {
+  font-family: var(--lds-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--lds-faint);
+}
+
+/* ============================================================================
+   Enterprise Shell — Aberdeen Blue rail + workspace
+   ========================================================================== */
+.lds-shell { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+
+.lds-rail {
+  background: linear-gradient(180deg, var(--lds-shell) 0%, var(--lds-shell-2) 100%);
+  color: var(--lds-shell-ink);
+  border-right: 1px solid rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  padding: 18px 14px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  gap: 4px;
+}
+.lds-rail-brand { display: flex; align-items: center; gap: 10px; padding: 4px 6px 14px; }
+.lds-mark {
+  width: 30px; height: 30px; border-radius: 8px; flex: none;
+  display: grid; place-items: center; position: relative;
+  background: var(--ab-verdigris); color: var(--ab-blue-900);
+  font-weight: 700; font-size: 16px; line-height: 1;
+}
+.lds-rail-brand .nm { font-weight: 600; font-size: 15px; color: #fff; letter-spacing: 0.02em; }
+.lds-rail-brand .sub { font-family: var(--lds-mono); font-size: 9.5px; letter-spacing: 0.12em; color: var(--lds-shell-muted); text-transform: uppercase; }
+.lds-rail-group { margin-top: 14px; }
+.lds-rail-group > .lds-label { color: var(--lds-shell-muted); padding: 0 8px 7px; display: block; }
+.lds-rail-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 8px;
+  color: var(--lds-shell-muted); font-size: 13px; font-weight: 500;
+  cursor: pointer; border: 1px solid transparent; width: 100%; text-align: left;
+  background: none; font-family: inherit;
+}
+.lds-rail-item:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.lds-rail-item.active { background: var(--lds-shell-active); color: #fff; border-color: var(--lds-accent-line); }
+.lds-rail-item .ic { width: 16px; height: 16px; flex: none; opacity: 0.85; }
+.lds-rail-item .ct { margin-left: auto; font-family: var(--lds-mono); font-size: 10px; color: var(--lds-shell-muted); }
+.lds-rail-spacer { flex: 1; }
+.lds-rail-foot { border-top: 1px solid var(--lds-shell-line); padding-top: 10px; font-size: 11px; color: var(--lds-shell-muted); }
+
+/* ============================================================================
+   Topbar
+   ========================================================================== */
+.lds-main { display: flex; flex-direction: column; min-width: 0; }
+.lds-topbar {
+  display: flex; align-items: center; gap: 14px;
+  height: 56px; padding: 0 22px;
+  background: rgba(255, 255, 255, 0.82); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--lds-border);
+  position: sticky; top: 0; z-index: 20;
+}
+.lds-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--lds-muted); }
+.lds-crumb b { color: var(--lds-ink); font-weight: 600; }
+.lds-crumb .sep { color: var(--lds-faint); }
+.lds-topbar .spacer { flex: 1; }
+.lds-cmd-trigger {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px 6px 12px; border-radius: 8px;
+  border: 1px solid var(--lds-border-strong); background: var(--lds-surface);
+  color: var(--lds-muted); font-size: 12.5px; cursor: pointer; font-family: inherit;
+}
+.lds-cmd-trigger:hover { border-color: var(--lds-accent-line); color: var(--lds-ink); }
+.lds-kbd {
+  font-family: var(--lds-mono); font-size: 10px; padding: 2px 6px; border-radius: 5px;
+  background: var(--lds-surface-3); border: 1px solid var(--lds-border); color: var(--lds-muted);
+}
+
+/* ============================================================================
+   Universal Workspace
+   ========================================================================== */
+.lds-workspace { padding: 24px 26px; display: flex; flex-direction: column; gap: 20px; max-width: 1400px; width: 100%; }
+.lds-ws-head { display: flex; align-items: flex-start; gap: 16px; }
+.lds-ws-head h1 { font-size: 22px; }
+.lds-ws-head .desc { color: var(--lds-muted); font-size: 13.5px; margin-top: 4px; max-width: 60ch; line-height: 1.55; }
+.lds-ws-head .spacer { flex: 1; }
+.lds-ws-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
+.lds-ws-grid.solo { grid-template-columns: minmax(0, 1fr); }
+.lds-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+/* ============================================================================
+   Cards / Property Cards
+   ========================================================================== */
+.lds-card { background: var(--lds-surface); border: 1px solid var(--lds-border); border-radius: var(--lds-r); box-shadow: var(--lds-shadow); }
+.lds-card-head { display: flex; align-items: center; gap: 10px; padding: 13px 16px; border-bottom: 1px solid var(--lds-border); }
+.lds-card-head h3 { font-size: 13.5px; font-weight: 600; }
+.lds-card-head .spacer { flex: 1; }
+.lds-card-body { padding: 16px; }
+.lds-card-body.tight { padding: 6px 16px; }
+
+.lds-prop-row { display: flex; align-items: flex-start; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--lds-border); }
+.lds-prop-row:last-child { border-bottom: none; }
+.lds-prop-row .k { width: 150px; flex: none; color: var(--lds-muted); font-size: 12.5px; padding-top: 2px; }
+.lds-prop-row .v { flex: 1; min-width: 0; font-size: 13.5px; color: var(--lds-ink); }
+.lds-prop-row .v .empty { color: var(--lds-faint); font-style: italic; }
+
+/* KPI tiles */
+.lds-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.lds-kpi { background: var(--lds-surface); border: 1px solid var(--lds-border); border-radius: var(--lds-r); padding: 13px 15px; box-shadow: var(--lds-shadow); }
+.lds-kpi .val { font-size: 24px; font-weight: 600; color: var(--lds-ink); letter-spacing: -0.02em; }
+.lds-kpi .val.accent { color: var(--ab-blue-600); }
+.lds-kpi .lab { margin-top: 3px; }
+.lds-kpi .sub { font-size: 11px; color: var(--lds-muted); margin-top: 5px; }
+
+/* ============================================================================
+   Smart Enterprise Chips
+   ========================================================================== */
+.lds-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 500;
+  border: 1px solid var(--lds-border-strong); background: var(--lds-surface-2); color: var(--lds-body);
+  max-width: 100%;
+}
+.lds-chip .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--lds-faint); }
+.lds-chip.resolved { background: var(--lds-accent-soft); border-color: var(--lds-accent-line); color: var(--lds-accent-ink); }
+.lds-chip.resolved .dot { background: var(--ab-verdigris); }
+.lds-chip.suggested { background: var(--lds-info-soft); border-color: rgba(46, 150, 210, 0.4); color: #1c5f86; }
+.lds-chip.suggested .dot { background: var(--ab-sky); }
+.lds-chip.pending { background: var(--lds-warn-soft); border-color: rgba(187, 150, 0, 0.4); color: #7a5d00; }
+.lds-chip.pending .dot { background: var(--ab-gold); }
+.lds-chip.conflict { background: var(--lds-bad-soft); border-color: rgba(219, 80, 74, 0.4); color: #9b2f2a; }
+.lds-chip.conflict .dot { background: var(--ab-jasper); }
+.lds-chip button { border: none; background: none; cursor: pointer; color: inherit; opacity: 0.6; padding: 0; font-size: 13px; line-height: 1; font-family: inherit; }
+.lds-chip button:hover { opacity: 1; }
+.lds-chip-row { display: flex; flex-wrap: wrap; gap: 7px; }
+
+/* ============================================================================
+   Badges & status dots
+   ========================================================================== */
+.lds-badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; font-family: var(--lds-mono); letter-spacing: 0.02em; }
+.lds-badge.good { background: var(--lds-good-soft); color: #047857; }
+.lds-badge.warn { background: var(--lds-warn-soft); color: #7a5d00; }
+.lds-badge.bad { background: var(--lds-bad-soft); color: #9b2f2a; }
+.lds-badge.info { background: var(--lds-info-soft); color: #1c5f86; }
+.lds-badge.neutral { background: var(--lds-surface-3); color: var(--lds-muted); }
+.lds-badge.brand { background: var(--ab-blue-100); color: var(--ab-blue-600); }
+.lds-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; }
+.lds-dot.good { background: var(--ab-jade); }
+.lds-dot.warn { background: var(--ab-gold); }
+.lds-dot.bad { background: var(--ab-jasper); }
+.lds-dot.info { background: var(--ab-sky); }
+.lds-dot.neutral { background: var(--lds-faint); }
+
+/* ============================================================================
+   Buttons
+   ========================================================================== */
+.lds-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 500;
+  font-family: inherit; cursor: pointer; border: 1px solid transparent;
+  transition: background 0.12s, border-color 0.12s, color 0.12s; white-space: nowrap;
+}
+.lds-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.lds-btn--primary { background: var(--ab-blue-700); color: #fff; }
+.lds-btn--primary:not(:disabled):hover { background: var(--ab-blue-600); }
+.lds-btn--accent { background: var(--ab-verdigris); color: var(--ab-blue-900); font-weight: 600; }
+.lds-btn--accent:not(:disabled):hover { background: #38a0a1; }
+.lds-btn--ghost { background: var(--lds-surface); border-color: var(--lds-border-strong); color: var(--lds-ink); }
+.lds-btn--ghost:not(:disabled):hover { border-color: var(--lds-accent-line); background: var(--lds-surface-2); }
+.lds-btn--quiet { background: none; color: var(--lds-muted); padding: 6px 8px; }
+.lds-btn--quiet:hover { color: var(--lds-ink); background: var(--lds-surface-3); }
+.lds-btn--sm { padding: 5px 10px; font-size: 12px; border-radius: 7px; }
+
+/* ============================================================================
+   Progressive Structured Input
+   ========================================================================== */
+.lds-steps { display: flex; align-items: center; gap: 0; flex-wrap: wrap; }
+.lds-step { display: flex; align-items: center; gap: 9px; }
+.lds-step .node {
+  width: 24px; height: 24px; border-radius: 50%; flex: none; display: grid; place-items: center;
+  font-size: 11px; font-weight: 600; font-family: var(--lds-mono);
+  border: 1.5px solid var(--lds-border-strong); background: var(--lds-surface); color: var(--lds-muted);
+}
+.lds-step.active .node { border-color: var(--ab-verdigris); color: var(--ab-blue-700); background: var(--lds-accent-soft); }
+.lds-step.done .node { border-color: var(--ab-jade); background: var(--ab-jade); color: #fff; }
+.lds-step .nm { font-size: 12px; color: var(--lds-muted); font-weight: 500; }
+.lds-step.active .nm, .lds-step.done .nm { color: var(--lds-ink); }
+.lds-step .bar { width: 30px; height: 1.5px; background: var(--lds-border-strong); margin: 0 8px; }
+.lds-step.done .bar { background: var(--ab-jade); }
+
+.lds-field { padding: 14px 0; border-bottom: 1px solid var(--lds-border); }
+.lds-field:last-child { border-bottom: none; }
+.lds-field-head { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.lds-field-head label { font-size: 13px; font-weight: 600; color: var(--lds-ink); }
+.lds-field-head .req { color: var(--ab-jasper); font-size: 12px; }
+.lds-field-head .spacer { flex: 1; }
+.lds-field .hint { font-size: 11.5px; color: var(--lds-muted); margin-top: 6px; line-height: 1.5; }
+.lds-field.done .lds-field-head label { color: #047857; }
+.lds-input, .lds-textarea, .lds-select {
+  width: 100%; font-family: inherit; font-size: 13.5px; color: var(--lds-ink);
+  background: var(--lds-surface); border: 1px solid var(--lds-border-strong); border-radius: 8px;
+  padding: 9px 11px; outline: none; transition: border-color 0.12s, box-shadow 0.12s;
+}
+.lds-textarea { resize: vertical; min-height: 76px; line-height: 1.55; }
+.lds-input:focus, .lds-textarea:focus, .lds-select:focus { border-color: var(--ab-verdigris); box-shadow: 0 0 0 3px var(--lds-ring); }
+.lds-input::placeholder, .lds-textarea::placeholder { color: var(--lds-faint); }
+
+/* ============================================================================
+   Advisor Rail
+   ========================================================================== */
+.lds-advisor { display: flex; flex-direction: column; gap: 10px; }
+.lds-advisor-item { border: 1px solid var(--lds-border); border-radius: var(--lds-r); padding: 12px 13px; background: var(--lds-surface); border-left: 3px solid var(--ab-verdigris); }
+.lds-advisor-item.suggest { border-left-color: var(--ab-sky); }
+.lds-advisor-item.warn { border-left-color: var(--ab-gold); }
+.lds-advisor-item .at { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--lds-ink); margin-bottom: 4px; }
+.lds-advisor-item .ab { font-size: 12px; color: var(--lds-muted); line-height: 1.5; }
+.lds-advisor-item .aa { margin-top: 9px; display: flex; gap: 7px; }
+.lds-advisor-conf { margin-left: auto; font-family: var(--lds-mono); font-size: 10px; color: var(--lds-faint); }
+
+/* ============================================================================
+   Inspector Panel
+   ========================================================================== */
+.lds-inspector { background: var(--lds-surface); border: 1px solid var(--lds-border); border-radius: var(--lds-r); box-shadow: var(--lds-shadow); position: sticky; top: 76px; overflow: hidden; }
+.lds-inspector-head { padding: 13px 15px; border-bottom: 1px solid var(--lds-border); display: flex; align-items: center; gap: 9px; }
+.lds-inspector-head .ttl { font-size: 13px; font-weight: 600; color: var(--lds-ink); }
+.lds-inspector-tabs { display: flex; gap: 2px; padding: 8px 10px; border-bottom: 1px solid var(--lds-border); background: var(--lds-surface-2); }
+.lds-inspector-tab { padding: 5px 10px; border-radius: 7px; font-size: 12px; color: var(--lds-muted); cursor: pointer; border: none; background: none; font-family: inherit; font-weight: 500; }
+.lds-inspector-tab.active { background: var(--ab-blue-700); color: #fff; }
+.lds-inspector-body { padding: 14px 15px; }
+
+/* ============================================================================
+   Activity Timeline
+   ========================================================================== */
+.lds-timeline { display: flex; flex-direction: column; }
+.lds-tl-item { display: flex; gap: 12px; padding-bottom: 16px; position: relative; }
+.lds-tl-item:not(:last-child)::before { content: ""; position: absolute; left: 5px; top: 16px; bottom: 0; width: 1.5px; background: var(--lds-border); }
+.lds-tl-node { width: 12px; height: 12px; border-radius: 50%; flex: none; margin-top: 2px; border: 2px solid var(--lds-surface); box-shadow: 0 0 0 1.5px var(--lds-border-strong); background: var(--lds-faint); z-index: 1; }
+.lds-tl-node.good { background: var(--ab-jade); box-shadow: 0 0 0 1.5px var(--ab-jade); }
+.lds-tl-node.accent { background: var(--ab-verdigris); box-shadow: 0 0 0 1.5px var(--ab-verdigris); }
+.lds-tl-node.info { background: var(--ab-sky); box-shadow: 0 0 0 1.5px var(--ab-sky); }
+.lds-tl-body { flex: 1; min-width: 0; }
+.lds-tl-body .t { font-size: 12.5px; color: var(--lds-ink); font-weight: 500; }
+.lds-tl-body .m { font-size: 11.5px; color: var(--lds-muted); margin-top: 2px; }
+.lds-tl-body .ts { font-family: var(--lds-mono); font-size: 10px; color: var(--lds-faint); margin-top: 3px; }
+
+/* ============================================================================
+   Evidence Panel
+   ========================================================================== */
+.lds-evidence { display: flex; flex-direction: column; gap: 8px; }
+.lds-ev-item { border: 1px solid var(--lds-border); border-radius: var(--lds-r-sm); padding: 10px 12px; background: var(--lds-surface-2); }
+.lds-ev-item .eh { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--lds-ink); }
+.lds-ev-item .src { font-family: var(--lds-mono); font-size: 10px; color: var(--lds-muted); margin-left: auto; }
+.lds-ev-item .eb { font-size: 12px; color: var(--lds-body); margin-top: 5px; line-height: 1.5; }
+.lds-ev-item .prov { font-family: var(--lds-mono); font-size: 10px; color: var(--lds-faint); margin-top: 6px; }
+
+/* ============================================================================
+   Diagnostics
+   ========================================================================== */
+.lds-diag { display: flex; flex-direction: column; }
+.lds-diag-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--lds-border); }
+.lds-diag-row:last-child { border-bottom: none; }
+.lds-diag-row .dt { flex: 1; min-width: 0; }
+.lds-diag-row .dt .dl { font-size: 12.5px; color: var(--lds-ink); font-weight: 500; }
+.lds-diag-row .dt .dd { font-size: 11.5px; color: var(--lds-muted); margin-top: 2px; line-height: 1.5; }
+
+/* ============================================================================
+   Command Center (⌘K)
+   ========================================================================== */
+.lds-cmd-overlay { position: fixed; inset: 0; background: rgba(9, 26, 43, 0.42); backdrop-filter: blur(3px); z-index: 100; display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; }
+.lds-cmd { width: min(620px, 92vw); background: var(--lds-surface); border: 1px solid var(--lds-border-strong); border-radius: var(--lds-r-lg); box-shadow: var(--lds-shadow-lg); overflow: hidden; }
+.lds-cmd-input-wrap { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--lds-border); }
+.lds-cmd-input { flex: 1; border: none; outline: none; font-family: inherit; font-size: 15px; color: var(--lds-ink); background: none; }
+.lds-cmd-input::placeholder { color: var(--lds-faint); }
+.lds-cmd-list { max-height: 360px; overflow-y: auto; padding: 8px; }
+.lds-cmd-group { font-family: var(--lds-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--lds-faint); padding: 9px 10px 4px; }
+.lds-cmd-item { display: flex; align-items: center; gap: 11px; padding: 9px 11px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--lds-body); }
+.lds-cmd-item.active { background: var(--ab-blue-100); color: var(--ab-blue-700); }
+.lds-cmd-item .ci { width: 15px; height: 15px; flex: none; opacity: 0.7; }
+.lds-cmd-item .ck { margin-left: auto; }
+.lds-cmd-empty { padding: 28px; text-align: center; color: var(--lds-muted); font-size: 13px; }
+
+/* ---- utilities ----------------------------------------------------------- */
+.lds-stack { display: flex; flex-direction: column; gap: 10px; }
+.lds-row { display: flex; align-items: center; gap: 10px; }
+.lds-divider { height: 1px; background: var(--lds-border); margin: 4px 0; }
+.lds-mono { font-family: var(--lds-mono); }
+.lds-empty-note { color: var(--lds-faint); font-size: 12.5px; font-style: italic; }

@@ -34,6 +34,13 @@ export const lawrenceNav: NavSection[] = [
     ],
   },
   {
+    title: "Studios",
+    items: [
+      { label: "Job Intake Studio", href: "/job-intake" },
+      { label: "Design System (LDS-001)", href: "/design-system" },
+    ],
+  },
+  {
     title: "DataOps",
     items: [
       { label: "Overview", href: "/dataops" },
