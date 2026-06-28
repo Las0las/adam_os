@@ -37,6 +37,7 @@ export const lawrenceNav: NavSection[] = [
   {
     title: "Studios",
     items: [
+      { label: "Enterprise Object Runtime", href: "/runtime-console" },
       { label: "EPR Runtime (Job · Candidate)", href: "/epr" },
       { label: "Universal Workspace", href: "/workspace" },
       { label: "Job Intake Studio", href: "/job-intake" },
