@@ -52,12 +52,20 @@ module.exports = {
       severity: "warn",
       from: {
         orphan: true,
-        pathNot: ["\\.d\\.ts$", "(^|/)index\\.ts$", "\\.(test|spec)\\.ts$"],
+        pathNot: [
+          "\\.d\\.ts$",
+          "(^|/)index\\.ts$",
+          "\\.(test|spec)\\.ts$",
+          "\\.config\\.(ts|mjs|cjs|js)$",
+        ],
       },
       to: {},
     },
   ],
   options: {
+    // Only analyze source. Compiled output under dist/ mirrors src/ and would
+    // produce duplicate, false orphan warnings.
+    exclude: { path: "(^|/)(dist|node_modules)/" },
     doNotFollow: { path: "node_modules" },
     tsConfig: { fileName: "tsconfig.base.json" },
     tsPreCompilationDeps: true,

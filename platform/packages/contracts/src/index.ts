@@ -29,5 +29,8 @@ export type * from "./kernel.js";
 // The three permanent registries
 export type * from "./registries.js";
 
-// The single frozen data export: the constitutional requirement set (CCR-001..004).
+// Frozen data exports (the only runtime values in the package):
+//  - the constitutional requirement set (CCR-001..N)
+//  - the frozen roster of the fifteen host services
 export { CONSTITUTIONAL_REQUIREMENTS } from "./constitutional-test.js";
+export { HOST_SERVICE_NAMES } from "./host-service.js";

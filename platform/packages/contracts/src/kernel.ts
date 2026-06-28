@@ -52,6 +52,9 @@ export interface KernelContract {
   guaranteeReversibility(event: DomainEvent): Promise<Result<ReversalPlan>>;
 }
 
+/** Canonical alias — the Kernel as referenced throughout the platform. */
+export type Kernel = KernelContract;
+
 /** A durable, immutable record that a decision was made — produced even on denial. */
 export interface AuditRecord {
   readonly decisionId: DecisionId;
@@ -59,4 +62,13 @@ export interface AuditRecord {
   readonly outcome: "granted" | "denied";
   readonly reasonCodes: readonly string[];
   readonly recordedAt: Iso8601;
+}
+
+/** A read query against the append-only audit log (kernel responsibility #7). */
+export interface AuditQuery {
+  readonly principalId?: PrincipalId;
+  readonly decisionId?: DecisionId;
+  readonly outcome?: "granted" | "denied";
+  readonly since?: Iso8601;
+  readonly until?: Iso8601;
 }

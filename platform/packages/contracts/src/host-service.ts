@@ -26,6 +26,25 @@ export type HostServiceName =
   | "notifications"
   | "extensions";
 
+/** The frozen roster of the fifteen permanent host services (value form of the union). */
+export const HOST_SERVICE_NAMES = Object.freeze([
+  "authentication",
+  "authorization",
+  "audit",
+  "ai-routing",
+  "streaming",
+  "caching",
+  "search",
+  "observability",
+  "metrics",
+  "secrets",
+  "storage",
+  "messaging",
+  "scheduling",
+  "notifications",
+  "extensions",
+] as const) satisfies readonly HostServiceName[];
+
 /** Common shape every host service exposes for discovery + health. */
 export interface HostService {
   readonly name: HostServiceName;
