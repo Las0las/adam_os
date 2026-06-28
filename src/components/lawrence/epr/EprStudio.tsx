@@ -25,6 +25,7 @@ import {
   type ObjectSchema,
   type Provenance,
 } from "@/lib/epr";
+import { PsiField } from "./PsiField";
 
 export function EprStudio({ schema }: { schema: ObjectSchema }) {
   const [state, setState] = useState<EprState>(emptyState);
@@ -39,14 +40,6 @@ export function EprStudio({ schema }: { schema: ObjectSchema }) {
 
   function mutate(key: string, value: string | string[], src: Provenance, conf: number, ev: string | null) {
     setState((s) => applyEvolution(s, key, value, src, conf, ev, schema));
-  }
-  function setSingle(key: string, val: string, src: Provenance) {
-    mutate(key, val, src, src === "ai" ? 0.92 : 0.8, src === "ai" ? "AI suggestion accepted" : null);
-  }
-  function toggleMulti(key: string, val: string) {
-    const cur = (state.props[key]?.value as string[]) || [];
-    const next = cur.indexOf(val) >= 0 ? cur.filter((v) => v !== val) : [...cur, val];
-    mutate(key, next, "suggestion", 0.8, null);
   }
   function aiFill(key: string, label: string) {
     // Deterministic "AI" fill from the field's first chip (evidence-backed).
@@ -115,44 +108,12 @@ export function EprStudio({ schema }: { schema: ObjectSchema }) {
                 {sec.hint && <p style={{ margin: "0 0 12px", fontSize: 12, color: "#6b7a8a" }}>{sec.hint}</p>}
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   {sec.fields.map((f) => (
-                    <div key={f.key}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: "#33424f" }}>
-                          {f.label}{f.req && <span style={{ color: "#db504a" }}> *</span>}
-                        </span>
-                        {f.hasValue && (
-                          <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 999, color: f.srcColor, background: f.srcBg, border: `1px solid ${f.srcBorder}` }}>
-                            {f.srcLabel} · {f.confText}
-                          </span>
-                        )}
-                        {f.evN > 0 && (
-                          <span title={f.evidence.join(" · ")} style={{ fontSize: 10, color: "#00875f", fontWeight: 600 }}>◆ {f.evN} evidence</span>
-                        )}
-                      </div>
-                      {f.kind === "multi" && f.selected.length > 0 && (
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
-                          {f.selected.map((v) => (
-                            <button key={v} onClick={() => toggleMulti(f.key, v)}
-                              style={{ fontSize: 12, padding: "4px 10px", borderRadius: 999, border: "1px solid #44b0b1", background: "#e6f6f6", color: "#0a5c5d", cursor: "pointer", fontWeight: 600 }}>
-                              {v} ×
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                        {f.chips.filter((c) => !c.selected).map((c) => (
-                          <button key={c.label}
-                            onClick={() => (f.kind === "multi" ? toggleMulti(f.key, c.label) : setSingle(f.key, c.label, "suggestion"))}
-                            style={{ fontSize: 12, padding: "4px 10px", borderRadius: 999, border: "1px solid #cdd9e3", background: "#f4f7fa", color: "#33424f", cursor: "pointer" }}>
-                            {c.label}
-                          </button>
-                        ))}
-                        <button onClick={() => aiFill(f.key, f.label)}
-                          style={{ fontSize: 11, padding: "4px 10px", borderRadius: 7, border: "1px solid #bde6e6", background: "#e6f6f6", color: "#0a5c5d", cursor: "pointer", fontWeight: 600 }}>
-                          ✦ AI
-                        </button>
-                      </div>
-                    </div>
+                    <PsiField
+                      key={f.key}
+                      field={f}
+                      commit={(value, src, conf, ev) => mutate(f.key, value, src, conf, ev)}
+                      aiPropose={() => aiFill(f.key, f.label)}
+                    />
                   ))}
                 </div>
               </section>
