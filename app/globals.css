@@ -1,3 +1,8 @@
+/* Poppins is the Aberdeen brand font (LDS-001), JetBrains Mono for mono labels.
+   Loaded via @import (browser-side fetch) rather than next/font so the build
+   never blocks on font egress; Arial is the brand-sanctioned fallback. */
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
 :root {
   --bg: #0b0e14;
   --panel: #131823;
