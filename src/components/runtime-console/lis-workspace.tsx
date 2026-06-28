@@ -110,16 +110,32 @@ function EventStreamTerminal() {
 
 export function LisWorkspace() {
   const { initialState, onLayoutChange } = useLayoutMemory("lis.workspace.v1");
+  // On a fresh seed (no persisted layout), open the terminal and close the
+  // shell's own left rail — NavMesh carries its own navigation rail in the
+  // canvas, so the shell reserves no left column. Persisted layouts win.
+  const seeded =
+    initialState.reason === "init"
+      ? {
+          ...initialState,
+          panels: {
+            ...initialState.panels,
+            left: { ...initialState.panels.left, open: false },
+            bottom: { ...initialState.panels.bottom, open: true },
+          },
+        }
+      : initialState;
   return (
-    <WorkspaceShell
-      layoutState="expanded-flex"
-      initialState={initialState}
-      onLayoutChange={onLayoutChange}
-      canvas={<NavMesh />}
-      rightInspector={<GovernanceInspector />}
-      rightLabel="Governance"
-      bottomTerminal={<EventStreamTerminal />}
-      bottomLabel="Event stream"
-    />
+    <div style={{ height: "100dvh", width: "100%", overflow: "hidden" }}>
+      <WorkspaceShell
+        layoutState="expanded-flex"
+        initialState={seeded}
+        onLayoutChange={onLayoutChange}
+        canvas={<NavMesh />}
+        rightInspector={<GovernanceInspector />}
+        rightLabel="Governance"
+        bottomTerminal={<EventStreamTerminal />}
+        bottomLabel="Event stream"
+      />
+    </div>
   );
 }

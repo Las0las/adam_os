@@ -111,6 +111,10 @@
   background: var(--shell-rail);
   overflow: hidden;
   min-inline-size: 0;
+  /* Fill the assigned grid cell. Without this, a grid item that is also a flex
+     container sizes to its content — the bottom bar would collapse to ~60px and
+     the side rails only matched their track by coincidence. */
+  inline-size: 100%;
 }
 .lis-rail-left {
   grid-area: left;
