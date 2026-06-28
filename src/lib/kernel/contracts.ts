@@ -124,6 +124,8 @@ export type JournalEventKind =
   | "AuthorityRequested"
   | "AuthorityGranted"
   | "AuthorityDenied"
+  | "DecisionComposed"
+  | "ConformanceValidated"
   | "SnapshotCreated"
   | "ProjectionResolved"
   | "ProjectionRendered"

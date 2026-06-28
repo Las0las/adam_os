@@ -46,14 +46,14 @@ registerAction({
     return result.ok ? null : (result.violations[0]?.message ?? "Invalid candidate payload");
   },
   async run(ctx, input) {
-    // L0 — obtain an ExecutionAuthority from the kernel BEFORE any mutation.
-    // The kernel asks the Constitution Runtime to authorize this intent, records
-    // the grant to the Execution Ledger, and returns a signed, expiring token —
-    // or throws AuthorityDeniedError, which the action engine surfaces as a
-    // denial. This is the authoritative, fail-closed re-check; the handler never
-    // mutates without a granted token.
+    // L0/L1 — Authority → Decision BEFORE any mutation. `Kernel.decide` first
+    // asserts authority ("may this happen?", fail-closed: throws
+    // AuthorityDeniedError on denial), then composes the concrete plan ("exactly
+    // what will happen?") and journals it. The handler executes the plan's
+    // immediate `create` step; downstream steps (assign recruiter, duplicate
+    // check, AI summary, onboarding workflow) are planned for the scheduler.
     const actorUserId = ctx.actorUserId ?? null;
-    const authority = Kernel.assertAuthority({
+    const { authority, decision } = Kernel.decide({
       kind: "object.create",
       actor: {
         // The governed action engine always runs under a resolved principal:
@@ -67,6 +67,7 @@ registerAction({
       object: { objectType: candidateObject.objectType, isMutation: false },
       audited: true,
     });
+    const createStepId = decision.primaryStepId ?? "create";
 
     // Authoritatively shape the canonical object from the metadata bindings —
     // never trust a client-assembled title/status/properties blob.
@@ -87,7 +88,7 @@ registerAction({
       actorId: authority.actor.id,
       enterpriseId: authority.enterpriseId,
       summary: `Prepared create of ${candidateObject.objectType}`,
-      detail: { externalKey, capabilities: authority.capabilities },
+      detail: { externalKey, capabilities: authority.capabilities, decisionPlanId: decision.decisionPlanId, step: createStepId },
     });
 
     const candidate = await upsertObject(ctx, {
@@ -110,7 +111,7 @@ registerAction({
       actorId: authority.actor.id,
       enterpriseId: authority.enterpriseId,
       summary: `Created ${candidateObject.objectType} ${candidate.id}`,
-      detail: { externalKey, capabilities: authority.capabilities },
+      detail: { externalKey, capabilities: authority.capabilities, decisionPlanId: decision.decisionPlanId, step: createStepId },
     });
 
     return {
@@ -119,6 +120,8 @@ registerAction({
       externalKey,
       authorityId: authority.authorityId,
       decisionId: authority.decisionId,
+      decisionPlanId: decision.decisionPlanId,
+      plannedSteps: decision.steps.map((s) => s.id),
     };
   },
 });

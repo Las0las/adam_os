@@ -23,6 +23,7 @@ import type {
   AuthorityOutcome,
 } from "./contracts";
 import { appendJournal } from "./execution-journal";
+import { composeDecision, type Decision } from "./decision-runtime";
 
 /** Default authority lifetime: short-lived, single-action grants. */
 const AUTHORITY_TTL_MS = 5 * 60 * 1000;
@@ -188,6 +189,34 @@ export const Kernel = {
     const authority = Kernel.requestAuthority(intent, now);
     if (!authority.granted) throw new AuthorityDeniedError(authority);
     return authority;
+  },
+
+  /**
+   * The Authority → Decision step. Asserts authority ("may this happen?"), then
+   * composes the concrete plan ("exactly what will happen?") and journals it.
+   * Returns the granted authority paired with its decision plan. The scheduler /
+   * action handler executes the plan's steps; the kernel never executes them.
+   */
+  decide(intent: Intent, now: number = Date.now()): { authority: ExecutionAuthority; decision: Decision } {
+    const authority = Kernel.assertAuthority(intent, now);
+    const decision = composeDecision(intent, authority);
+    appendJournal({
+      kind: "DecisionComposed",
+      at: authority.issuedAt,
+      snapshotId: null,
+      authorityId: authority.authorityId,
+      decisionId: authority.decisionId,
+      actorKind: intent.actor.kind,
+      actorId: intent.actor.id,
+      enterpriseId: intent.enterpriseId,
+      summary: `Decision plan ${decision.decisionPlanId}: ${decision.steps.length} step(s) for ${intent.kind}`,
+      detail: {
+        decisionPlanId: decision.decisionPlanId,
+        steps: decision.steps.map((s) => ({ id: s.id, label: s.label, execution: s.execution })),
+        primaryStepId: decision.primaryStepId,
+      },
+    });
+    return { authority, decision };
   },
 
   /** Verify a token has not been tampered with and has not expired. */

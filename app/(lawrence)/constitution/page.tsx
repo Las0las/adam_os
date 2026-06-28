@@ -6,7 +6,7 @@
 
 import { getConstitution, projectHeadline, toConstitutionView } from "@/lib/constitution";
 import { liveSampleDecisions } from "@/lib/constitution/sample-decisions";
-import { liveSampleAuthorities, getJournalDescending } from "@/lib/kernel";
+import { liveSampleAuthorities, liveSampleDecision, validateConformance, getJournalDescending } from "@/lib/kernel";
 import { proveReplayDeterminism } from "@/lib/projection-runtime";
 import { ConstitutionLenses } from "@/components/lawrence/constitution/ConstitutionLenses";
 import { PageHeader } from "@/components/lawrence/shared/widgets";
@@ -26,8 +26,12 @@ export default function ConstitutionPage() {
   // effect: representative intents through the kernel, plus a replay-determinism
   // proof that resolves the same projection twice. Read the journal AFTER.
   const authorities = liveSampleAuthorities();
+  // The executable Constitutional Validator: admit the runtime stack only if it
+  // conforms. And the Authority → Decision path: show what an authority plans.
+  const conformance = validateConformance();
+  const decisionPlan = liveSampleDecision();
   const replay = proveReplayDeterminism();
-  const journal = getJournalDescending(30);
+  const journal = getJournalDescending(36);
 
   return (
     <div className="page">
@@ -40,6 +44,8 @@ export default function ConstitutionPage() {
         headline={headline}
         decisions={decisions}
         authorities={authorities}
+        decisionPlan={decisionPlan}
+        conformance={conformance}
         journal={journal}
         replay={replay}
       />

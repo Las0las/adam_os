@@ -8,7 +8,7 @@ import {
   type ConstitutionView,
   type DecisionSummary,
 } from "@/lib/constitution";
-import type { AuthoritySummary, JournalEntry } from "@/lib/kernel";
+import type { AuthoritySummary, JournalEntry, SampleDecision, ConformanceReport } from "@/lib/kernel";
 import type { ReplayProof } from "@/lib/projection-runtime";
 
 interface Props {
@@ -16,11 +16,13 @@ interface Props {
   headline: ConstitutionHeadline;
   decisions: DecisionSummary[];
   authorities: AuthoritySummary[];
+  decisionPlan: SampleDecision;
+  conformance: ConformanceReport;
   journal: JournalEntry[];
   replay: ReplayProof;
 }
 
-export function ConstitutionLenses({ constitution: c, headline, decisions, authorities, journal, replay }: Props) {
+export function ConstitutionLenses({ constitution: c, headline, decisions, authorities, decisionPlan, conformance, journal, replay }: Props) {
   const [lens, setLens] = useState<ConstitutionLens>("document");
 
   return (
@@ -46,7 +48,15 @@ export function ConstitutionLenses({ constitution: c, headline, decisions, autho
       {lens === "executive" && <ExecutiveLens c={c} headline={headline} />}
       {lens === "developer" && <DeveloperLens c={c} />}
       {lens === "audit" && (
-        <AuditLens c={c} decisions={decisions} authorities={authorities} journal={journal} replay={replay} />
+        <AuditLens
+          c={c}
+          decisions={decisions}
+          authorities={authorities}
+          decisionPlan={decisionPlan}
+          conformance={conformance}
+          journal={journal}
+          replay={replay}
+        />
       )}
     </div>
   );
@@ -219,17 +229,59 @@ function AuditLens({
   c,
   decisions,
   authorities,
+  decisionPlan,
+  conformance,
   journal,
   replay,
 }: {
   c: ConstitutionView;
   decisions: DecisionSummary[];
   authorities: AuthoritySummary[];
+  decisionPlan: SampleDecision;
+  conformance: ConformanceReport;
   journal: JournalEntry[];
   replay: ReplayProof;
 }) {
+  const failed = conformance.findings.filter((f) => !f.ok);
   return (
     <div className="stack">
+      <section>
+        <h3 className="const-section-title">Constitutional validation</h3>
+        <p className="const-section-note">
+          The Constitution is an executable contract. Before the runtime stack is admitted, every runtime
+          publishes a self-describing descriptor and the validator checks it against every applicable article —
+          self-description, an acyclic hierarchy, mandatory invariants, and health. A failing stack does not run.
+        </p>
+        <Card className="const-row">
+          <div className="const-item-head">
+            <span className={`badge ${conformance.conformant ? "good" : "bad"}`}>
+              {conformance.conformant ? "conformant" : "NON-CONFORMANT"}
+            </span>
+            <h4>{conformance.descriptors.length} runtimes · {conformance.findings.length} checks · {failed.length} failing</h4>
+            <span className="spacer" />
+            <span className="const-derived">v{conformance.constitutionVersion} · graph {conformance.runtimeGraphHash}</span>
+          </div>
+          <div className="const-enforces">
+            {conformance.descriptors.map((d) => (
+              <span
+                key={d.runtimeId}
+                className={`badge ${conformance.findings.some((f) => f.runtimeId === d.runtimeId && !f.ok) ? "bad" : "neutral"}`}
+                title={`${d.label} v${d.runtimeVersion} · ${d.layer} · replay=${d.replaySupport}`}
+              >
+                {d.runtimeId} v{d.runtimeVersion}
+              </span>
+            ))}
+          </div>
+          {failed.length > 0 && (
+            <div className="const-enforces">
+              {failed.map((f, i) => (
+                <span key={i} className="badge bad" title={f.article}>{f.runtimeId}: {f.detail}</span>
+              ))}
+            </div>
+          )}
+        </Card>
+      </section>
+
       <section>
         <h3 className="const-section-title">Replay determinism</h3>
         <p className="const-section-note">
@@ -296,6 +348,36 @@ function AuditLens({
             </Card>
           ))}
         </div>
+      </section>
+
+      <section>
+        <h3 className="const-section-title">Decision plan</h3>
+        <p className="const-section-note">
+          Authority answers <em>&ldquo;may this happen?&rdquo;</em>; the Decision Runtime answers <em>&ldquo;exactly
+          what will happen?&rdquo;</em> An authorized intent decomposes into a concrete, ordered plan of steps the
+          scheduler executes — each spending a capability, each recorded.
+        </p>
+        <Card className="const-row">
+          <div className="const-item-head">
+            <span className="badge good">{decisionPlan.intentKind}</span>
+            <h4>{decisionPlan.scenario}</h4>
+            <span className="spacer" />
+            <span className="const-derived">{decisionPlan.decisionPlanId}</span>
+          </div>
+          <ol className="const-steps" style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+            {decisionPlan.steps.map((s, i) => (
+              <li key={s.id} style={{ marginBottom: 4 }}>
+                <span style={{ fontWeight: s.id === decisionPlan.primaryStepId ? 600 : 400 }}>{s.label}</span>{" "}
+                <span className={`badge ${s.execution === "immediate" ? "good" : "neutral"}`}>{s.execution}</span>
+                {s.mutates && <span className="badge warn" title="performs a write">mutates</span>}
+                {s.dependsOn.length > 0 && (
+                  <span className="const-derived"> after {s.dependsOn.join(", ")}</span>
+                )}
+                {s.id === decisionPlan.primaryStepId && <span className="badge accent">primary</span>}
+              </li>
+            ))}
+          </ol>
+        </Card>
       </section>
 
       <section>

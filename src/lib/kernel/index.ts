@@ -52,5 +52,17 @@ export {
   RuntimeHierarchyError,
 } from "./runtime-hierarchy";
 export type { RuntimeLayer } from "./runtime-hierarchy";
-export { liveSampleAuthorities } from "./sample-authorities";
-export type { AuthoritySummary } from "./sample-authorities";
+export { liveSampleAuthorities, liveSampleDecision } from "./sample-authorities";
+export type { AuthoritySummary, SampleDecision } from "./sample-authorities";
+export { composeDecision } from "./decision-runtime";
+export type { Decision, DecisionStep, StepExecution } from "./decision-runtime";
+export {
+  RUNTIME_DESCRIPTORS,
+  validateConformance,
+} from "./runtime-conformance";
+export type {
+  RuntimeDescriptor,
+  ConformanceReport,
+  ConformanceFinding,
+  ReplaySupport,
+} from "./runtime-conformance";

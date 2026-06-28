@@ -104,3 +104,38 @@ export function liveSampleAuthorities(now = Date.parse("2026-01-01T00:00:00.000Z
 
   return scenarios.map((s) => summarize(s.label, Kernel.requestAuthority(s.intent, now)));
 }
+
+/**
+ * Run a representative authorized intent through the full Authority → Decision
+ * path so the audit lens can show the concrete plan an authority decomposes
+ * into. Side effect: journals a DecisionComposed entry. Fixed clock = stable.
+ */
+export function liveSampleDecision(now = Date.parse("2026-01-01T00:00:00.000Z")) {
+  const tenant = "lawrence";
+  const { authority, decision } = Kernel.decide(
+    {
+      kind: "object.create",
+      actor: { kind: "human", id: "user_recruiter_01", tenantId: tenant, permissions: ["candidate:create"] },
+      enterpriseId: tenant,
+      object: { objectType: "candidate", isMutation: false },
+      audited: true,
+    },
+    now,
+  );
+  return {
+    scenario: "Authorized Candidate.Create decomposed into its execution plan",
+    decisionPlanId: decision.decisionPlanId,
+    authorityId: authority.authorityId,
+    intentKind: decision.intentKind,
+    primaryStepId: decision.primaryStepId,
+    steps: decision.steps.map((s) => ({
+      id: s.id,
+      label: s.label,
+      execution: s.execution,
+      mutates: s.mutates,
+      dependsOn: s.dependsOn,
+    })),
+  };
+}
+
+export type SampleDecision = ReturnType<typeof liveSampleDecision>;
