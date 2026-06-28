@@ -71,7 +71,7 @@ export function EprStudio({ schema }: { schema: ObjectSchema }) {
         {/* Object header — maturity is computed, never asserted */}
         <header style={{ background: "linear-gradient(135deg,#09375f,#0a2a47)", color: "#fff", padding: "18px 28px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 12, opacity: 0.7 }}>{schema.glyph}</span>
+            <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 10, fontWeight: 700, letterSpacing: 0.6, padding: "3px 8px", borderRadius: 5, background: "rgba(255,255,255,.14)", color: "#cfe0ee" }}>{schema.glyph}</span>
             <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>{schema.label}</h1>
             <span
               style={{

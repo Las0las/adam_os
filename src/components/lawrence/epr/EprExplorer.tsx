@@ -29,11 +29,11 @@ export function EprExplorer() {
               aria-selected={i === idx}
               onClick={() => setIdx(i)}
               style={{
-                fontSize: 12, fontWeight: 600, padding: "5px 14px", borderRadius: 6, cursor: "pointer", border: "none",
-                background: i === idx ? "#44b0b1" : "transparent", color: "#fff",
+                fontSize: 12, fontWeight: 600, padding: "5px 16px", borderRadius: 6, cursor: "pointer", border: "none",
+                background: i === idx ? "#44b0b1" : "transparent", color: "#fff", opacity: i === idx ? 1 : 0.72,
               }}
             >
-              {s.schema.glyph} {s.id}
+              {s.id}
             </button>
           ))}
         </div>

@@ -4,7 +4,7 @@ import type { ObjectSchema } from "../contracts";
 export const jobSchema: ObjectSchema = {
   objectType: "Job",
   label: "Job Requisition",
-  glyph: "⟨Job⟩",
+  glyph: "JOB",
   studio: "Job Studio",
   identityKeys: ["title"],
   governKey: "approval",

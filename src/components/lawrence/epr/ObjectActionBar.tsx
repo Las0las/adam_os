@@ -92,7 +92,7 @@ export function ObjectActionBar({
   return (
     <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
       {objectGlyph && (
-        <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11, color: "#6b7a8a", marginRight: 2 }}>
+        <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 9, fontWeight: 700, letterSpacing: 0.5, color: "#7d8a98", background: "#eef3f7", border: "1px solid #dde6ee", borderRadius: 5, padding: "2px 7px", marginRight: 4 }}>
           {objectGlyph}
         </span>
       )}
