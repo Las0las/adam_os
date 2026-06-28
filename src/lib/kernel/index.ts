@@ -52,7 +52,7 @@ export {
   RuntimeHierarchyError,
 } from "./runtime-hierarchy";
 export type { RuntimeLayer } from "./runtime-hierarchy";
-export { liveSampleAuthorities, liveSampleDecision } from "./sample-authorities";
+export { liveSampleAuthorities, liveSampleDecision, liveSampleSnapshot } from "./sample-authorities";
 export type { AuthoritySummary, SampleDecision } from "./sample-authorities";
 export { composeDecision } from "./decision-runtime";
 export type { Decision, DecisionStep, StepExecution } from "./decision-runtime";

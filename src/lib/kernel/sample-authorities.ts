@@ -8,6 +8,7 @@
 
 import { Kernel } from "./kernel-runtime";
 import type { ExecutionAuthority, Intent } from "./contracts";
+import { createSnapshot, type RuntimeSnapshot } from "./runtime-snapshot";
 
 /** A serializable summary of one issued authority, for the audit lens. */
 export interface AuthoritySummary {
@@ -139,3 +140,37 @@ export function liveSampleDecision(now = Date.parse("2026-01-01T00:00:00.000Z"))
 }
 
 export type SampleDecision = ReturnType<typeof liveSampleDecision>;
+
+/**
+ * Capture a representative RuntimeSnapshot so the Kernel Explorer can show the
+ * single most important reproduction primitive in full: the content-hashed,
+ * fully-serializable context that makes an execution replayable bit-for-bit.
+ * Deterministic — fixed clock and fixed inputs yield a stable snapshotId.
+ */
+export function liveSampleSnapshot(now = Date.parse("2026-01-01T00:00:00.000Z")): RuntimeSnapshot {
+  const tenant = "lawrence";
+  const authority = Kernel.requestAuthority(
+    {
+      kind: "projection.resolve",
+      actor: { kind: "human", id: "user_recruiter_01", tenantId: tenant, permissions: ["candidate:read"] },
+      enterpriseId: tenant,
+      projection: { objectType: "candidate", projectionId: "candidate.detail", surface: "fullPage" },
+      audited: true,
+    },
+    now,
+  );
+  return createSnapshot({
+    authority,
+    enterpriseId: tenant,
+    host: { surface: "server", now: new Date(now).toISOString() },
+    runtimeState: {
+      instance: null,
+      surface: "fullPage",
+      mode: "view",
+      locale: "en-US",
+      user: { tenantId: tenant, userId: "user_recruiter_01", displayName: "Recruiter One" },
+      permissions: ["candidate:read"],
+      policy: { requireApprovalFor: [], blockedIntents: [] },
+    },
+  });
+}
