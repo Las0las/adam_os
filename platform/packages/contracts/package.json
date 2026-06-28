@@ -1,0 +1,28 @@
+{
+  "name": "@lawrence/contracts",
+  "version": "0.0.0",
+  "description": "RFC-PC0 — LAWRENCE Platform Contracts. The frozen, implementation-free interfaces the platform survives on.",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "devDependencies": {
+    "typescript": "5.6.3",
+    "vitest": "2.1.5"
+  }
+}
