@@ -36,6 +36,7 @@ export const lawrenceNav: NavSection[] = [
   {
     title: "Studios",
     items: [
+      { label: "Universal Workspace", href: "/workspace" },
       { label: "Job Intake Studio", href: "/job-intake" },
       { label: "Candidate Studio", href: "/candidate-studio" },
       { label: "Design System (LDS-001)", href: "/design-system" },
