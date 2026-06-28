@@ -67,19 +67,45 @@ export interface ProjectionTelemetry {
   resolvedAt: string;
 }
 
-/** The constitutional authority under which this projection was resolved. Every
- *  projection derives its right to render from the root Constitution Runtime;
- *  this serializable summary carries that decision to the surface so the UI can
- *  attribute and explain it. */
+/** The execution authority under which this projection was resolved. Every
+ *  projection is rendered against an ExecutionAuthority token issued by the
+ *  kernel (built on the Constitution Runtime); this serializable summary carries
+ *  that authority to the surface so the UI can attribute and explain it. */
 export interface ProjectionAuthority {
+  /** The ExecutionAuthority token id issued by the kernel for this resolve. */
+  authorityId: string;
   decisionId: string;
   outcome: "authorized" | "denied" | "authorized_with_advice";
   authorized: boolean;
   constitutionVersion: string;
+  /** Capabilities the authority grants for this projection. */
+  capabilities: string[];
   /** Mission objective this projection best serves, if any. */
   missionObjective?: string;
-  /** Plain reasons when the projection was not fully authorized. */
+  /** Plain reasons/restrictions when the projection was not fully authorized. */
   advisories: string[];
+}
+
+/** Provenance: the exact execution context that produced this RenderPlan. A
+ *  screenshot alone can be traced back to its snapshot, runtime version graph,
+ *  authority, and a content fingerprint — so any plan is reproducible and any
+ *  drift is detectable. */
+export interface ProjectionProvenance {
+  /** The RuntimeSnapshot id this plan was composed under. */
+  snapshotId: string;
+  /** Hash of the runtime version graph that produced it. */
+  runtimeGraphHash: string;
+  /** Pinned versions of the runtimes that composed it. */
+  projectionVersion: string;
+  composerVersion: string;
+  /** The authority token id under which it resolved. */
+  authorityId: string;
+  /** Hash of the authority's evidence trail. */
+  evidenceHash: string;
+  /** Logical generation time (from the snapshot's host clock, not wall-clock). */
+  generatedAt: string;
+  /** Content fingerprint of the plan body — identical inputs ⇒ identical value. */
+  planFingerprint: string;
 }
 
 /** The complete, serializable render plan. */
@@ -99,6 +125,8 @@ export interface RenderPlan {
   telemetry: ProjectionTelemetry;
   /** The constitutional decision that authorized this projection to resolve. */
   authority: ProjectionAuthority;
+  /** The reproducible execution context that produced this plan. */
+  provenance: ProjectionProvenance;
 }
 
 /** The runtime's resolve() output. */

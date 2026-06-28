@@ -41,5 +41,11 @@ export {
   CONSTITUTION_LENSES,
   projectHeadline,
   summarizeDecision,
+  toConstitutionView,
 } from "./projection";
-export type { ConstitutionLens, ConstitutionHeadline, DecisionSummary } from "./projection";
+export type {
+  ConstitutionLens,
+  ConstitutionHeadline,
+  ConstitutionView,
+  DecisionSummary,
+} from "./projection";

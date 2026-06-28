@@ -10,11 +10,58 @@ import type { Constitution, ConstitutionDecision } from "./contracts";
 
 export type ConstitutionLens = "document" | "executive" | "developer" | "audit";
 
+/**
+ * A fully serializable view of the constitution — predicates (honored/met/holds/
+ * evaluate) stripped — so it can cross the server→client boundary. Surfaces
+ * render from this, never from the live document.
+ */
+export interface ConstitutionView {
+  version: string;
+  effectiveDate: string;
+  amendments: Constitution["amendments"];
+  identity: Constitution["identity"];
+  mission: Constitution["mission"];
+  principles: Constitution["principles"];
+  rights: { id: string; holder: string; statement: string; rationale: string }[];
+  responsibilities: { id: string; bearer: string; statement: string; rationale: string }[];
+  invariants: {
+    id: string;
+    title: string;
+    statement: string;
+    severity: Constitution["invariants"][number]["severity"];
+    derivedFrom: string[];
+    rationale: string;
+  }[];
+  policies: { id: string; title: string; statement: string; enforces: string[] }[];
+}
+
+export function toConstitutionView(c: Constitution): ConstitutionView {
+  return {
+    version: c.version,
+    effectiveDate: c.effectiveDate,
+    amendments: c.amendments,
+    identity: c.identity,
+    mission: c.mission,
+    principles: c.principles,
+    rights: c.rights.map((r) => ({ id: r.id, holder: r.holder, statement: r.statement, rationale: r.rationale })),
+    responsibilities: c.responsibilities.map((r) => ({ id: r.id, bearer: r.bearer, statement: r.statement, rationale: r.rationale })),
+    invariants: c.invariants.map((i) => ({
+      id: i.id,
+      title: i.title,
+      statement: i.statement,
+      severity: i.severity,
+      derivedFrom: i.derivedFrom,
+      rationale: i.rationale,
+    })),
+    policies: c.policies.map((p) => ({ id: p.id, title: p.title, statement: p.statement, enforces: p.enforces })),
+  };
+}
+
 export const CONSTITUTION_LENSES: { id: ConstitutionLens; label: string; blurb: string }[] = [
   { id: "document", label: "Document", blurb: "The ratified text: identity, mission, principles, rights, duties." },
   { id: "executive", label: "Executive", blurb: "Mission objectives, posture, and what the constitution guarantees." },
   { id: "developer", label: "Developer", blurb: "Invariants, executable policies, and the contracts they enforce." },
-  { id: "audit", label: "Audit", blurb: "Version lineage and live, evidenced decisions from the runtime." },
+  { id: "audit", label: "Audit", blurb: "Self-hosting (SB-7), constitutional validation, replay determinism, execution authority, decision plans, the journal, and lineage." },
 ];
 
 /** A serializable summary of one decision, for the audit/evidence lens. */
@@ -59,7 +106,7 @@ export interface ConstitutionHeadline {
   objectives: number;
 }
 
-export function projectHeadline(c: Constitution): ConstitutionHeadline {
+export function projectHeadline(c: Constitution | ConstitutionView): ConstitutionHeadline {
   return {
     principles: c.principles.length,
     rights: c.rights.length,

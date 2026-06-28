@@ -8,7 +8,7 @@
 
 import { registerAction } from "@/lib/mission-control/actions/action-service";
 import { upsertObject } from "@/lib/dataops/ontology/object-service";
-import { ConstitutionRuntime } from "@/lib/constitution";
+import { Kernel, appendJournal } from "@/lib/kernel";
 import { id } from "@/lib/lawrence-core/utils/ids";
 import { candidateObject } from "@/lib/projection-runtime/definitions/candidate.object";
 import { toCanonicalPayload } from "@/lib/projection-runtime/engines/binding-engine";
@@ -46,13 +46,14 @@ registerAction({
     return result.ok ? null : (result.violations[0]?.message ?? "Invalid candidate payload");
   },
   async run(ctx, input) {
-    // L0 — derive execution authority from the root runtime BEFORE any mutation.
-    // The governed path resolves identity, scopes the tenant, and is audited; the
-    // runtime returns an evidenced ConstitutionDecision (the authority token) or
-    // throws ConstitutionViolationError, which the action engine surfaces as a
-    // denial. This is the authoritative, fail-closed re-check.
+    // L0/L1 — Authority → Decision BEFORE any mutation. `Kernel.decide` first
+    // asserts authority ("may this happen?", fail-closed: throws
+    // AuthorityDeniedError on denial), then composes the concrete plan ("exactly
+    // what will happen?") and journals it. The handler executes the plan's
+    // immediate `create` step; downstream steps (assign recruiter, duplicate
+    // check, AI summary, onboarding workflow) are planned for the scheduler.
     const actorUserId = ctx.actorUserId ?? null;
-    const decision = ConstitutionRuntime.assertAuthorized({
+    const { authority, decision } = Kernel.decide({
       kind: "object.create",
       actor: {
         // The governed action engine always runs under a resolved principal:
@@ -66,6 +67,7 @@ registerAction({
       object: { objectType: candidateObject.objectType, isMutation: false },
       audited: true,
     });
+    const createStepId = decision.primaryStepId ?? "create";
 
     // Authoritatively shape the canonical object from the metadata bindings —
     // never trust a client-assembled title/status/properties blob.
@@ -73,6 +75,21 @@ registerAction({
     const email = payload.properties.email;
     const externalKey =
       email != null && String(email).length > 0 ? `cand-${String(email).toLowerCase()}` : `cand-${id("c")}`;
+
+    // The runtime never edits objects in place — it PREPARES a mutation, then
+    // commits it. Both steps are journaled, bound to the authorizing token.
+    appendJournal({
+      kind: "MutationPrepared",
+      at: new Date().toISOString(),
+      snapshotId: null,
+      authorityId: authority.authorityId,
+      decisionId: authority.decisionId,
+      actorKind: authority.actor.kind,
+      actorId: authority.actor.id,
+      enterpriseId: authority.enterpriseId,
+      summary: `Prepared create of ${candidateObject.objectType}`,
+      detail: { externalKey, capabilities: authority.capabilities, decisionPlanId: decision.decisionPlanId, step: createStepId },
+    });
 
     const candidate = await upsertObject(ctx, {
       objectType: candidateObject.objectType,
@@ -82,11 +99,29 @@ registerAction({
       properties: payload.properties,
     });
 
+    // The committed mutation creates a new object version — recorded in the
+    // append-only journal, bound to the authority that permitted it.
+    appendJournal({
+      kind: "MutationCommitted",
+      at: new Date().toISOString(),
+      snapshotId: null,
+      authorityId: authority.authorityId,
+      decisionId: authority.decisionId,
+      actorKind: authority.actor.kind,
+      actorId: authority.actor.id,
+      enterpriseId: authority.enterpriseId,
+      summary: `Created ${candidateObject.objectType} ${candidate.id}`,
+      detail: { externalKey, capabilities: authority.capabilities, decisionPlanId: decision.decisionPlanId, step: createStepId },
+    });
+
     return {
       candidateId: candidate.id,
       objectType: candidateObject.objectType,
       externalKey,
-      constitutionDecisionId: decision.decisionId,
+      authorityId: authority.authorityId,
+      decisionId: authority.decisionId,
+      decisionPlanId: decision.decisionPlanId,
+      plannedSteps: decision.steps.map((s) => s.id),
     };
   },
 });
