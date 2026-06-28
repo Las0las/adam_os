@@ -48,6 +48,22 @@ pnpm build               # tsc build of every package
 on-demand command and is intentionally **not** part of the `test` gate (no Studios
 exist yet, and a clean clone should not need a browser download to go green).
 
+## Continuous Integration (one-time manual step)
+
+The GitHub Actions workflow lives at [`ci/platform-ci.yml`](./ci/platform-ci.yml)
+as a **drop-in template**. It is not committed under `.github/workflows/` because
+the automated tooling that authored this subtree lacks the `workflows` GitHub App
+permission. To activate CI, copy it to the repo root once:
+
+```bash
+mkdir -p .github/workflows
+cp platform/ci/platform-ci.yml .github/workflows/platform-ci.yml
+git add .github/workflows/platform-ci.yml && git commit -m "ci: enable platform-ci"
+```
+
+The workflow is path-scoped to `platform/**`, so it runs independently of the
+existing application CI and only fires on changes within this subtree.
+
 ## Packages
 
 | Package               | Role                                                            |

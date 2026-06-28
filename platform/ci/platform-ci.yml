@@ -1,7 +1,18 @@
+# LAWRENCE Platform monorepo CI (Phase 0+).
+#
+# This is a DROP-IN TEMPLATE. v0's connected GitHub App does not have the
+# `workflows` permission, so it cannot commit files under `.github/workflows/`.
+# To enable CI, copy this file to `.github/workflows/platform-ci.yml` at the
+# repo root yourself (a one-time manual step):
+#
+#     mkdir -p .github/workflows
+#     cp platform/ci/platform-ci.yml .github/workflows/platform-ci.yml
+#
+# It is scoped to `platform/**` so it is fully independent of the existing
+# application CI at the repo root.
+
 name: platform-ci
 
-# CI for the LAWRENCE Platform monorepo (Phase 0+). Scoped to platform/** so it
-# is independent of the existing application CI at the repo root.
 on:
   push:
     branches: [main]
