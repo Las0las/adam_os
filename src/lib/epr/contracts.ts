@@ -76,6 +76,8 @@ export interface ObjectSchema {
   label: string;
   /** Glyph/short code for the object header. */
   glyph?: string;
+  /** Display name of the studio that projects this object (e.g. "Job Studio"). */
+  studio?: string;
   /** Keys that together establish identity (maturity step "Identified"). */
   identityKeys: string[];
   /** Key whose presence marks the object "Governed". */

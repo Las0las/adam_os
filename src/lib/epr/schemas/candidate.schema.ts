@@ -5,6 +5,7 @@ export const candidateSchema: ObjectSchema = {
   objectType: "Candidate",
   label: "Candidate",
   glyph: "⟨Candidate⟩",
+  studio: "Candidate Studio",
   identityKeys: ["fullName"],
   governKey: "consent",
   sections: [

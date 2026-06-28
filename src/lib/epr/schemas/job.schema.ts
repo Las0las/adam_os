@@ -5,6 +5,7 @@ export const jobSchema: ObjectSchema = {
   objectType: "Job",
   label: "Job Requisition",
   glyph: "⟨Job⟩",
+  studio: "Job Studio",
   identityKeys: ["title"],
   governKey: "approval",
   sections: [
