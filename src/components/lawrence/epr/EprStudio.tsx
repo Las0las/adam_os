@@ -26,6 +26,7 @@ import {
   type Provenance,
 } from "@/lib/epr";
 import { PsiField } from "./PsiField";
+import { ObjectActionBar } from "./ObjectActionBar";
 
 export function EprStudio({ schema }: { schema: ObjectSchema }) {
   const [state, setState] = useState<EprState>(emptyState);
@@ -46,6 +47,22 @@ export function EprStudio({ schema }: { schema: ObjectSchema }) {
     const f = schema.sections.flatMap((s) => s.fields).find((x) => x.key === key);
     const v = f?.kind === "multi" ? (f.chips || []).slice(0, 2) : (f?.chips?.[0] || "Generated");
     mutate(key, v, "ai", 0.92, `AI proposed ${label}`);
+  }
+
+  /**
+   * STD-UX-0001 Part III "Evolve": the Advisor advances the object to its next
+   * maturity state. It applies the single highest-gain recommendation through the
+   * SAME governed runtime path a human uses — never a direct mutation.
+   */
+  const topRec = advisor[0] || null;
+  function evolve() {
+    if (!topRec) return;
+    if (topRec.kind === "market") {
+      setMarket((m) => ({ ...m, on: true }));
+      return;
+    }
+    const f = schema.sections.flatMap((s) => s.fields).find((x) => x.key === topRec.key);
+    aiFill(topRec.key, f?.label || topRec.key);
   }
 
   return (
@@ -95,6 +112,18 @@ export function EprStudio({ schema }: { schema: ObjectSchema }) {
             <span style={{ fontSize: 12, fontFamily: "JetBrains Mono, monospace" }} data-testid="readiness">{ready}% ready</span>
           </div>
         </header>
+
+        {/* STD-UX-0001 Part III — every Enterprise Object inherits this identical action bar */}
+        <div style={{ background: "#fff", borderBottom: "1px solid #d9e1ea", padding: "10px 20px" }}>
+          <ObjectActionBar
+            objectLabel={schema.label}
+            objectGlyph={schema.glyph}
+            referenceId={schema.id}
+            onEvolve={topRec ? evolve : null}
+            nextEvolution={topRec ? topRec.label : null}
+            onAskAdvisor={() => { /* Advisor rail is always visible in this projection */ }}
+          />
+        </div>
 
         <div style={{ display: "flex", alignItems: "flex-start", gap: 16, padding: 20, flexWrap: "wrap" }}>
           {/* PROJECTION CANVAS */}
