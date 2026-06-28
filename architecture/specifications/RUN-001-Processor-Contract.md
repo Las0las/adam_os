@@ -90,6 +90,10 @@ altering any existing contract; any inference invocation path.
   the wrapped unit directly.
 - **INV-001.6 (Identity stability).** `ProcessorIdentity` SHALL be immutable once
   published; a behavior change SHALL increment `version`.
+- **INV-001.7 (No direct reality mutation).** A processor's effect on the world SHALL be a
+  `ProcessorEffect` (RUN-011): a `ProjectionWrite` to a disposable projection, or a
+  `CommandIntent` realized only by an accepted event. A processor SHALL NOT mutate ontology
+  objects directly (Principle 0 §9; Axioms 1–3).
 
 ## Conformance Requirements
 
@@ -101,14 +105,18 @@ altering any existing contract; any inference invocation path.
 - **RUN-001/C4.** RUN-001 exports no bare `Processor`, `Function`, or `Pipeline`
   identifier (AS-003 R10).
 - **RUN-001/C5.** A processor never reaches a provider except via `executeInference`.
+- **RUN-001/C6.** A processor performs no direct ontology mutation; its world-effect is a
+  `ProcessorEffect` (RUN-011).
 
 ## Related Specifications
 
-RUN-000 (ownership), RUN-002, RUN-003, RUN-004, RUN-005, RUN-006, RUN-007, RUN-009.
+RUN-000 (ownership), RUN-002, RUN-003, RUN-004, RUN-005, RUN-006, RUN-007, RUN-009,
+RUN-011 (effect boundary).
 
 ## Related ADRs
 
-ADR-0005 (establishing); ADR-0003 (IOS boundary preserved).
+ADR-0005 (establishing); ADR-0006 (Principle 0 boundary); ADR-0003 (IOS boundary
+preserved).
 
 ## Implementation Notes (non-normative)
 

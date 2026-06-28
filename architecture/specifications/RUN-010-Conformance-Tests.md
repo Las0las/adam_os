@@ -51,8 +51,9 @@ consistency).
 ## Normative Interfaces
 
 - **RUN-010/1.** Suites SHALL live under `/conformance/run/<area>` with areas mirroring
-  RUN-001 … RUN-009 (`contract/`, `io/`, `context/`, `profile/`, `incremental/`,
-  `governance/`, `registry/`, `materializer/`, `exceptions/`).
+  RUN-001 … RUN-009 and RUN-011 (`contract/`, `io/`, `context/`, `profile/`,
+  `incremental/`, `governance/`, `registry/`, `materializer/`, `exceptions/`,
+  `ontology-boundary/`).
 - **RUN-010/2.** Each Conformance Requirement `RUN-NNN/Cx` SHALL map to at least one
   executable assertion. A suite verifies but does not define behavior; where suite and
   spec disagree, the spec governs (CONF-FRAMEWORK §3).
@@ -81,21 +82,29 @@ consistency).
   `aiops/execution/**` is unmodified (ADR-0003; AS-003 R1).
 - **INV-010.8 (Ownership consistency).** A suite SHALL assert each RUN spec's owned objects
   match the RUN-000 matrix and no object is owned twice (RUN-000/C1–C3).
+- **INV-010.9 (Ontology owns reality).** A suite SHALL assert no processor performs a
+  direct ontology mutation; the Runtime's only reality path is a `CommandIntent` (RUN-011)
+  realized by an accepted event (Principle 0 §5/§9; Axioms 1–2).
+- **INV-010.10 (Projection disposability).** A suite SHALL assert materialized projections
+  are rebuildable from the ontology and are not treated as authoritative (Axiom 3).
+- **INV-010.11 (Governance precedes execution).** A suite SHALL assert a reality-changing
+  effect cannot proceed without Policy authorization (Axiom 7; RUN-011/C4).
 
 ## Conformance Requirements
 
 - **RUN-010/C1.** Each `RUN-NNN/Cx` has at least one mapped executable assertion.
-- **RUN-010/C2.** All cross-cutting proofs INV-010.1–INV-010.8 exist and pass.
+- **RUN-010/C2.** All cross-cutting proofs INV-010.1–INV-010.11 exist and pass.
 - **RUN-010/C3.** Existing `tests/**` and `/conformance/ios/**` remain unmoved and
   unmodified.
 
 ## Related Specifications
 
-RUN-000 (ownership), RUN-001 … RUN-009 (requirement sources), CONF-FRAMEWORK.
+RUN-000 (ownership), RUN-001 … RUN-009 and RUN-011 (requirement sources), CONF-FRAMEWORK.
 
 ## Related ADRs
 
-ADR-0005 (establishing); ADR-0001 (conformance framework lineage).
+ADR-0005 (establishing); ADR-0006 (Principle 0 boundary); ADR-0001 (conformance framework
+lineage).
 
 ## Implementation Notes (non-normative)
 

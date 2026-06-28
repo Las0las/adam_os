@@ -9,13 +9,15 @@
 | Owner | LAWRENCE Architecture Council |
 | Effective Date | — (Draft) |
 | Superseded By | — |
-| Related Artifacts | AS-003, ADR-0005, RUN-001 … RUN-010, ASSESS-001 |
+| Related Artifacts | CONST-PLATFORM-LAWRENCE (Principle 0), AS-003, ADR-0005, ADR-0006, RUN-001 … RUN-011, ASSESS-001 |
 
-> This index defines the **Runtime Architecture Library**: the set of ten RUN
+> This index defines the **Runtime Architecture Library**: the set of RUN
 > specifications that together form the **constitutional runtime contracts** of the
 > Processor Runtime (AS-003). It is normative for **canonical object ownership** and the
-> producer/consumer graph. Terminology follows RFC-2119. No implementation SHALL begin
-> until AS-003 and the RUN specifications are ratified and ADR-0005 is approved.
+> producer/consumer graph. The Library is subordinate to the LAWRENCE Platform
+> Constitution and its **Principle 0 — The Ontology Owns Reality** (see RUN-011, ADR-0006).
+> Terminology follows RFC-2119. No implementation SHALL begin until AS-003 and the RUN
+> specifications are ratified and ADR-0005/ADR-0006 are approved.
 
 ## Purpose
 
@@ -44,6 +46,7 @@ this index governs until corrected by an ADR.
 | RUN-008 | Output Materializers | `OutputMaterializer`, `MaterializationSink`, `MaterializationResult` |
 | RUN-009 | Runtime Exception Taxonomy | `RuntimeException`, `RuntimeFaultKind`, RUN fault subtypes |
 | RUN-010 | Conformance Tests | RUN conformance suites & assertions (`/conformance/run/**`) |
+| RUN-011 | Ontology & Event Boundary | `ProcessorEffect`, `ProjectionWrite`, `CommandIntent` |
 
 ## Canonical Object Ownership Matrix (normative)
 
@@ -68,6 +71,7 @@ this index governs until corrected by an ADR.
 | `OutputMaterializer` / `MaterializationSink` | RUN-008 | RUN-008 | runtime executor |
 | `MaterializationResult` | RUN-008 | RUN-008 | lineage, audit, RUN-009 |
 | `RuntimeException` / `RuntimeFaultKind` | RUN-009 | RUN-009 normalizer (`normalizeRuntimeFault`) | all RUN specs (raise), executor, RUN-010 |
+| `ProcessorEffect` / `ProjectionWrite` / `CommandIntent` | RUN-011 | Processor (declares effect); `CommandIntent` realized by accepted events | RUN-008 (`ProjectionWrite`), Command/Event subsystems (`CommandIntent`) |
 
 ## Consumed External Objects (owned outside the Runtime Library)
 
@@ -76,6 +80,9 @@ treat them as read-only public contracts of their authoritative producers.
 
 | External Object | Authoritative Producer (existing) | RUN Consumer(s) |
 |---|---|---|
+| **enterprise reality / ontology objects** | **Ontology subsystem** — *owns reality* (Principle 0 §1/§9) | RUN-011 (consumes; never mutates directly) |
+| **accepted events** (establish facts) | **Event subsystem / event store** (Principle 0 §5/§8; Axiom 2) | RUN-011 (reality changes realized here) |
+| **command acceptance & authorization** | **Command + Policy subsystems** (Principle 0 §6/§7; Axiom 7) | RUN-011 (`CommandIntent`), RUN-006 (authorization composition) |
 | `ActorContext` | Platform / app | RUN-003 |
 | `AccessDecision`, `SecurityContext`, `evaluateObjectAccess` | Security (`src/lib/security`) | RUN-006 |
 | `LineageEvent` / lineage emission | DataOps (`src/lib/dataops/lineage`) | RUN-005, RUN-008 |
@@ -95,8 +102,9 @@ AS-003
        ├─ RUN-003 ─┤  (consumes RUN-004 profile, RUN-005 mode, RUN-006 clearance)
        ├─ RUN-001 ─┤  (consumes RUN-002/003/004/005/006)
        ├─ RUN-007 ─┤  (consumes RUN-001/004)
-       ├─ RUN-008 ─┤  (consumes RUN-002/003/005/006 + external persistence)
-       ├─ RUN-009 ─┘  (classifies faults across all; wraps IOS ExecutionError)
+       ├─ RUN-008 ─┤  (consumes RUN-002/003/005/006/011 + external persistence)
+       ├─ RUN-009 ─┤  (classifies faults across all; wraps IOS ExecutionError)
+       ├─ RUN-011 ─┘  (Principle 0 boundary; consumes Ontology/Event/Command/Policy)
        └─ RUN-010     (verifies all of the above)
 ```
 
@@ -104,6 +112,10 @@ AS-003
 - No RUN specification SHALL depend on a lower platform layer (Constitution Art. I);
   external objects are consumed only as published public contracts.
 - No lower layer (IOS, DataOps, Security, kernel) SHALL depend on any RUN object.
+- **Principle 0 (Ontology owns reality).** The Runtime Library owns neither reality nor
+  facts. It consumes the Ontology (reality), Event (facts), and Command/Policy (intent/
+  authorization) subsystems as published contracts; reality changes occur only via
+  accepted events (RUN-011). The Runtime materializes **disposable projections** only.
 
 ## Conformance Requirements (index-level)
 
@@ -112,14 +124,32 @@ AS-003
 - **RUN-000/C2.** Every consumed object SHALL name an authoritative producer that exists
   in this index or in the external-objects table.
 - **RUN-000/C3.** The intra-library dependency graph SHALL be acyclic (RUN-010 enforces).
+- **RUN-000/C4.** No RUN object SHALL claim ownership of enterprise reality or facts; the
+  Ontology and Event subsystems remain their authoritative owners (Principle 0; RUN-011).
+
+## Axiom Traceability (normative)
+
+| Axiom | Realized by |
+|---|---|
+| 1. The ontology owns reality | RUN-011 (no direct mutation), RUN-008 (projections only) |
+| 2. Events establish facts | RUN-011 (`CommandIntent` → accepted event) |
+| 3. State is derived, never edited | RUN-008 (projections disposable/rebuildable), RUN-005 |
+| 4. Contracts define behavior | RUN-001/002 (declared contracts) |
+| 5. Invariants define correctness | every RUN spec's Runtime Invariants |
+| 6. Specifications precede implementation | AS-003 R11 / DD-001 |
+| 7. Governance precedes execution | RUN-011 (policy before effect), RUN-006 |
+| 8. Missions express intent | RUN-011 (`CommandIntent`) — bound to mission/command subsystem |
+| 9. Automation executes under governance | RUN-006 clearance + RUN-011 authorization |
+| 10. Every experience is a projection | RUN-008 (projection materialization) |
 
 ## Related Specifications
 
-RUN-001 … RUN-010 (members); governed by AS-003.
+RUN-001 … RUN-011 (members); governed by AS-003.
 
 ## Related ADRs
 
-ADR-0005 (establishing); ADR-0003 and ADR-0004 (IOS boundary preserved).
+ADR-0005 (establishing); ADR-0006 (Principle 0 / ontology-event boundary); ADR-0003 and
+ADR-0004 (IOS boundary preserved).
 
 ## Implementation Notes (non-normative)
 
