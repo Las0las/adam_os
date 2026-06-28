@@ -67,7 +67,12 @@ export type IconName =
   | "arrow"
   | "close"
   | "shield"
-  | "play";
+  | "play"
+  | "link"
+  | "code"
+  | "hash"
+  | "pin"
+  | "open";
 
 export function Icon({ name, ...p }: P & { name: IconName }) {
   switch (name) {
@@ -340,6 +345,42 @@ export function Icon({ name, ...p }: P & { name: IconName }) {
         <S {...p}>
           <path d="M12 3l7 3v5c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9V6l7-3Z" />
           <path d="M9 11.5l2 2 4-4" />
+        </S>
+      );
+    case "link":
+      return (
+        <S {...p}>
+          <path d="M10 13.5a3.5 3.5 0 0 0 5 0l2.5-2.5a3.54 3.54 0 0 0-5-5L11 7.5" />
+          <path d="M14 10.5a3.5 3.5 0 0 0-5 0L6.5 13a3.54 3.54 0 0 0 5 5L13 16.5" />
+        </S>
+      );
+    case "code":
+      return (
+        <S {...p}>
+          <path d="m8 8-4 4 4 4" />
+          <path d="m16 8 4 4-4 4" />
+          <path d="m13.5 6-3 12" />
+        </S>
+      );
+    case "hash":
+      return (
+        <S {...p}>
+          <path d="M5 9h14M5 15h14M9.5 4 8 20M16 4l-1.5 16" />
+        </S>
+      );
+    case "pin":
+      return (
+        <S {...p}>
+          <path d="M12 17v5" />
+          <path d="M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6Z" />
+        </S>
+      );
+    case "open":
+      return (
+        <S {...p}>
+          <path d="M14 4h6v6" />
+          <path d="M20 4 10 14" />
+          <path d="M19 14v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
         </S>
       );
     case "play":

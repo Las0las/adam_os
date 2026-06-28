@@ -1,8 +1,12 @@
 "use client";
 
 import { Icon } from "./icons";
+import { ContextZone, IntentPreview, useClipboard, type MenuItem } from "./lis";
 import {
   ENTERPRISE_OBJECTS,
+  OBJECT_INTENT,
+  objectCopyPayload,
+  objectLink,
   RECENT_COMMANDS,
   type EnterpriseObject,
 } from "@/lib/runtime-console/data";
@@ -11,15 +15,61 @@ function ObjectRow({
   obj,
   active,
   onOpen,
+  onToast,
 }: {
   obj: EnterpriseObject;
   active: boolean;
   onOpen: (id: string) => void;
+  onToast: (msg: string) => void;
 }) {
-  return (
+  const copy = useClipboard();
+  const menu: MenuItem[] = [
+    {
+      id: `${obj.id}-link`,
+      label: "Copy link",
+      icon: "link",
+      kbd: "⌘L",
+      flashOnRun: true,
+      run: () => copy(objectLink(obj.id)),
+    },
+    {
+      id: `${obj.id}-json`,
+      label: "Copy as JSON",
+      icon: "code",
+      flashOnRun: true,
+      run: () => copy(objectCopyPayload(obj.id, obj.name, "Object collection")),
+    },
+    {
+      id: `${obj.id}-id`,
+      label: "Copy object ID",
+      icon: "hash",
+      flashOnRun: true,
+      run: () => copy(obj.id),
+    },
+    { id: `${obj.id}-sep`, label: "", icon: "link", sep: true, run: () => false },
+    {
+      id: `${obj.id}-open`,
+      label: "Open in Workspace",
+      icon: "open",
+      run: () => {
+        onOpen(obj.id);
+        return false;
+      },
+    },
+    {
+      id: `${obj.id}-pin`,
+      label: "Pin to workspace",
+      icon: "pin",
+      run: () => {
+        onToast(`${obj.name} pinned to workspace`);
+        return false;
+      },
+    },
+  ];
+  const row = (
     <button
       type="button"
-      className={`eor-obj${active ? " active" : ""}`}
+      className={`eor-obj lis-intent lis-focusable${active ? " active" : ""}`}
       onClick={() => onOpen(obj.id)}
       aria-label={`Open ${obj.name} objects`}
     >
@@ -43,16 +93,24 @@ function ObjectRow({
       </span>
     </button>
   );
+  const meta = OBJECT_INTENT[obj.id];
+  return (
+    <ContextZone items={menu}>
+      {meta ? <IntentPreview meta={meta}>{row}</IntentPreview> : row}
+    </ContextZone>
+  );
 }
 
 export function LeftRail({
   activeId,
   onOpenObject,
   onOpenPalette,
+  onToast,
 }: {
   activeId: string | null;
   onOpenObject: (id: string) => void;
   onOpenPalette: () => void;
+  onToast: (msg: string) => void;
 }) {
   return (
     <aside className="eor-col eor-rail-left">
@@ -65,7 +123,13 @@ export function LeftRail({
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {ENTERPRISE_OBJECTS.map((o) => (
-            <ObjectRow key={o.id} obj={o} active={activeId === o.id} onOpen={onOpenObject} />
+            <ObjectRow
+              key={o.id}
+              obj={o}
+              active={activeId === o.id}
+              onOpen={onOpenObject}
+              onToast={onToast}
+            />
           ))}
         </div>
         <button className="eor-more" type="button">

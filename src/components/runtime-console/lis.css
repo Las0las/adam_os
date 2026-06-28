@@ -1,0 +1,361 @@
+/* ───────────────────────────────────────────────────────────────────────────
+   LIS-001 — LAWRENCE Interaction System
+   Foundation tokens + primitive styles. Scoped under .eor so the system never
+   leaks into the rest of the app. Every interaction in the runtime console
+   inherits these tokens; nothing hardcodes a duration, easing, or focus ring.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.eor {
+  /* Motion — durations */
+  --lis-dur-instant: 80ms;
+  --lis-dur-fast: 140ms;
+  --lis-dur-base: 220ms;
+  --lis-dur-slow: 360ms;
+
+  /* Motion — easings (governed feel: decisive in, gentle settle) */
+  --lis-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --lis-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --lis-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Interaction state colors (semantic, not raw) */
+  --lis-pending: #d8a838; /* requested / in flight */
+  --lis-governing: #44b0b1; /* policy evaluation */
+  --lis-granted: #3fb27f; /* approved / settled-allow */
+  --lis-denied: #d8694e; /* denied / blocked */
+  --lis-escalated: #6ea8e6; /* routed to a human */
+
+  /* Focus ring — one ring, used everywhere keyboard focus lands */
+  --lis-ring: 0 0 0 2px rgba(8, 24, 40, 1), 0 0 0 4px rgba(68, 176, 177, 0.9);
+
+  /* Elevation (hover intent) */
+  --lis-elev-hover: 0 8px 24px -6px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(68, 176, 177, 0.35);
+}
+
+/* Respect reduced-motion: collapse all transitions/animations. */
+@media (prefers-reduced-motion: reduce) {
+  .eor * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ── Universal focus ring ──────────────────────────────────────────────────
+   Applied to any focusable LIS primitive via :focus-visible so mouse users
+   never see it but keyboard users always do. */
+.eor .lis-focusable:focus-visible {
+  outline: none;
+  box-shadow: var(--lis-ring);
+  border-radius: 8px;
+}
+
+/* ── Hover-intent elevation ─────────────────────────────────────────────── */
+.eor .lis-intent {
+  transition:
+    transform var(--lis-dur-fast) var(--lis-ease-out),
+    box-shadow var(--lis-dur-fast) var(--lis-ease-out),
+    border-color var(--lis-dur-fast) var(--lis-ease-out);
+}
+.eor .lis-intent:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--lis-elev-hover);
+}
+
+/* ── Intent preview hovercard ──────────────────────────────────────────────
+   Shows intent / authority / risk / evidence / expected result on hover.
+   Proves the action is governed before it is ever clicked. */
+.eor .lis-preview {
+  position: fixed;
+  z-index: 120;
+  width: 320px;
+  padding: 14px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(13, 38, 60, 0.98), rgba(9, 27, 44, 0.98));
+  border: 1px solid rgba(68, 176, 177, 0.32);
+  box-shadow: 0 18px 48px -12px rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+  animation: lis-pop var(--lis-dur-fast) var(--lis-ease-out);
+}
+@keyframes lis-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.eor .lis-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.eor .lis-preview-intent {
+  font-size: 13px;
+  font-weight: 600;
+  color: #eaf3f6;
+  letter-spacing: 0.01em;
+}
+.eor .lis-preview-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.eor .lis-preview-row {
+  display: flex;
+  gap: 8px;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+.eor .lis-preview-k {
+  flex: 0 0 64px;
+  color: #7f9bb0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 9.5px;
+  padding-top: 1px;
+}
+.eor .lis-preview-v {
+  color: #cfe0e8;
+  flex: 1;
+}
+.eor .lis-preview-ev {
+  margin: 0;
+  padding-left: 14px;
+  color: #cfe0e8;
+}
+.eor .lis-preview-ev li {
+  margin: 2px 0;
+}
+.eor .lis-risk {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+.eor .lis-risk .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+}
+.eor .lis-risk.r-good {
+  background: rgba(63, 178, 127, 0.16);
+  color: #7fd6ab;
+}
+.eor .lis-risk.r-good .dot {
+  background: var(--lis-granted);
+}
+.eor .lis-risk.r-warn {
+  background: rgba(216, 168, 56, 0.16);
+  color: #e7c878;
+}
+.eor .lis-risk.r-warn .dot {
+  background: var(--lis-pending);
+}
+.eor .lis-risk.r-bad {
+  background: rgba(216, 105, 78, 0.16);
+  color: #e89a86;
+}
+.eor .lis-risk.r-bad .dot {
+  background: var(--lis-denied);
+}
+
+/* ── Governed action bar (optimistic Approve / Dismiss / Escalate) ─────────── */
+.eor .lis-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.eor .lis-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    background var(--lis-dur-fast) var(--lis-ease-out),
+    border-color var(--lis-dur-fast) var(--lis-ease-out),
+    transform var(--lis-dur-instant) var(--lis-ease-out),
+    opacity var(--lis-dur-fast) var(--lis-ease-out);
+}
+.eor .lis-btn:active {
+  transform: scale(0.96);
+}
+.eor .lis-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.eor .lis-btn.approve {
+  background: rgba(63, 178, 127, 0.14);
+  border-color: rgba(63, 178, 127, 0.4);
+  color: #8fe0b8;
+}
+.eor .lis-btn.approve:hover:not(:disabled) {
+  background: rgba(63, 178, 127, 0.24);
+}
+.eor .lis-btn.dismiss {
+  background: rgba(127, 155, 176, 0.1);
+  border-color: rgba(127, 155, 176, 0.28);
+  color: #b6c8d4;
+}
+.eor .lis-btn.dismiss:hover:not(:disabled) {
+  background: rgba(127, 155, 176, 0.2);
+}
+.eor .lis-btn.escalate {
+  background: rgba(110, 168, 230, 0.12);
+  border-color: rgba(110, 168, 230, 0.34);
+  color: #a8caf0;
+}
+.eor .lis-btn.escalate:hover:not(:disabled) {
+  background: rgba(110, 168, 230, 0.22);
+}
+
+/* Optimistic status track — the chain the user sees the instant they click */
+.eor .lis-track {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: rgba(8, 26, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 11.5px;
+  animation: lis-pop var(--lis-dur-fast) var(--lis-ease-out);
+}
+.eor .lis-track-spinner {
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-top-color: var(--lis-governing);
+  animation: lis-spin 0.7s linear infinite;
+  flex: 0 0 auto;
+}
+@keyframes lis-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.eor .lis-track-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  animation: lis-pulse 1.4s var(--lis-ease-in-out) infinite;
+}
+.eor .lis-track-dot.requested {
+  background: var(--lis-pending);
+}
+.eor .lis-track-dot.granted {
+  background: var(--lis-granted);
+  animation: none;
+}
+.eor .lis-track-dot.denied {
+  background: var(--lis-denied);
+  animation: none;
+}
+.eor .lis-track-dot.escalated {
+  background: var(--lis-escalated);
+  animation: none;
+}
+@keyframes lis-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+.eor .lis-track-label {
+  color: #dcebf1;
+  flex: 1;
+}
+.eor .lis-track-label b {
+  color: #fff;
+}
+.eor .lis-undo {
+  background: none;
+  border: none;
+  color: var(--lis-governing);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+.eor .lis-undo:hover {
+  text-decoration: underline;
+}
+
+/* ── Context menu (universal copy / open / pin) ───────────────────────────── */
+.eor .lis-menu {
+  position: fixed;
+  z-index: 130;
+  min-width: 196px;
+  padding: 6px;
+  border-radius: 11px;
+  background: linear-gradient(180deg, rgba(14, 40, 62, 0.99), rgba(9, 27, 44, 0.99));
+  border: 1px solid rgba(68, 176, 177, 0.3);
+  box-shadow: 0 22px 56px -14px rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(10px);
+  animation: lis-pop var(--lis-dur-fast) var(--lis-ease-out);
+}
+.eor .lis-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 9px;
+  border: none;
+  background: none;
+  color: #cfe0e8;
+  font-size: 12.5px;
+  text-align: left;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background var(--lis-dur-instant) var(--lis-ease-out);
+}
+.eor .lis-menu-item:hover {
+  background: rgba(68, 176, 177, 0.14);
+  color: #eaf3f6;
+}
+.eor .lis-menu-item .lis-menu-ico {
+  color: #7f9bb0;
+  display: inline-flex;
+}
+.eor .lis-menu-item:hover .lis-menu-ico {
+  color: var(--lis-governing);
+}
+.eor .lis-menu-kbd {
+  margin-left: auto;
+  font-size: 10px;
+  color: #5f7d92;
+  letter-spacing: 0.04em;
+}
+.eor .lis-menu-sep {
+  height: 1px;
+  margin: 5px 6px;
+  background: rgba(255, 255, 255, 0.07);
+}
+.eor .lis-menu-flash {
+  color: var(--lis-granted) !important;
+}
+
+/* Right-click affordance: object surfaces hint they are interactive. */
+.eor .lis-ctx {
+  cursor: context-menu;
+}

@@ -3,6 +3,8 @@
 // Aberdeen Recruiting workspace. Pure data: surfaces project these, never mutate.
 // ─────────────────────────────────────────────────────────────────────────
 
+import type { IntentMeta } from "@/components/runtime-console/lis";
+
 export type IconKey =
   | "candidate"
   | "job"
@@ -399,6 +401,149 @@ export const FOOTER_CONTEXT: readonly { icon: IconKey; label: string; value: str
 
 export const SCOPES = ["North America", "EMEA", "APAC", "Global"] as const;
 export type Scope = (typeof SCOPES)[number];
+
+// ── LIS-001 governance metadata ──────────────────────────────────────────────
+// What each object / action / capability declares BEFORE it runs. Surfaced as a
+// hover intent preview and folded into copy payloads, so the runtime always
+// shows its intent, authority, risk, evidence, and expected result up front.
+
+/** Keyed by object id (selected objects + left-rail objects). */
+export const OBJECT_INTENT: Record<string, IntentMeta> = {
+  "sarah-chen": {
+    intent: "Project candidate against an open requisition",
+    authority: "Recruiter · read-only projection",
+    risk: { tier: 0, label: "No mutation", band: "good" },
+    evidence: ["94% skills match (9/10)", "Final Round completed", "Comp within band"],
+    expected: "Side-by-side fit, gap, and risk read — no record is changed",
+  },
+  "jr-118": {
+    intent: "Inspect requisition coverage and pipeline",
+    authority: "Recruiter · read-only projection",
+    risk: { tier: 0, label: "No mutation", band: "good" },
+    evidence: ["2 openings · critical", "12 active candidates", "Coverage Workflow 360 running"],
+    expected: "Live coverage truth and top matches — no record is changed",
+  },
+  candidates: {
+    intent: "Open the Candidates object collection",
+    authority: "Recruiter · read-only",
+    risk: { tier: 0, label: "No mutation", band: "good" },
+    evidence: ["318 objects", "12 active", "47 at risk"],
+    expected: "Projected candidate roster scoped to the workspace",
+  },
+  offers: {
+    intent: "Review the Offers object collection",
+    authority: "Recruiter · approvals gated",
+    risk: { tier: 2, label: "Approval-gated", band: "warn" },
+    evidence: ["6 objects", "2 expiring", "1 pending"],
+    expected: "Offer roster; extending or editing routes to approval",
+  },
+  revenue: {
+    intent: "Investigate revenue posture",
+    authority: "Executive lens · read-only",
+    risk: { tier: 1, label: "Sensitive read", band: "warn" },
+    evidence: ["QTD $4.2M", "-6.3% vs last QTD"],
+    expected: "Revenue projection with at-risk attribution",
+  },
+};
+
+/** Keyed by recommended-action id. */
+export const ACTION_INTENT: Record<string, IntentMeta> = {
+  ra1: {
+    intent: "Approve candidates awaiting review",
+    authority: "Recruiter · within shortlist policy",
+    risk: { tier: 1, label: "Low", band: "good" },
+    evidence: ["2 candidates queued", "Both passed screening", "No policy conflicts"],
+    expected: "Candidates advance; a governed event is appended for each",
+  },
+  ra2: {
+    intent: "Schedule pending interviews",
+    authority: "Recruiter · calendar write",
+    risk: { tier: 1, label: "Low", band: "good" },
+    evidence: ["3 interviews unscheduled", "Panels available this week"],
+    expected: "Interview objects created and invites drafted",
+  },
+  ra3: {
+    intent: "Investigate revenue risk",
+    authority: "Executive lens · read-only",
+    risk: { tier: 1, label: "Sensitive read", band: "warn" },
+    evidence: ["-6.3% vs last QTD", "2 roles driving exposure"],
+    expected: "Attribution of the decline — no record is changed",
+  },
+  ra4: {
+    intent: "Act on an offer expiring tomorrow",
+    authority: "Recruiter · approval required to extend",
+    risk: { tier: 3, label: "High · time-bound", band: "bad" },
+    evidence: ["1 offer · expires in <24h", "Candidate in Final Round"],
+    expected: "Opens the offer; extension routes to human approval",
+  },
+  ra5: {
+    intent: "Resolve a policy conflict",
+    authority: "Compliance · requires review",
+    risk: { tier: 3, label: "High", band: "bad" },
+    evidence: ["1 conflict flagged", "Blocks downstream automation"],
+    expected: "Conflict opened for review; resolution is logged",
+  },
+};
+
+/** Keyed by capability id. */
+export const CAPABILITY_INTENT: Record<string, IntentMeta> = {
+  skills: {
+    intent: "Run Skills Match analysis",
+    authority: "Comparison Runtime v1.4.2 · read-only",
+    risk: { tier: 0, label: "No mutation", band: "good" },
+    evidence: ["Required vs. actual skill graph", "10 hard skills evaluated"],
+    expected: "Match score with per-skill gaps",
+  },
+  experience: {
+    intent: "Run Experience Analysis",
+    authority: "Comparison Runtime v1.4.2 · read-only",
+    risk: { tier: 0, label: "No mutation", band: "good" },
+    evidence: ["Years, roles, domain depth"],
+    expected: "Seniority and domain-fit read",
+  },
+  culture: {
+    intent: "Run Cultural Fit analysis",
+    authority: "Comparison Runtime v1.4.2 · read-only",
+    risk: { tier: 0, label: "No mutation", band: "good" },
+    evidence: ["Values and work-style signals"],
+    expected: "Alignment read with caveats",
+  },
+  comp: {
+    intent: "Run Compensation Analysis",
+    authority: "Comparison Runtime v1.4.2 · read-only",
+    risk: { tier: 1, label: "Sensitive read", band: "warn" },
+    evidence: ["Market and internal benchmarks"],
+    expected: "Band positioning — no offer is created",
+  },
+  risk: {
+    intent: "Run Risk Assessment",
+    authority: "Comparison Runtime v1.4.2 · read-only",
+    risk: { tier: 1, label: "Sensitive read", band: "warn" },
+    evidence: ["Turnover and performance signals"],
+    expected: "Risk read with contributing factors",
+  },
+};
+
+/** Stable deep-link + JSON payload for any object, used by the copy menu. */
+export function objectLink(id: string): string {
+  const base = typeof window !== "undefined" ? window.location.origin : "https://lawrence.app";
+  return `${base}/runtime-console#object=${id}`;
+}
+
+export function objectCopyPayload(id: string, name: string, kind: string): string {
+  return JSON.stringify(
+    {
+      id,
+      name,
+      kind,
+      workspace: "Aberdeen Recruiting",
+      link: objectLink(id),
+      intent: OBJECT_INTENT[id] ?? null,
+    },
+    null,
+    2,
+  );
+}
 
 // ── Universal Workspace inspector (read-only projection) ─────────────────────
 

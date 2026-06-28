@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./runtime-console.css";
+import "./lis.css";
 import { Icon } from "./icons";
+import { LisMenuProvider } from "./lis";
 import { LeftRail } from "./LeftRail";
 import { CenterStage } from "./CenterStage";
 import { RightRail } from "./RightRail";
@@ -96,6 +98,7 @@ export function RuntimeConsole() {
   const openObject = useCallback((id: string) => setOpenObjectId(id), []);
 
   return (
+    <LisMenuProvider>
     <div className="eor">
       <div className="eor-inner">
         {/* ── Top bar ──────────────────────────────────────────────────── */}
@@ -147,6 +150,7 @@ export function RuntimeConsole() {
             activeId={openObjectId}
             onOpenObject={openObject}
             onOpenPalette={() => setPaletteOpen(true)}
+            onToast={showToast}
           />
           <CenterStage
             activeIndex={activeIndex}
@@ -154,7 +158,7 @@ export function RuntimeConsole() {
             executing={executing}
             onExecute={execute}
             onOpenObject={openObject}
-            onAction={(label) => showToast(`${label} — routed to the runtime`)}
+            onToast={showToast}
           />
           <RightRail />
         </div>
@@ -176,5 +180,6 @@ export function RuntimeConsole() {
         </div>
       )}
     </div>
+    </LisMenuProvider>
   );
 }
