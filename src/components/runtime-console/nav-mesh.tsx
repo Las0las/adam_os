@@ -190,8 +190,8 @@ function LeftWorkspaceRail() {
   const activeObject = useNavStore((s) => s.activeObject);
   const pivotTo = useNavStore((s) => s.pivotTo);
   return (
-    <nav className="lis-rail" aria-label="Enterprise objects">
-      <div className="lis-rail-mark" title="LAWRENCE">
+    <nav className="lis-mesh-rail" aria-label="Enterprise objects">
+      <div className="lis-mesh-rail-mark" title="LAWRENCE">
         <Icon name="command" size={18} />
       </div>
       {OBJECTS.map((o) => (
@@ -222,15 +222,15 @@ function RailButton({
   return (
     <button
       type="button"
-      className={`lis-rail-btn lis-focusable${active ? " active" : ""}`}
+      className={`lis-mesh-rail-btn lis-focusable${active ? " active" : ""}`}
       title={`${label} · ${count}`}
       aria-label={`${label}, ${count} objects`}
       aria-current={active ? "true" : undefined}
       onClick={() => onPivot(object, rootId, rootLabel)}
     >
       <Icon name={icon} size={20} />
-      {count > 0 && <span className="lis-rail-count">{count}</span>}
-      {active && <span className="lis-rail-active" aria-hidden />}
+      {count > 0 && <span className="lis-mesh-rail-count">{count}</span>}
+      {active && <span className="lis-mesh-rail-active" aria-hidden />}
     </button>
   );
 }

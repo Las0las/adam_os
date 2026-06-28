@@ -115,6 +115,11 @@
   background: var(--shell-rail);
   overflow: hidden;
   min-inline-size: 0;
+  /* Fill the assigned grid track. justify-self:stretch is unreliable for a
+     flex-display grid item here (it leaves the rail content-width ~60px and
+     clips the in-flow panel); an explicit 100% inline-size fills it reliably.
+     For a collapsed track this resolves to 40px, so it is always correct. */
+  inline-size: 100%;
 }
 .lis-rail-left {
   grid-area: left;

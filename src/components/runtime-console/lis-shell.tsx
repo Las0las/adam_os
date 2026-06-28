@@ -420,6 +420,9 @@ export function useLayoutMemory(
   fallbackPosture: LayoutPosture = "expanded-flex",
 ): {
   initialState: ViewportLayoutState;
+  /** Bumps once after persisted state is rehydrated post-mount. Spread as the
+   *  shell's `key` so it re-seeds from localStorage WITHOUT an SSR mismatch. */
+  hydrationKey: number;
   onLayoutChange: (s: ViewportLayoutState) => void;
   clear: () => void;
 } {
@@ -439,18 +442,21 @@ export function useLayoutMemory(
     };
   }, [fallbackPosture]);
 
-  const [initialState] = useState<ViewportLayoutState>(() => {
-    if (typeof window === "undefined") return seedFromPosture();
+  // Deterministic seed: identical on the server and the first client render, so
+  // hydration always matches. Persisted layout is applied AFTER mount (below).
+  const [seed] = useState<ViewportLayoutState>(seedFromPosture);
+  const [persisted, setPersisted] = useState<ViewportLayoutState | null>(null);
+
+  useEffect(() => {
     try {
       const raw = window.localStorage.getItem(storageKey);
-      if (!raw) return seedFromPosture();
+      if (!raw) return;
       const parsed = JSON.parse(raw) as ViewportLayoutState;
-      if (parsed && parsed.panels && parsed.mode) return parsed;
+      if (parsed && parsed.panels && parsed.mode) setPersisted(parsed);
     } catch {
-      /* corrupt payload → fall back */
+      /* corrupt payload → keep the seed */
     }
-    return seedFromPosture();
-  });
+  }, [storageKey]);
 
   const onLayoutChange = useCallback(
     (s: ViewportLayoutState) => {
@@ -465,6 +471,7 @@ export function useLayoutMemory(
   );
 
   const clear = useCallback(() => {
+    setPersisted(null);
     if (typeof window === "undefined") return;
     try {
       window.localStorage.removeItem(storageKey);
@@ -473,7 +480,12 @@ export function useLayoutMemory(
     }
   }, [storageKey]);
 
-  return { initialState, onLayoutChange, clear };
+  return {
+    initialState: persisted ?? seed,
+    hydrationKey: persisted ? 1 : 0,
+    onLayoutChange,
+    clear,
+  };
 }
 
 // ── Inline glyphs (self-contained, no icon-name coupling) ────────────────────

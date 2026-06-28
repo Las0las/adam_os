@@ -51,7 +51,7 @@
 }
 
 /* ── Layer 1 · rail ───────────────────────────────────────────────────── */
-.lis-rail {
+.lis-mesh-rail {
   width: 60px;
   flex: 0 0 60px;
   background: var(--m-rail);
@@ -62,7 +62,7 @@
   gap: 8px;
   padding: 12px 0;
 }
-.lis-rail-mark {
+.lis-mesh-rail-mark {
   width: 36px;
   height: 36px;
   display: grid;
@@ -70,7 +70,7 @@
   color: var(--m-accent);
   margin-bottom: 6px;
 }
-.lis-rail-btn {
+.lis-mesh-rail-btn {
   position: relative;
   width: 40px;
   height: 40px;
@@ -83,15 +83,15 @@
   cursor: pointer;
   transition: background var(--m-dur) var(--m-ease), color var(--m-dur) var(--m-ease);
 }
-.lis-rail-btn:hover {
+.lis-mesh-rail-btn:hover {
   background: var(--m-panel-2);
   color: var(--m-ink);
 }
-.lis-rail-btn.active {
+.lis-mesh-rail-btn.active {
   background: var(--m-panel-2);
   color: var(--m-accent);
 }
-.lis-rail-active {
+.lis-mesh-rail-active {
   position: absolute;
   left: -10px;
   top: 8px;
@@ -585,7 +585,7 @@
 .lis-mesh .t-accent { color: var(--m-accent); }
 .lis-mesh .t-muted { color: var(--m-ink-faint); }
 
-.lis-rail-count {
+.lis-mesh-rail-count {
   position: absolute;
   top: 5px;
   right: 6px;

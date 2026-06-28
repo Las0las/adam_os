@@ -28,7 +28,7 @@ function setShellMode(mode: ShellMode) {
 }
 
 export function WorkspaceShellDemo() {
-  const { initialState, onLayoutChange, clear } = useLayoutMemory(
+  const { initialState, hydrationKey, onLayoutChange, clear } = useLayoutMemory(
     "lis.shell.demo.v1",
     "expanded-flex",
   );
@@ -62,6 +62,7 @@ export function WorkspaceShellDemo() {
 
       <div className="lis-demo-stage">
         <WorkspaceShell
+          key={hydrationKey}
           layoutState={initialState.posture}
           initialState={initialState}
           onLayoutChange={(s) => {
