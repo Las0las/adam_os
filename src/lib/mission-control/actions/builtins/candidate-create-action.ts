@@ -8,6 +8,7 @@
 
 import { registerAction } from "@/lib/mission-control/actions/action-service";
 import { upsertObject } from "@/lib/dataops/ontology/object-service";
+import { assertCompliant } from "@/lib/constitution";
 import { id } from "@/lib/lawrence-core/utils/ids";
 import { candidateObject } from "@/lib/projection-runtime/definitions/candidate.object";
 import { toCanonicalPayload } from "@/lib/projection-runtime/engines/binding-engine";
@@ -45,6 +46,26 @@ registerAction({
     return result.ok ? null : (result.violations[0]?.message ?? "Invalid candidate payload");
   },
   async run(ctx, input) {
+    // L0 — constitutional preflight (fail-closed, authoritative). The governed
+    // path resolves identity, scopes the tenant, and is audited; assert the
+    // blocking invariants before any mutation. Throws ConstitutionViolationError
+    // on violation, which the action engine surfaces as a denial.
+    const actorUserId = ctx.actorUserId ?? null;
+    assertCompliant({
+      kind: "object.create",
+      actor: {
+        // The governed action engine always runs under a resolved ActorContext:
+        // a user (with a user id) or the tenant-scoped system actor (without one).
+        kind: actorUserId ? "user" : "system",
+        id: actorUserId,
+        tenantId: ctx.tenantId ?? null,
+        permissions: ctx.permissions as unknown as string[],
+      },
+      enterpriseId: ctx.tenantId ?? "",
+      object: { objectType: candidateObject.objectType, isMutation: false },
+      audited: true,
+    });
+
     // Authoritatively shape the canonical object from the metadata bindings —
     // never trust a client-assembled title/status/properties blob.
     const payload = toCanonicalPayload(candidateObject, input as Record<string, unknown>);

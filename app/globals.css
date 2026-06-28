@@ -180,3 +180,30 @@ pre.json { background: var(--panel-2); padding: 10px; border-radius: 6px; font-s
 .proj-result.bad { background: rgba(255,92,92,0.12); color: var(--bad); }
 .proj-result.warn { background: rgba(245,166,35,0.12); color: var(--warn); }
 .btn-secondary { background: var(--panel-2); }
+
+/* ── L0 — Enterprise Constitution surface ────────────────────────────────── */
+.stack { display: flex; flex-direction: column; gap: 28px; }
+.const-eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+.const-hero { padding: 24px; border-left: 3px solid var(--accent); }
+.const-identity-name { font-size: 26px; font-weight: 800; margin: 0 0 6px; letter-spacing: 0.4px; }
+.const-descriptor { font-size: 15px; color: var(--text); margin: 0 0 14px; max-width: 70ch; }
+.const-identity-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+.const-mission { border-top: 1px solid var(--border); padding-top: 16px; }
+.const-mission-statement { font-size: 15px; margin: 0 0 10px; max-width: 80ch; }
+.const-measures { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+.const-measures li { margin: 3px 0; }
+
+.const-section-title { font-size: 15px; font-weight: 700; margin: 0 0 4px; }
+.const-section-note { font-size: 12px; margin: 0 0 14px; max-width: 80ch; }
+.const-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.const-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 900px) { .const-two-col { grid-template-columns: 1fr; } }
+.const-list { display: flex; flex-direction: column; gap: 10px; }
+
+.const-item, .const-row { padding: 14px 16px; }
+.const-item-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.const-item-head h4 { margin: 0; font-size: 14px; }
+.const-item p, .const-row p { margin: 0; font-size: 13px; }
+.const-derived { font-size: 11px; color: var(--muted); }
+.const-row .spacer { flex: 1; }
+.const-enforces { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
