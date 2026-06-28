@@ -12,7 +12,13 @@ export default async function CandidatesPage() {
   return (
     <>
       <PageHeader title="Candidates" sub="Candidate objects projected from ingested data." />
-      <Metric label="Candidates" value={candidates.length} />
+      <div className="cc-toolbar">
+        <Metric label="Candidates" value={candidates.length} />
+        <div className="spacer" />
+        <Link href="/recruiting/candidates/new" className="btn btn-primary">
+          New candidate
+        </Link>
+      </div>
       <div className="card">
         <h3>Candidates</h3>
         <table>

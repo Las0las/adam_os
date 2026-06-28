@@ -35,6 +35,7 @@ import { installEvalSuites } from "@/lib/aiops/evals/eval-seed";
 import { installSecuritySeeds } from "@/lib/security/security-seed";
 import "@/lib/mission-control/actions/builtins";
 import "@/lib/integrations/register-integrations";
+import { registerConstitutionGovernancePolicy } from "@/lib/constitution";
 import {
   seedOnboarding,
   seedSupport,
@@ -97,6 +98,11 @@ export function ensureBootstrapped(): Promise<void> {
 
 async function initRuntime(): Promise<void> {
   assertPersistenceReady();
+  // L0 — register the Enterprise Constitution's blocking invariants as a
+  // governance policy so the orchestrator enforces them on every governed
+  // subject. Idempotent and deterministic; it only re-expresses the ratified
+  // constitution in the orchestrator's finding vocabulary.
+  registerConstitutionGovernancePolicy();
   // Attach the passive observability stack to the execution pipeline so every
   // inference automatically produces telemetry, metrics, audit, and health
   // observations. Idempotent and observation-only — it changes no behavior.
