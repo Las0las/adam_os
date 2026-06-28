@@ -6,6 +6,7 @@
 
 import { getConstitution, projectHeadline, toConstitutionView } from "@/lib/constitution";
 import { liveSampleDecisions } from "@/lib/constitution/sample-decisions";
+import { liveSampleAuthorities, getLedger } from "@/lib/kernel";
 import { ConstitutionLenses } from "@/components/lawrence/constitution/ConstitutionLenses";
 import { PageHeader } from "@/components/lawrence/shared/widgets";
 
@@ -19,14 +20,25 @@ export default function ConstitutionPage() {
   const view = toConstitutionView(getConstitution());
   const headline = projectHeadline(view);
   const decisions = liveSampleDecisions();
+  // Run representative intents through the kernel — this ISSUES ExecutionAuthority
+  // tokens and, as a side effect, appends grant/denial entries to the Execution
+  // Ledger. Read the ledger AFTER so the surface reflects those writes.
+  const authorities = liveSampleAuthorities();
+  const ledger = getLedger(24);
 
   return (
     <div className="page">
       <PageHeader
         title="Enterprise Constitution"
-        sub={`The root runtime · v${view.version} · every layer derives its execution authority from an evidenced constitutional decision`}
+        sub={`The root runtime · v${view.version} · every layer derives its execution authority from a signed, evidenced ExecutionAuthority issued by the kernel`}
       />
-      <ConstitutionLenses constitution={view} headline={headline} decisions={decisions} />
+      <ConstitutionLenses
+        constitution={view}
+        headline={headline}
+        decisions={decisions}
+        authorities={authorities}
+        ledger={ledger}
+      />
     </div>
   );
 }

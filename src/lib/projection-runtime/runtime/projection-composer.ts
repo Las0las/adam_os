@@ -28,8 +28,10 @@ import { canEmitIntent } from "../engines/permission-engine";
 import { evaluateIntentPolicy } from "../engines/policy-engine";
 import { initialState } from "../engines/lifecycle-engine";
 import { NOOP_TELEMETRY } from "../engines/telemetry-emitter";
-import { ConstitutionRuntime } from "@/lib/constitution";
 import type { PrincipalKind } from "@/lib/constitution";
+// L3 → L0: the projection runtime obtains an ExecutionAuthority from the kernel.
+// It never evaluates the constitution itself — it consumes the issued token.
+import { Kernel } from "@/lib/kernel";
 
 export interface ComposeInput {
   enterpriseObject: EnterpriseObjectDefinition;
@@ -127,27 +129,32 @@ export function compose(input: ComposeInput): RenderPlan {
     data: { projectionId: projectionDefinition.id, objectType: enterpriseObject.objectType },
   });
 
-  // L0 — a projection derives its right to render from the root Constitution
-  // Runtime. Resolution itself is a (read) action; authorize it and carry the
-  // evidenced decision onto the plan so every surface is attributable.
+  // L0 — a projection derives its right to render from an ExecutionAuthority
+  // issued by the kernel. Resolution is an intent; the kernel authorizes it
+  // (via the Constitution Runtime), records the grant to the ledger, and returns
+  // the token we carry onto the plan so every surface is attributable.
   const principalKind: PrincipalKind =
     input.principalKind ?? (userContext.userId ? "human" : "system");
-  const decision = ConstitutionRuntime.authorize({
-    kind: "projection.resolve",
-    actor: {
-      kind: principalKind,
-      id: userContext.userId,
-      tenantId: userContext.tenantId,
-      permissions: permissionContext.permissions as unknown as string[],
+  const surface = runtimeContext.surfaceOverride ?? projectionDefinition.surface;
+  const authority = Kernel.requestAuthority(
+    {
+      kind: "projection.resolve",
+      actor: {
+        kind: principalKind,
+        id: userContext.userId,
+        tenantId: userContext.tenantId,
+        permissions: permissionContext.permissions as unknown as string[],
+      },
+      enterpriseId: userContext.tenantId,
+      projection: {
+        objectType: enterpriseObject.objectType,
+        projectionId: projectionDefinition.id,
+        surface,
+      },
+      audited: true,
     },
-    enterpriseId: userContext.tenantId,
-    projection: {
-      objectType: enterpriseObject.objectType,
-      projectionId: projectionDefinition.id,
-      surface: runtimeContext.surfaceOverride ?? projectionDefinition.surface,
-    },
-    audited: true,
-  });
+    Date.parse(runtimeContext.now) || Date.now(),
+  );
 
   // Resolve every field once, key it, then place into the layout.
   const resolvedByKey = new Map<string, ResolvedField>();
@@ -167,13 +174,13 @@ export function compose(input: ComposeInput): RenderPlan {
   const primaryDef = projectionDefinition.primaryIntent
     ? intentByName.get(projectionDefinition.primaryIntent)
     : undefined;
-  // When the Constitution denies resolution, no intent may be emitted from this
-  // surface — authority flows from the decision, not from the button.
-  const constitutionalReason = decision.authorized
+  // When the kernel withholds authority, no intent may be emitted from this
+  // surface — authority flows from the issued token, not from the button.
+  const constitutionalReason = authority.granted
     ? undefined
-    : `Constitution denied resolution: ${decision.violations.map((v) => v.ref).join(", ")}`;
+    : `Execution authority denied: ${authority.restrictions.join(", ") || "constitution withheld authority"}`;
   const gate = (intent: ResolvedIntent): ResolvedIntent =>
-    decision.authorized ? intent : { ...intent, enabled: false, disabledReason: constitutionalReason };
+    authority.granted ? intent : { ...intent, enabled: false, disabledReason: constitutionalReason };
 
   const primaryDefResolved = primaryDef ? resolveIntent(primaryDef, input) : undefined;
   const primaryIntent = primaryDefResolved ? gate(primaryDefResolved) : undefined;
@@ -202,12 +209,19 @@ export function compose(input: ComposeInput): RenderPlan {
       resolvedAt: runtimeContext.now,
     },
     authority: {
-      decisionId: decision.decisionId,
-      outcome: decision.outcome,
-      authorized: decision.authorized,
-      constitutionVersion: decision.constitutionVersion,
-      missionObjective: decision.missionAlignment?.title,
-      advisories: decision.advisories.map((a) => `${a.ref}: ${a.rationale}`),
+      authorityId: authority.authorityId,
+      decisionId: authority.decisionId,
+      outcome:
+        authority.outcome === "granted"
+          ? "authorized"
+          : authority.outcome === "denied"
+            ? "denied"
+            : "authorized_with_advice",
+      authorized: authority.granted,
+      constitutionVersion: authority.constitutionVersion,
+      capabilities: authority.capabilities,
+      missionObjective: authority.mission?.title,
+      advisories: authority.restrictions,
     },
   };
 

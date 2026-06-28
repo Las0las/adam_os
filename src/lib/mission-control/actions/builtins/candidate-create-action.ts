@@ -8,7 +8,7 @@
 
 import { registerAction } from "@/lib/mission-control/actions/action-service";
 import { upsertObject } from "@/lib/dataops/ontology/object-service";
-import { ConstitutionRuntime } from "@/lib/constitution";
+import { Kernel, appendLedger } from "@/lib/kernel";
 import { id } from "@/lib/lawrence-core/utils/ids";
 import { candidateObject } from "@/lib/projection-runtime/definitions/candidate.object";
 import { toCanonicalPayload } from "@/lib/projection-runtime/engines/binding-engine";
@@ -46,13 +46,14 @@ registerAction({
     return result.ok ? null : (result.violations[0]?.message ?? "Invalid candidate payload");
   },
   async run(ctx, input) {
-    // L0 — derive execution authority from the root runtime BEFORE any mutation.
-    // The governed path resolves identity, scopes the tenant, and is audited; the
-    // runtime returns an evidenced ConstitutionDecision (the authority token) or
-    // throws ConstitutionViolationError, which the action engine surfaces as a
-    // denial. This is the authoritative, fail-closed re-check.
+    // L0 — obtain an ExecutionAuthority from the kernel BEFORE any mutation.
+    // The kernel asks the Constitution Runtime to authorize this intent, records
+    // the grant to the Execution Ledger, and returns a signed, expiring token —
+    // or throws AuthorityDeniedError, which the action engine surfaces as a
+    // denial. This is the authoritative, fail-closed re-check; the handler never
+    // mutates without a granted token.
     const actorUserId = ctx.actorUserId ?? null;
-    const decision = ConstitutionRuntime.assertAuthorized({
+    const authority = Kernel.assertAuthority({
       kind: "object.create",
       actor: {
         // The governed action engine always runs under a resolved principal:
@@ -82,11 +83,26 @@ registerAction({
       properties: payload.properties,
     });
 
+    // Append the committed mutation to the append-only Execution Ledger, bound
+    // to the authority that permitted it — the enterprise's operational history.
+    appendLedger({
+      kind: "mutation.committed",
+      at: new Date().toISOString(),
+      authorityId: authority.authorityId,
+      decisionId: authority.decisionId,
+      actorKind: authority.actor.kind,
+      actorId: authority.actor.id,
+      enterpriseId: authority.enterpriseId,
+      summary: `Created ${candidateObject.objectType} ${candidate.id}`,
+      detail: { externalKey, capabilities: authority.capabilities },
+    });
+
     return {
       candidateId: candidate.id,
       objectType: candidateObject.objectType,
       externalKey,
-      constitutionDecisionId: decision.decisionId,
+      authorityId: authority.authorityId,
+      decisionId: authority.decisionId,
     };
   },
 });

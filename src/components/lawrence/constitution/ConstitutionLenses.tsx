@@ -8,14 +8,17 @@ import {
   type ConstitutionView,
   type DecisionSummary,
 } from "@/lib/constitution";
+import type { AuthoritySummary, LedgerEntry } from "@/lib/kernel";
 
 interface Props {
   constitution: ConstitutionView;
   headline: ConstitutionHeadline;
   decisions: DecisionSummary[];
+  authorities: AuthoritySummary[];
+  ledger: LedgerEntry[];
 }
 
-export function ConstitutionLenses({ constitution: c, headline, decisions }: Props) {
+export function ConstitutionLenses({ constitution: c, headline, decisions, authorities, ledger }: Props) {
   const [lens, setLens] = useState<ConstitutionLens>("document");
 
   return (
@@ -40,7 +43,9 @@ export function ConstitutionLenses({ constitution: c, headline, decisions }: Pro
       {lens === "document" && <DocumentLens c={c} />}
       {lens === "executive" && <ExecutiveLens c={c} headline={headline} />}
       {lens === "developer" && <DeveloperLens c={c} />}
-      {lens === "audit" && <AuditLens c={c} decisions={decisions} />}
+      {lens === "audit" && (
+        <AuditLens c={c} decisions={decisions} authorities={authorities} ledger={ledger} />
+      )}
     </div>
   );
 }
@@ -208,9 +213,88 @@ function DeveloperLens({ c }: { c: ConstitutionView }) {
 }
 
 // ── Audit lens ───────────────────────────────────────────────────────────────
-function AuditLens({ c, decisions }: { c: ConstitutionView; decisions: DecisionSummary[] }) {
+function AuditLens({
+  c,
+  decisions,
+  authorities,
+  ledger,
+}: {
+  c: ConstitutionView;
+  decisions: DecisionSummary[];
+  authorities: AuthoritySummary[];
+  ledger: LedgerEntry[];
+}) {
   return (
     <div className="stack">
+      <section>
+        <h3 className="const-section-title">Execution authority</h3>
+        <p className="const-section-note">
+          Every actor — human or AI — submits an intent to the kernel, which issues a signed, expiring
+          ExecutionAuthority. AI never executes; it requests authority through this same path.
+        </p>
+        <div className="const-list">
+          {authorities.map((a) => (
+            <Card key={a.authorityId} className="const-row">
+              <div className="const-item-head">
+                <span className={`badge ${a.granted ? "good" : "bad"}`}>
+                  {a.granted ? "granted" : "denied"}
+                </span>
+                <h4>{a.scenario}</h4>
+                <span className="spacer" />
+                <span className="const-derived">{a.actorKind}</span>
+              </div>
+              <div className="const-enforces">
+                <span className="badge neutral" title="authority id">{a.authorityId}</span>
+                <span className="badge neutral" title="tamper-evident signature">{a.signature}</span>
+                {a.mission && <span className="badge accent" title="mission objective served">{a.mission}</span>}
+              </div>
+              {a.capabilities.length > 0 && (
+                <div className="const-enforces">
+                  {a.capabilities.map((cap) => (
+                    <span key={cap} className="badge accent">grants {cap}</span>
+                  ))}
+                </div>
+              )}
+              {a.restrictions.length > 0 && (
+                <div className="const-enforces">
+                  {a.restrictions.map((r) => (
+                    <span key={r} className="badge warn">{r}</span>
+                  ))}
+                </div>
+              )}
+              {a.granted && (
+                <p className="const-derived">Expires {a.expiresAt} · decision {a.decisionId}</p>
+              )}
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h3 className="const-section-title">Execution ledger</h3>
+        <p className="const-section-note">
+          The append-only operational history. Every governed behavior — authority granted/denied, projection
+          rendered, mutation committed — is recorded here and can never be altered.
+        </p>
+        <div className="const-list">
+          {ledger.map((e) => (
+            <Card key={e.entryId} className="const-row">
+              <div className="const-item-head">
+                <span className={`badge ${e.kind.endsWith("denied") ? "bad" : "neutral"}`}>{e.kind}</span>
+                <h4>{e.summary}</h4>
+                <span className="spacer" />
+                <span className="const-derived">#{e.seq} · {e.actorKind}</span>
+              </div>
+              <p className="const-derived">
+                {e.at}
+                {e.authorityId ? ` · authority ${e.authorityId}` : ""}
+                {e.decisionId ? ` · decision ${e.decisionId}` : ""}
+              </p>
+            </Card>
+          ))}
+        </div>
+      </section>
+
       <section>
         <h3 className="const-section-title">Version lineage</h3>
         <div className="const-list">
