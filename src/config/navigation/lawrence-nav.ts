@@ -28,6 +28,7 @@ export const lawrenceNav: NavSection[] = [
     items: [
       { label: "Constitution", href: "/constitution" },
       { label: "Kernel Explorer", href: "/kernel" },
+      { label: "Architecture Primer", href: "/primer" },
     ],
   },
   {
