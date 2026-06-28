@@ -28,6 +28,8 @@ import { canEmitIntent } from "../engines/permission-engine";
 import { evaluateIntentPolicy } from "../engines/policy-engine";
 import { initialState } from "../engines/lifecycle-engine";
 import { NOOP_TELEMETRY } from "../engines/telemetry-emitter";
+import { ConstitutionRuntime } from "@/lib/constitution";
+import type { PrincipalKind } from "@/lib/constitution";
 
 export interface ComposeInput {
   enterpriseObject: EnterpriseObjectDefinition;
@@ -36,6 +38,9 @@ export interface ComposeInput {
   permissionContext: PermissionContext;
   policyContext: PolicyContext;
   runtimeContext: RuntimeContext;
+  /** The constitutionally-significant principal resolving the projection.
+   *  Defaults to `human` when a userId is present, else `system`. */
+  principalKind?: PrincipalKind;
 }
 
 /** Flatten a field's declared validations, injecting a lifecycle/required default
@@ -114,12 +119,34 @@ function resolvePostActions(input: ComposeInput): ResolvedPostAction[] {
 }
 
 export function compose(input: ComposeInput): RenderPlan {
-  const { enterpriseObject, projectionDefinition, runtimeContext } = input;
+  const { enterpriseObject, projectionDefinition, runtimeContext, userContext, permissionContext } = input;
   const telemetry = runtimeContext.telemetry ?? NOOP_TELEMETRY;
   telemetry.emit({
     name: "projection.resolving",
     at: runtimeContext.now,
     data: { projectionId: projectionDefinition.id, objectType: enterpriseObject.objectType },
+  });
+
+  // L0 — a projection derives its right to render from the root Constitution
+  // Runtime. Resolution itself is a (read) action; authorize it and carry the
+  // evidenced decision onto the plan so every surface is attributable.
+  const principalKind: PrincipalKind =
+    input.principalKind ?? (userContext.userId ? "human" : "system");
+  const decision = ConstitutionRuntime.authorize({
+    kind: "projection.resolve",
+    actor: {
+      kind: principalKind,
+      id: userContext.userId,
+      tenantId: userContext.tenantId,
+      permissions: permissionContext.permissions as unknown as string[],
+    },
+    enterpriseId: userContext.tenantId,
+    projection: {
+      objectType: enterpriseObject.objectType,
+      projectionId: projectionDefinition.id,
+      surface: runtimeContext.surfaceOverride ?? projectionDefinition.surface,
+    },
+    audited: true,
   });
 
   // Resolve every field once, key it, then place into the layout.
@@ -140,11 +167,20 @@ export function compose(input: ComposeInput): RenderPlan {
   const primaryDef = projectionDefinition.primaryIntent
     ? intentByName.get(projectionDefinition.primaryIntent)
     : undefined;
-  const primaryIntent = primaryDef ? resolveIntent(primaryDef, input) : undefined;
+  // When the Constitution denies resolution, no intent may be emitted from this
+  // surface — authority flows from the decision, not from the button.
+  const constitutionalReason = decision.authorized
+    ? undefined
+    : `Constitution denied resolution: ${decision.violations.map((v) => v.ref).join(", ")}`;
+  const gate = (intent: ResolvedIntent): ResolvedIntent =>
+    decision.authorized ? intent : { ...intent, enabled: false, disabledReason: constitutionalReason };
+
+  const primaryDefResolved = primaryDef ? resolveIntent(primaryDef, input) : undefined;
+  const primaryIntent = primaryDefResolved ? gate(primaryDefResolved) : undefined;
   const secondaryIntents = (projectionDefinition.secondaryIntents ?? [])
     .map((name) => intentByName.get(name))
     .filter((i): i is IntentDefinition => Boolean(i))
-    .map((i) => resolveIntent(i, input));
+    .map((i) => gate(resolveIntent(i, input)));
 
   const plan: RenderPlan = {
     projectionId: projectionDefinition.id,
@@ -164,6 +200,14 @@ export function compose(input: ComposeInput): RenderPlan {
       objectType: enterpriseObject.objectType,
       surface: runtimeContext.surfaceOverride ?? projectionDefinition.surface,
       resolvedAt: runtimeContext.now,
+    },
+    authority: {
+      decisionId: decision.decisionId,
+      outcome: decision.outcome,
+      authorized: decision.authorized,
+      constitutionVersion: decision.constitutionVersion,
+      missionObjective: decision.missionAlignment?.title,
+      advisories: decision.advisories.map((a) => `${a.ref}: ${a.rationale}`),
     },
   };
 

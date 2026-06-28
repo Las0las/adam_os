@@ -8,7 +8,7 @@
 
 import { registerAction } from "@/lib/mission-control/actions/action-service";
 import { upsertObject } from "@/lib/dataops/ontology/object-service";
-import { assertCompliant } from "@/lib/constitution";
+import { ConstitutionRuntime } from "@/lib/constitution";
 import { id } from "@/lib/lawrence-core/utils/ids";
 import { candidateObject } from "@/lib/projection-runtime/definitions/candidate.object";
 import { toCanonicalPayload } from "@/lib/projection-runtime/engines/binding-engine";
@@ -46,17 +46,18 @@ registerAction({
     return result.ok ? null : (result.violations[0]?.message ?? "Invalid candidate payload");
   },
   async run(ctx, input) {
-    // L0 — constitutional preflight (fail-closed, authoritative). The governed
-    // path resolves identity, scopes the tenant, and is audited; assert the
-    // blocking invariants before any mutation. Throws ConstitutionViolationError
-    // on violation, which the action engine surfaces as a denial.
+    // L0 — derive execution authority from the root runtime BEFORE any mutation.
+    // The governed path resolves identity, scopes the tenant, and is audited; the
+    // runtime returns an evidenced ConstitutionDecision (the authority token) or
+    // throws ConstitutionViolationError, which the action engine surfaces as a
+    // denial. This is the authoritative, fail-closed re-check.
     const actorUserId = ctx.actorUserId ?? null;
-    assertCompliant({
+    const decision = ConstitutionRuntime.assertAuthorized({
       kind: "object.create",
       actor: {
-        // The governed action engine always runs under a resolved ActorContext:
-        // a user (with a user id) or the tenant-scoped system actor (without one).
-        kind: actorUserId ? "user" : "system",
+        // The governed action engine always runs under a resolved principal:
+        // a human (with a user id) or the tenant-scoped system actor.
+        kind: actorUserId ? "human" : "system",
         id: actorUserId,
         tenantId: ctx.tenantId ?? null,
         permissions: ctx.permissions as unknown as string[],
@@ -81,6 +82,11 @@ registerAction({
       properties: payload.properties,
     });
 
-    return { candidateId: candidate.id, objectType: candidateObject.objectType, externalKey };
+    return {
+      candidateId: candidate.id,
+      objectType: candidateObject.objectType,
+      externalKey,
+      constitutionDecisionId: decision.decisionId,
+    };
   },
 });

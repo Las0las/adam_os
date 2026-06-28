@@ -1,13 +1,22 @@
 // L0 — the ratified Enterprise Constitution for the LAWRENCE platform.
 //
-// This is the single authoritative document. Every invariant is a pure predicate
-// over a ConstitutionContext; the engine enforces them fail-closed. Editing this
-// file changes what the entire platform is permitted to do — there is no other
-// place rules of this rank live.
+// This is the single authoritative document the Constitution Runtime executes.
+// Every right, responsibility, policy and invariant is a PURE predicate over a
+// ConstitutionContext, so the runtime authorizes fail-closed and identically on
+// client and server. Editing this file changes what the entire platform is
+// permitted to do — there is no other place rules of this rank live.
 
-import type { Constitution, ConstitutionContext } from "./contracts";
+import type {
+  Constitution,
+  ConstitutionContext,
+  EvidenceItem,
+  PolicyEffect,
+  PolicyEvaluation,
+} from "./contracts";
+import { RESOLVED_PRINCIPAL_KINDS } from "./contracts";
 
-const CONSTITUTION_VERSION = "1.0.0";
+const CONSTITUTION_VERSION = "1.1.0";
+const EFFECTIVE_DATE = "2026-06-27";
 
 /** A write is any action that creates, updates, or deletes an object. */
 function isWrite(ctx: ConstitutionContext): boolean {
@@ -18,14 +27,62 @@ function isWrite(ctx: ConstitutionContext): boolean {
   );
 }
 
+function isResolved(ctx: ConstitutionContext): boolean {
+  if (ctx.actor.kind === "human") return Boolean(ctx.actor.id && ctx.actor.id.length > 0);
+  return RESOLVED_PRINCIPAL_KINDS.includes(ctx.actor.kind);
+}
+
+/** Small helper to assemble an executable policy from a pure decision function. */
+function makePolicy(
+  id: string,
+  title: string,
+  statement: string,
+  enforces: string[],
+  decide: (ctx: ConstitutionContext) => {
+    effect: PolicyEffect;
+    satisfied: boolean;
+    explanation: string;
+    evidence: EvidenceItem[];
+    recommendation?: string;
+  },
+) {
+  return {
+    id,
+    title,
+    statement,
+    enforces,
+    evaluate(ctx: ConstitutionContext): PolicyEvaluation {
+      const d = decide(ctx);
+      return { policyId: id, ...d };
+    },
+  };
+}
+
 const constitution: Constitution = {
   version: CONSTITUTION_VERSION,
+  effectiveDate: EFFECTIVE_DATE,
+
+  amendments: [
+    {
+      version: "1.1.0",
+      effectiveDate: EFFECTIVE_DATE,
+      supersedes: "1.0.0",
+      summary:
+        "Elevated the Constitution from a module to the root runtime: richer principals, executable policies, mission objectives, and evidenced decisions.",
+    },
+    {
+      version: "1.0.0",
+      effectiveDate: "2026-06-26",
+      supersedes: null,
+      summary: "Genesis ratification: identity, mission, principles, rights, responsibilities, invariants.",
+    },
+  ],
 
   identity: {
     id: "lawrence",
     name: "LAWRENCE",
     descriptor:
-      "A governed enterprise operating system where every surface is a projection of one canonical truth.",
+      "A constitutional enterprise operating system where every surface is a projection of one canonical truth, and every action derives its authority from a single governing runtime.",
     jurisdictions: ["US"],
     ratifiedVersion: CONSTITUTION_VERSION,
   },
@@ -37,6 +94,30 @@ const constitution: Constitution = {
       "Every mutation is attributable to a resolved identity.",
       "Every governed action passes the same rules on the client and the server.",
       "No surface owns truth; surfaces only project it.",
+    ],
+    objectives: [
+      {
+        id: "OBJ-INTEGRITY",
+        title: "Protect canonical integrity",
+        statement:
+          "Keep the canonical model correct and authoritative; never let a surface or cache become an independent source of truth.",
+        priority: 1,
+        successMetric: "Zero mutations that bypass the governed path.",
+      },
+      {
+        id: "OBJ-ACCOUNTABILITY",
+        title: "Make every action accountable",
+        statement: "Every state change is attributable to an identity and carries its evidence.",
+        priority: 2,
+        successMetric: "100% of mutations carry an attributable, evidenced decision.",
+      },
+      {
+        id: "OBJ-TRANSPARENCY",
+        title: "Make every decision explainable",
+        statement: "Anyone can see why an action was authorized or denied without reading code.",
+        priority: 3,
+        successMetric: "Every denial returns a specific constitutional reason.",
+      },
     ],
   },
 
@@ -84,22 +165,31 @@ const constitution: Constitution = {
       id: "R1",
       holder: "every-actor",
       statement: "To know which identity and authority an action was performed under.",
+      rationale: "Every action must be attributable to a resolved principal.",
+      honored: (ctx) => !isWrite(ctx) || isResolved(ctx),
     },
     {
       id: "R2",
       holder: "every-actor",
       statement: "To receive a clear, specific reason whenever an action is denied.",
+      // Always honored structurally: the runtime always returns evidenced reasons.
+      rationale: "Denials must carry a specific reason.",
+      honored: () => true,
     },
     {
       id: "R3",
       holder: "subject-of-record",
       statement:
         "To have their record changed only through a governed, audited, attributable action.",
+      rationale: "Records may change only via an audited, attributable path.",
+      honored: (ctx) => !isWrite(ctx) || (ctx.audited === true && isResolved(ctx)),
     },
     {
       id: "R4",
       holder: "enterprise",
       statement: "To have its constitution enforced uniformly across every surface and integration.",
+      rationale: "The constitution must apply to every action scope.",
+      honored: (ctx) => ctx.enterpriseId.length > 0,
     },
   ],
 
@@ -108,23 +198,31 @@ const constitution: Constitution = {
       id: "D1",
       bearer: "every-actor",
       statement: "To act within granted authority and never to circumvent the governed path.",
+      rationale: "Actors should carry only the authority they need.",
+      met: (ctx) => !isWrite(ctx) || ctx.actor.permissions.length > 0,
     },
     {
       id: "D2",
       bearer: "every-surface",
       statement:
         "To route mutations through governed intents and never to write to the canonical model directly.",
+      rationale: "Surfaces must mutate only through governed intents.",
+      met: (ctx) => !isWrite(ctx) || ctx.audited === true,
     },
     {
       id: "D3",
       bearer: "the-runtime",
       statement:
         "To re-validate every action authoritatively on the server, treating client validation as convenience only.",
+      rationale: "Object writes must name a canonical type so the server can re-validate.",
+      met: (ctx) => !isWrite(ctx) || Boolean(ctx.object?.objectType),
     },
     {
       id: "D4",
       bearer: "the-enterprise",
       statement: "To keep the constitution legible and current, and to version every change to it.",
+      rationale: "The constitution must remain versioned and legible.",
+      met: () => true,
     },
   ],
 
@@ -133,18 +231,11 @@ const constitution: Constitution = {
       id: "INV-IDENTITY",
       title: "No anonymous mutation",
       statement:
-        "Every write is bound to a resolved principal — a user, or a tenant-scoped system/machine identity. Never anonymous.",
+        "Every write is bound to a resolved principal — never anonymous. Human principals carry a user id; system, agent, workflow, integration, service and automation principals are resolved and tenant-scoped.",
       severity: "blocking",
       derivedFrom: ["P2", "P5"],
       rationale: "A write was attempted without a resolved actor identity.",
-      // A `user` actor must carry a user id; a `system` actor is resolved without
-      // one. `anonymous` is never permitted to mutate.
-      holds: (ctx) => {
-        if (!isWrite(ctx)) return true;
-        if (ctx.actor.kind === "anonymous") return false;
-        if (ctx.actor.kind === "user") return ctx.actor.id != null && ctx.actor.id.length > 0;
-        return true; // system/machine identity is resolved
-      },
+      holds: (ctx) => !isWrite(ctx) || isResolved(ctx),
     },
     {
       id: "INV-TENANCY",
@@ -194,19 +285,88 @@ const constitution: Constitution = {
   ],
 
   policies: [
-    {
-      id: "POL-GOVERNED-WRITE",
-      title: "Governed write path",
-      statement:
-        "All mutations flow through governed intents that resolve identity, check authority, and audit the result.",
-      enforces: ["INV-IDENTITY", "INV-TENANCY", "INV-AUDITABLE", "INV-AUTHORITY"],
-    },
-    {
-      id: "POL-CANONICAL-TYPE",
-      title: "Canonical typing",
-      statement: "Object mutations are typed against the canonical ontology.",
-      enforces: ["INV-TYPED-OBJECT"],
-    },
+    makePolicy(
+      "POL-GOVERNED-WRITE",
+      "Governed write path",
+      "All mutations flow through governed intents that resolve identity, check authority, and audit the result.",
+      ["INV-IDENTITY", "INV-TENANCY", "INV-AUDITABLE", "INV-AUTHORITY"],
+      (ctx) => {
+        if (!isWrite(ctx)) {
+          return {
+            effect: "allow",
+            satisfied: true,
+            explanation: "Non-mutating action; governed-write policy does not apply.",
+            evidence: [],
+          };
+        }
+        const checks = [
+          { ok: isResolved(ctx), ref: "INV-IDENTITY", why: "resolved identity" },
+          {
+            ok: ctx.actor.tenantId != null && ctx.actor.tenantId.length > 0,
+            ref: "INV-TENANCY",
+            why: "tenant scope",
+          },
+          { ok: ctx.audited === true, ref: "INV-AUDITABLE", why: "audited path" },
+          { ok: ctx.actor.permissions.length > 0, ref: "INV-AUTHORITY", why: "granted authority" },
+        ];
+        const failed = checks.filter((c) => !c.ok);
+        const evidence: EvidenceItem[] = checks.map((c) => ({
+          kind: "policy",
+          ref: c.ref,
+          observation: `${c.why}: ${c.ok ? "present" : "absent"}`,
+          supports: c.ok,
+        }));
+        if (failed.length === 0) {
+          return {
+            effect: "allow",
+            satisfied: true,
+            explanation: "Write satisfies identity, tenancy, audit, and authority.",
+            evidence,
+          };
+        }
+        return {
+          effect: "deny",
+          satisfied: false,
+          explanation: `Write is missing: ${failed.map((f) => f.why).join(", ")}.`,
+          evidence,
+          recommendation: "Route the mutation through a governed intent under a resolved, audited identity.",
+        };
+      },
+    ),
+    makePolicy(
+      "POL-CANONICAL-TYPE",
+      "Canonical typing",
+      "Object mutations are typed against the canonical ontology.",
+      ["INV-TYPED-OBJECT"],
+      (ctx) => {
+        const touchesObject =
+          ctx.kind === "object.create" ||
+          ctx.kind === "object.update" ||
+          ctx.kind === "object.delete";
+        const typed = Boolean(ctx.object?.objectType);
+        if (!touchesObject || typed) {
+          return {
+            effect: "allow",
+            satisfied: true,
+            explanation: touchesObject
+              ? `Object write is typed as "${ctx.object?.objectType}".`
+              : "Action does not write an object.",
+            evidence: [
+              { kind: "policy", ref: "INV-TYPED-OBJECT", observation: "canonical type present", supports: true },
+            ],
+          };
+        }
+        return {
+          effect: "deny",
+          satisfied: false,
+          explanation: "Object write did not name a canonical object type.",
+          evidence: [
+            { kind: "policy", ref: "INV-TYPED-OBJECT", observation: "canonical type missing", supports: false },
+          ],
+          recommendation: "Name the canonical object type on the write.",
+        };
+      },
+    ),
   ],
 };
 

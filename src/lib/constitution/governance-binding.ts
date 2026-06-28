@@ -38,10 +38,10 @@ export function registerConstitutionGovernancePolicy(): void {
       "Enforces the Enterprise Constitution's blocking invariants on every governed subject.",
     evaluate(input: GovernancePolicyContext): GovernanceFinding[] {
       const actorUserId = input.ctx.actorUserId ?? null;
-      const verdict = evaluate({
+      const decision = evaluate({
         kind: subjectToKind(input.subjectType),
         actor: {
-          kind: actorUserId ? "user" : "system",
+          kind: actorUserId ? "human" : "system",
           id: actorUserId,
           tenantId: input.ctx.tenantId ?? null,
           permissions: (input.ctx.permissions ?? []) as string[],
@@ -50,9 +50,9 @@ export function registerConstitutionGovernancePolicy(): void {
         audited: true, // the orchestrator path is audited
       });
 
-      return [...verdict.violations, ...verdict.advisories].map((v) => ({
+      return [...decision.violations, ...decision.advisories].map((v) => ({
         stage: "policy" as const,
-        code: v.invariantId,
+        code: v.ref,
         severity: v.severity === "blocking" ? ("error" as const) : ("warning" as const),
         message: `${v.title}: ${v.rationale}`,
       }));

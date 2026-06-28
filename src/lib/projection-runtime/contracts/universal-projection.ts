@@ -67,6 +67,21 @@ export interface ProjectionTelemetry {
   resolvedAt: string;
 }
 
+/** The constitutional authority under which this projection was resolved. Every
+ *  projection derives its right to render from the root Constitution Runtime;
+ *  this serializable summary carries that decision to the surface so the UI can
+ *  attribute and explain it. */
+export interface ProjectionAuthority {
+  decisionId: string;
+  outcome: "authorized" | "denied" | "authorized_with_advice";
+  authorized: boolean;
+  constitutionVersion: string;
+  /** Mission objective this projection best serves, if any. */
+  missionObjective?: string;
+  /** Plain reasons when the projection was not fully authorized. */
+  advisories: string[];
+}
+
 /** The complete, serializable render plan. */
 export interface RenderPlan {
   projectionId: string;
@@ -82,6 +97,8 @@ export interface RenderPlan {
   postActions: ResolvedPostAction[];
   display?: ProjectionDisplay;
   telemetry: ProjectionTelemetry;
+  /** The constitutional decision that authorized this projection to resolve. */
+  authority: ProjectionAuthority;
 }
 
 /** The runtime's resolve() output. */

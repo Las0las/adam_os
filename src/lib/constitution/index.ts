@@ -1,22 +1,33 @@
-// L0 — Enterprise Constitution. Public surface.
+// L0 — Enterprise Constitution (root runtime). Public surface.
 export type {
   Constitution,
   ConstitutionActionKind,
+  ConstitutionActor,
   ConstitutionContext,
-  ConstitutionVerdict,
+  ConstitutionDecision,
+  ConstitutionViolation,
+  ConstitutionSeverity,
+  ConstitutionAmendment,
+  DecisionOutcome,
   EnterpriseIdentity,
+  EvidenceItem,
+  EvidenceKind,
   Mission,
+  MissionObjective,
   Principle,
+  PrincipalKind,
   Right,
   Responsibility,
   Invariant,
-  InvariantSeverity,
-  InvariantViolation,
   Policy,
+  PolicyEffect,
+  PolicyEvaluation,
 } from "./contracts";
+export { RESOLVED_PRINCIPAL_KINDS } from "./contracts";
 export { LAWRENCE_CONSTITUTION } from "./constitution";
-export { evaluateConstitution } from "./invariant-engine";
+export { decide } from "./evaluation-engine";
 export {
+  ConstitutionRuntime,
   ConstitutionViolationError,
   assertCompliant,
   evaluate,
@@ -26,3 +37,9 @@ export {
   CONSTITUTION_GOVERNANCE_POLICY_ID,
   registerConstitutionGovernancePolicy,
 } from "./governance-binding";
+export {
+  CONSTITUTION_LENSES,
+  projectHeadline,
+  summarizeDecision,
+} from "./projection";
+export type { ConstitutionLens, ConstitutionHeadline, DecisionSummary } from "./projection";
