@@ -9,8 +9,10 @@ export * from "./engines";
 
 export { ProjectionRuntime } from "./runtime/projection-runtime";
 export type { ResolveInput } from "./runtime/projection-runtime";
-export { compose } from "./runtime/projection-composer";
+export { compose, composeRenderPlan } from "./runtime/projection-composer";
 export type { ComposeInput } from "./runtime/projection-composer";
+export { proveReplayDeterminism } from "./runtime/replay-proof";
+export type { ReplayProof } from "./runtime/replay-proof";
 
 export {
   registerEnterpriseObject,

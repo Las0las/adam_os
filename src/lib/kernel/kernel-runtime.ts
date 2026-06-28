@@ -22,7 +22,7 @@ import type {
   Intent,
   AuthorityOutcome,
 } from "./contracts";
-import { appendLedger } from "./execution-ledger";
+import { appendJournal } from "./execution-journal";
 
 /** Default authority lifetime: short-lived, single-action grants. */
 const AUTHORITY_TTL_MS = 5 * 60 * 1000;
@@ -136,8 +136,21 @@ function mintAuthority(intent: Intent, decision: ConstitutionDecision, now: numb
 }
 
 function record(intent: Intent, authority: ExecutionAuthority): void {
-  appendLedger({
-    kind: authority.granted ? "authority.granted" : "authority.denied",
+  // Journal the full request lifecycle in causal order: the intent arrives, then
+  // authority is either granted or denied. This is the event-sourced trail.
+  appendJournal({
+    kind: "IntentReceived",
+    at: authority.issuedAt,
+    authorityId: null,
+    decisionId: authority.decisionId,
+    actorKind: intent.actor.kind,
+    actorId: intent.actor.id,
+    enterpriseId: intent.enterpriseId,
+    summary: `${intent.actor.kind} submitted intent ${intent.kind}`,
+    detail: { kind: intent.kind, object: intent.object, projection: intent.projection },
+  });
+  appendJournal({
+    kind: authority.granted ? "AuthorityGranted" : "AuthorityDenied",
     at: authority.issuedAt,
     authorityId: authority.authorityId,
     decisionId: authority.decisionId,

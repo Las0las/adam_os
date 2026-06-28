@@ -111,9 +111,54 @@ export interface KernelContext {
   telemetry: TelemetryContext;
 }
 
-// ── Execution Ledger ──────────────────────────────────────────────────────--
+// ── Execution Journal ────────────────────────────────────────────────────--
 
-/** Every observable, governed behavior appends one entry here. */
+/**
+ * The canonical, append-only event-sourcing record of everything the runtime
+ * does. Unlike the audit-oriented ledger, the journal captures the full
+ * execution lifecycle so it can serve as the replay source: feed the journal
+ * back through the runtimes and you reconstruct the exact same state.
+ */
+export type JournalEventKind =
+  | "IntentReceived"
+  | "AuthorityRequested"
+  | "AuthorityGranted"
+  | "AuthorityDenied"
+  | "SnapshotCreated"
+  | "ProjectionResolved"
+  | "ProjectionRendered"
+  | "WorkflowStarted"
+  | "WorkflowTransitioned"
+  | "MutationPrepared"
+  | "MutationCommitted"
+  | "EvidenceAttached"
+  | "TelemetryRecorded";
+
+export interface JournalEntry {
+  /** Monotonic sequence number — the journal's total order. */
+  seq: number;
+  /** Stable, content-derived entry id. */
+  entryId: string;
+  kind: JournalEventKind;
+  at: string;
+  /** The runtime snapshot under which this event occurred (replay linkage). */
+  snapshotId: string | null;
+  /** The authority under which it happened (if any). */
+  authorityId: string | null;
+  /** The constitutional decision behind it (if any). */
+  decisionId: string | null;
+  actorKind: ConstitutionActor["kind"];
+  actorId: string | null;
+  enterpriseId: string;
+  /** Short human-readable summary. */
+  summary: string;
+  /** Arbitrary structured detail (frozen, read-only). */
+  detail?: Record<string, unknown>;
+}
+
+// ── Execution Ledger (audit projection over the journal) ─────────────────────
+
+/** The audit-oriented subset projected from the journal. */
 export type LedgerEntryKind =
   | "authority.granted"
   | "authority.denied"

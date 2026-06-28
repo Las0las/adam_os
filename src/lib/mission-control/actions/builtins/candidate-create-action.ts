@@ -8,7 +8,7 @@
 
 import { registerAction } from "@/lib/mission-control/actions/action-service";
 import { upsertObject } from "@/lib/dataops/ontology/object-service";
-import { Kernel, appendLedger } from "@/lib/kernel";
+import { Kernel, appendJournal } from "@/lib/kernel";
 import { id } from "@/lib/lawrence-core/utils/ids";
 import { candidateObject } from "@/lib/projection-runtime/definitions/candidate.object";
 import { toCanonicalPayload } from "@/lib/projection-runtime/engines/binding-engine";
@@ -75,6 +75,21 @@ registerAction({
     const externalKey =
       email != null && String(email).length > 0 ? `cand-${String(email).toLowerCase()}` : `cand-${id("c")}`;
 
+    // The runtime never edits objects in place — it PREPARES a mutation, then
+    // commits it. Both steps are journaled, bound to the authorizing token.
+    appendJournal({
+      kind: "MutationPrepared",
+      at: new Date().toISOString(),
+      snapshotId: null,
+      authorityId: authority.authorityId,
+      decisionId: authority.decisionId,
+      actorKind: authority.actor.kind,
+      actorId: authority.actor.id,
+      enterpriseId: authority.enterpriseId,
+      summary: `Prepared create of ${candidateObject.objectType}`,
+      detail: { externalKey, capabilities: authority.capabilities },
+    });
+
     const candidate = await upsertObject(ctx, {
       objectType: candidateObject.objectType,
       externalKey,
@@ -83,11 +98,12 @@ registerAction({
       properties: payload.properties,
     });
 
-    // Append the committed mutation to the append-only Execution Ledger, bound
-    // to the authority that permitted it — the enterprise's operational history.
-    appendLedger({
-      kind: "mutation.committed",
+    // The committed mutation creates a new object version — recorded in the
+    // append-only journal, bound to the authority that permitted it.
+    appendJournal({
+      kind: "MutationCommitted",
       at: new Date().toISOString(),
+      snapshotId: null,
       authorityId: authority.authorityId,
       decisionId: authority.decisionId,
       actorKind: authority.actor.kind,

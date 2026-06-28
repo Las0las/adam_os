@@ -6,7 +6,8 @@
 
 import { getConstitution, projectHeadline, toConstitutionView } from "@/lib/constitution";
 import { liveSampleDecisions } from "@/lib/constitution/sample-decisions";
-import { liveSampleAuthorities, getLedger } from "@/lib/kernel";
+import { liveSampleAuthorities, getJournalDescending } from "@/lib/kernel";
+import { proveReplayDeterminism } from "@/lib/projection-runtime";
 import { ConstitutionLenses } from "@/components/lawrence/constitution/ConstitutionLenses";
 import { PageHeader } from "@/components/lawrence/shared/widgets";
 
@@ -20,11 +21,13 @@ export default function ConstitutionPage() {
   const view = toConstitutionView(getConstitution());
   const headline = projectHeadline(view);
   const decisions = liveSampleDecisions();
-  // Run representative intents through the kernel — this ISSUES ExecutionAuthority
-  // tokens and, as a side effect, appends grant/denial entries to the Execution
-  // Ledger. Read the ledger AFTER so the surface reflects those writes.
+  // Exercise the runtime so the surface reflects real execution. Each of these
+  // ISSUES authority and APPENDS to the canonical Execution Journal as a side
+  // effect: representative intents through the kernel, plus a replay-determinism
+  // proof that resolves the same projection twice. Read the journal AFTER.
   const authorities = liveSampleAuthorities();
-  const ledger = getLedger(24);
+  const replay = proveReplayDeterminism();
+  const journal = getJournalDescending(30);
 
   return (
     <div className="page">
@@ -37,7 +40,8 @@ export default function ConstitutionPage() {
         headline={headline}
         decisions={decisions}
         authorities={authorities}
-        ledger={ledger}
+        journal={journal}
+        replay={replay}
       />
     </div>
   );

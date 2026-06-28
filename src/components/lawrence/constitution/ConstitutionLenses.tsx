@@ -8,17 +8,19 @@ import {
   type ConstitutionView,
   type DecisionSummary,
 } from "@/lib/constitution";
-import type { AuthoritySummary, LedgerEntry } from "@/lib/kernel";
+import type { AuthoritySummary, JournalEntry } from "@/lib/kernel";
+import type { ReplayProof } from "@/lib/projection-runtime";
 
 interface Props {
   constitution: ConstitutionView;
   headline: ConstitutionHeadline;
   decisions: DecisionSummary[];
   authorities: AuthoritySummary[];
-  ledger: LedgerEntry[];
+  journal: JournalEntry[];
+  replay: ReplayProof;
 }
 
-export function ConstitutionLenses({ constitution: c, headline, decisions, authorities, ledger }: Props) {
+export function ConstitutionLenses({ constitution: c, headline, decisions, authorities, journal, replay }: Props) {
   const [lens, setLens] = useState<ConstitutionLens>("document");
 
   return (
@@ -44,7 +46,7 @@ export function ConstitutionLenses({ constitution: c, headline, decisions, autho
       {lens === "executive" && <ExecutiveLens c={c} headline={headline} />}
       {lens === "developer" && <DeveloperLens c={c} />}
       {lens === "audit" && (
-        <AuditLens c={c} decisions={decisions} authorities={authorities} ledger={ledger} />
+        <AuditLens c={c} decisions={decisions} authorities={authorities} journal={journal} replay={replay} />
       )}
     </div>
   );
@@ -217,12 +219,14 @@ function AuditLens({
   c,
   decisions,
   authorities,
-  ledger,
+  journal,
+  replay,
 }: {
   c: ConstitutionView;
   decisions: DecisionSummary[];
   authorities: AuthoritySummary[];
-  ledger: LedgerEntry[];
+  journal: JournalEntry[];
+  replay: ReplayProof;
 }) {
   return (
     <div className="stack">

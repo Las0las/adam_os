@@ -1,29 +1,18 @@
-// L0 kernel — the Execution Ledger.
+// L0 kernel — the Execution Ledger, now a PROJECTION over the Execution Journal.
 //
-// A single append-only record of every governed behavior in the enterprise:
-// authority granted/denied, projections rendered, mutations committed, workflow
-// transitions, AI recommendations. This is the enterprise's operational
-// history — nothing here can be mutated or deleted after it is written.
+// The journal (execution-journal.ts) is the canonical, event-sourced source of
+// truth. The ledger is the audit-oriented VIEW of it: the financial/compliance
+// subset (authority granted/denied, projections rendered, mutations committed,
+// workflow transitions, AI recommendations) mapped to the stable LedgerEntry
+// shape that audit surfaces consume.
 //
-// In-memory and process-local (consistent with the demo object-service). The
-// seam is the same one a durable Postgres-backed ledger would sit behind.
+// `appendLedger` is retained as a compatibility shim — it appends to the
+// journal. There is no separate ledger store, so the two can never diverge.
 
-import type { LedgerEntry, LedgerEntryKind } from "./contracts";
+import type { JournalEntry, JournalEventKind, LedgerEntry, LedgerEntryKind } from "./contracts";
+import { appendJournal, getJournalDescending, subscribeJournal } from "./execution-journal";
 
-const entries: LedgerEntry[] = [];
-const listeners = new Set<() => void>();
-let seq = 0;
-
-/** Deterministic, dependency-free hash (FNV-1a 32-bit) for entry ids. */
-function stableId(input: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < input.length; i++) {
-    h ^= input.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return (h >>> 0).toString(16).padStart(8, "0");
-}
-
+/** Compatibility input for callers still speaking the ledger vocabulary. */
 export interface AppendInput {
   kind: LedgerEntryKind;
   at: string;
@@ -36,16 +25,32 @@ export interface AppendInput {
   detail?: Record<string, unknown>;
 }
 
+/** Map a ledger kind onto its canonical journal event kind. */
+const LEDGER_TO_JOURNAL: Record<LedgerEntryKind, JournalEventKind> = {
+  "authority.granted": "AuthorityGranted",
+  "authority.denied": "AuthorityDenied",
+  "projection.rendered": "ProjectionRendered",
+  "mutation.committed": "MutationCommitted",
+  "workflow.transitioned": "WorkflowTransitioned",
+  "ai.recommendation": "TelemetryRecorded",
+};
+
+/** The journal event kinds that are audit-relevant, and their ledger label. */
+const JOURNAL_TO_LEDGER: Partial<Record<JournalEventKind, LedgerEntryKind>> = {
+  AuthorityGranted: "authority.granted",
+  AuthorityDenied: "authority.denied",
+  ProjectionRendered: "projection.rendered",
+  MutationCommitted: "mutation.committed",
+  WorkflowTransitioned: "workflow.transitioned",
+};
+
 /**
- * Append one entry. The ONLY mutating operation the ledger exposes — there is
- * deliberately no update or delete. Returns the written, frozen entry.
+ * Compatibility shim: append an audit event by writing to the canonical journal.
+ * Returns the projected LedgerEntry view of the written journal entry.
  */
 export function appendLedger(input: AppendInput): LedgerEntry {
-  const nextSeq = ++seq;
-  const entry: LedgerEntry = Object.freeze({
-    seq: nextSeq,
-    entryId: `le_${stableId(`${nextSeq}:${input.kind}:${input.at}:${input.decisionId ?? ""}`)}`,
-    kind: input.kind,
+  const entry = appendJournal({
+    kind: LEDGER_TO_JOURNAL[input.kind],
     at: input.at,
     authorityId: input.authorityId,
     decisionId: input.decisionId,
@@ -53,31 +58,50 @@ export function appendLedger(input: AppendInput): LedgerEntry {
     actorId: input.actorId,
     enterpriseId: input.enterpriseId,
     summary: input.summary,
-    detail: input.detail ? Object.freeze({ ...input.detail }) : undefined,
+    detail: input.detail,
   });
-  entries.push(entry);
-  for (const l of listeners) l();
-  return entry;
+  return toLedgerEntry(entry, input.kind);
 }
 
-/** Read the full ledger, newest first. Returns a defensive copy. */
+function toLedgerEntry(entry: JournalEntry, kind: LedgerEntryKind): LedgerEntry {
+  return {
+    seq: entry.seq,
+    entryId: entry.entryId.replace(/^je_/, "le_"),
+    kind,
+    at: entry.at,
+    authorityId: entry.authorityId,
+    decisionId: entry.decisionId,
+    actorKind: entry.actorKind,
+    actorId: entry.actorId,
+    enterpriseId: entry.enterpriseId,
+    summary: entry.summary,
+    detail: entry.detail,
+  };
+}
+
+/** Read the audit ledger (projection of the journal), newest first. */
 export function getLedger(limit?: number): LedgerEntry[] {
-  const all = [...entries].reverse();
-  return typeof limit === "number" ? all.slice(0, limit) : all;
+  const projected: LedgerEntry[] = [];
+  for (const entry of getJournalDescending()) {
+    const kind = JOURNAL_TO_LEDGER[entry.kind];
+    if (!kind) continue;
+    projected.push(toLedgerEntry(entry, kind));
+    if (typeof limit === "number" && projected.length >= limit) break;
+  }
+  return projected;
 }
 
-/** Read entries scoped to one authority. */
+/** Read ledger entries scoped to one authority. */
 export function getLedgerForAuthority(authorityId: string): LedgerEntry[] {
-  return entries.filter((e) => e.authorityId === authorityId).reverse();
+  return getLedger().filter((e) => e.authorityId === authorityId);
 }
 
-/** Total number of entries written. */
+/** Total number of audit-relevant entries in the ledger projection. */
 export function ledgerSize(): number {
-  return entries.length;
+  return getLedger().length;
 }
 
-/** Subscribe to appends (for useSyncExternalStore-style consumers). */
+/** Subscribe to journal appends (the ledger updates whenever the journal does). */
 export function subscribeLedger(fn: () => void): () => void {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
+  return subscribeJournal(fn);
 }

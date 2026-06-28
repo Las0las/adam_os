@@ -86,6 +86,28 @@ export interface ProjectionAuthority {
   advisories: string[];
 }
 
+/** Provenance: the exact execution context that produced this RenderPlan. A
+ *  screenshot alone can be traced back to its snapshot, runtime version graph,
+ *  authority, and a content fingerprint — so any plan is reproducible and any
+ *  drift is detectable. */
+export interface ProjectionProvenance {
+  /** The RuntimeSnapshot id this plan was composed under. */
+  snapshotId: string;
+  /** Hash of the runtime version graph that produced it. */
+  runtimeGraphHash: string;
+  /** Pinned versions of the runtimes that composed it. */
+  projectionVersion: string;
+  composerVersion: string;
+  /** The authority token id under which it resolved. */
+  authorityId: string;
+  /** Hash of the authority's evidence trail. */
+  evidenceHash: string;
+  /** Logical generation time (from the snapshot's host clock, not wall-clock). */
+  generatedAt: string;
+  /** Content fingerprint of the plan body — identical inputs ⇒ identical value. */
+  planFingerprint: string;
+}
+
 /** The complete, serializable render plan. */
 export interface RenderPlan {
   projectionId: string;
@@ -103,6 +125,8 @@ export interface RenderPlan {
   telemetry: ProjectionTelemetry;
   /** The constitutional decision that authorized this projection to resolve. */
   authority: ProjectionAuthority;
+  /** The reproducible execution context that produced this plan. */
+  provenance: ProjectionProvenance;
 }
 
 /** The runtime's resolve() output. */
