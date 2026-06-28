@@ -59,6 +59,10 @@ export function PrimerDeck({ metrics }: { metrics: PrimerMetrics }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const slideRefs = useRef<(HTMLElement | null)[]>([]);
   const [active, setActive] = useState(0);
+  // Year is resolved on the client only — rendering new Date() during the
+  // server pass would mismatch the client clock and break hydration.
+  const [year, setYear] = useState<number | null>(null);
+  useEffect(() => setYear(new Date().getFullYear()), []);
 
   const goTo = useCallback((i: number) => {
     const clamped = Math.max(0, Math.min(TOTAL - 1, i));
@@ -428,7 +432,7 @@ export function PrimerDeck({ metrics }: { metrics: PrimerMetrics }) {
             </div>
             <div className="pr-cta-foot">
               <Mono>LAWRENCE · CONSTITUTIONAL ENTERPRISE OPERATING SYSTEM</Mono>
-              <Mono>OFFICE OF THE CHIEF ARCHITECT · {new Date().getFullYear()}</Mono>
+              <Mono>OFFICE OF THE CHIEF ARCHITECT{year ? ` · ${year}` : ""}</Mono>
             </div>
           </div>
         </section>

@@ -1,3 +1,19 @@
+/* Poppins is the Aberdeen brand font (LDS-001), JetBrains Mono for mono labels.
+   Loaded via @import (browser-side fetch) rather than next/font so the build
+   never blocks on font egress; Arial is the brand-sanctioned fallback. */
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+/* Accessibility: one consistent keyboard focus ring for every interactive control
+   inside an LDS surface. :focus-visible shows it for keyboard users only (no ring
+   on mouse click). Verdigris 2px + offset meets the 3:1 non-text contrast rule.
+   Lives in globals (always loaded) so it applies even on surfaces like /epr that
+   don't import the LDS component bundle, while staying scoped to .lds. */
+.lds :is(button, a, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid #44b0b1;
+  outline-offset: 2px;
+  border-radius: 7px;
+}
+
 :root {
   --bg: #0b0e14;
   --panel: #131823;

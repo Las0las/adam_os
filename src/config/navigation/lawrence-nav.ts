@@ -29,6 +29,19 @@ export const lawrenceNav: NavSection[] = [
       { label: "Constitution", href: "/constitution" },
       { label: "Kernel Explorer", href: "/kernel" },
       { label: "Architecture Primer", href: "/primer" },
+      { label: "Projection Studio", href: "/studio" },
+      { label: "Engineering Program", href: "/program" },
+    ],
+  },
+  {
+    title: "Studios",
+    items: [
+      { label: "EPR Runtime (Job · Candidate)", href: "/epr" },
+      { label: "Universal Workspace", href: "/workspace" },
+      { label: "Job Intake Studio", href: "/job-intake" },
+      { label: "Candidate Studio", href: "/candidate-studio" },
+      { label: "Design System (LDS-001)", href: "/design-system" },
+      { label: "Interaction Canon (STD-UX-0001)", href: "/interaction-canon" },
     ],
   },
   {

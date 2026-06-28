@@ -1,0 +1,181 @@
+/* ============================================================================
+   LAWRENCE Universal Workspace Shell — LDS-001 surface
+   The ONE persistent shell that HOSTS studios. Studios are object projections
+   rendered in the center canvas; the header, nav rail, collections column, and
+   advisor/inspector rail persist across every hosted studio.
+   Scoped under .uws so it never collides with the global theme or .lds tokens.
+   ========================================================================== */
+
+.uws {
+  --navy: #09375f;
+  --navy-deep: #06294a;
+  --navy-soft: #0c4a7e;
+  --teal: #44b0b1;
+  --teal-dark: #0a5c5d;
+  --teal-tint: #e6f6f6;
+  --teal-ln: #bde6e6;
+  --sky: #5cc8ff;
+  --jasper: #db504a;
+  --jade: #00a676;
+  --gold: #f7d002;
+  --onyx: #404040;
+  --ink: #13283b;
+  --bg: #edf1f6;
+  --surface: #ffffff;
+  --surface2: #f3f6fa;
+  --line: #e2e8f0;
+  --line2: #d8e0ea;
+  --muted: #5c6b7a;
+  --faint: #93a1b0;
+  --sans: "Poppins", Arial, system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 13px;
+}
+
+.uws *,
+.uws *::before,
+.uws *::after {
+  box-sizing: border-box;
+}
+
+.uws ::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+.uws ::-webkit-scrollbar-thumb {
+  background: #cdd7e2;
+  border-radius: 5px;
+}
+.uws ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.uws input {
+  font-family: inherit;
+}
+
+.uws .navi,
+.uws .coll,
+.uws .tab,
+.uws .cap,
+.uws .chip,
+.uws .rec {
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  cursor: pointer;
+}
+.uws .navi:hover {
+  background: var(--navy-soft);
+  color: #fff;
+}
+.uws .coll:hover {
+  background: #fff;
+}
+.uws .cap:hover {
+  filter: brightness(1.07);
+}
+.uws .chip:hover {
+  border-color: var(--navy);
+}
+.uws .rec:hover {
+  border-color: var(--teal);
+  background: #eef6f6;
+}
+.uws .tab:hover {
+  color: var(--ink);
+}
+
+.uws .card {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 11px;
+  padding: 13px 15px;
+}
+.uws .chip {
+  font: 500 11.5px/1 var(--sans);
+  border: 1px solid var(--line2);
+  background: var(--surface2);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 7px 10px;
+}
+.uws .chip.on {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+  font-weight: 600;
+}
+.uws .badge {
+  font: 700 8.5px/1 var(--mono);
+  border-radius: 5px;
+  padding: 4px 6px;
+}
+.uws .cap {
+  font: 600 11px/1 var(--sans);
+  border: 1px solid var(--line2);
+  background: #fff;
+  color: var(--navy);
+  border-radius: 8px;
+  padding: 8px 11px;
+}
+.uws .cap.primary {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+}
+.uws .cap.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: none;
+}
+.uws .smart {
+  font: 600 11px/1 var(--sans);
+  border: 1px solid var(--line2);
+  background: #fff;
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 6px 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.uws .rec {
+  border: 1px solid var(--line2);
+  background: var(--surface2);
+  border-radius: 9px;
+  padding: 9px 11px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.uws .kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 5px 11px;
+  font: 500 11px/1.5 var(--mono);
+}
+.uws .kv .k {
+  color: var(--faint);
+}
+.uws .kv .v {
+  color: var(--onyx);
+}
+
+/* reset native button styling for clickable spans rendered as buttons */
+.uws button.cap,
+.uws button.chip,
+.uws button.navi,
+.uws button.coll,
+.uws button.tab,
+.uws button.rec {
+  appearance: none;
+  text-align: left;
+  font-family: inherit;
+}
