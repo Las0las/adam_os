@@ -1,25 +1,36 @@
 /**
- * INTERNAL — kernel-private. This module is the append-only ledger store that
- * backs the kernel's audit + commit responsibilities. It is NOT part of the
- * public surface: no package outside @lawrence/kernel may import from
- * "@lawrence/kernel/internal/*" or reach into this file. The protected
- * architectural test (packages/workspace) and dependency-cruiser both enforce
- * this. A projection/runtime/workspace that needs ledger data must go through
- * the governed Kernel.audit() query — never the raw store.
+ * INTERNAL — kernel-private. The append-only audit ledger that backs the kernel's
+ * "guarantee audit" responsibility. Every decision — grant OR deny — yields one
+ * immutable record here. It is NOT part of the public surface: no package outside
+ * @lawrence/kernel may import from "@lawrence/kernel/internal/*" or this file. The
+ * protected architectural test (packages/workspace) and dependency-cruiser enforce
+ * this. A consumer that needs ledger data goes through the governed kernel audit
+ * query — never the raw store.
  */
 import type { AuditQuery, AuditRecord } from "@lawrence/contracts";
 
-const RECORDS: AuditRecord[] = [];
+export class AuditLedger {
+  private readonly records: AuditRecord[] = [];
 
-/** Append-only: callers cannot mutate or delete existing records. */
-export function appendRecord(record: AuditRecord): void {
-  RECORDS.push(Object.freeze({ ...record }));
-}
+  /** Append-only: callers can neither mutate nor delete existing records. */
+  append(record: AuditRecord): AuditRecord {
+    const frozen = Object.freeze({ ...record });
+    this.records.push(frozen);
+    return frozen;
+  }
 
-export function queryRecords(_query: AuditQuery): readonly AuditRecord[] {
-  return RECORDS.slice();
-}
+  query(filter: AuditQuery = {}): readonly AuditRecord[] {
+    return this.records.filter((r) => {
+      if (filter.principalId && r.principalId !== filter.principalId) return false;
+      if (filter.decisionId && r.decisionId !== filter.decisionId) return false;
+      if (filter.outcome && r.outcome !== filter.outcome) return false;
+      if (filter.since && r.recordedAt < filter.since) return false;
+      if (filter.until && r.recordedAt > filter.until) return false;
+      return true;
+    });
+  }
 
-export function recordCount(): number {
-  return RECORDS.length;
+  count(): number {
+    return this.records.length;
+  }
 }
