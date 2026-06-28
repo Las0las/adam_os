@@ -61,7 +61,7 @@ export const CONSTITUTION_LENSES: { id: ConstitutionLens; label: string; blurb: 
   { id: "document", label: "Document", blurb: "The ratified text: identity, mission, principles, rights, duties." },
   { id: "executive", label: "Executive", blurb: "Mission objectives, posture, and what the constitution guarantees." },
   { id: "developer", label: "Developer", blurb: "Invariants, executable policies, and the contracts they enforce." },
-  { id: "audit", label: "Audit", blurb: "Issued execution authority, the append-only ledger, lineage, and live evidenced decisions." },
+  { id: "audit", label: "Audit", blurb: "Replay determinism, issued execution authority, the append-only journal, lineage, and live evidenced decisions." },
 ];
 
 /** A serializable summary of one decision, for the audit/evidence lens. */

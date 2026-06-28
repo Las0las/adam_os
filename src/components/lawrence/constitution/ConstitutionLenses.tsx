@@ -231,6 +231,30 @@ function AuditLens({
   return (
     <div className="stack">
       <section>
+        <h3 className="const-section-title">Replay determinism</h3>
+        <p className="const-section-note">
+          A RenderPlan is a pure function of its definition, object, authority, and runtime snapshot. Resolving
+          the same projection twice under the same snapshot must yield a byte-identical plan — the guarantee that
+          makes replay, caching, and AI reasoning sound.
+        </p>
+        <Card className="const-row">
+          <div className="const-item-head">
+            <span className={`badge ${replay.deterministic ? "good" : "bad"}`}>
+              {replay.deterministic ? "deterministic" : "DRIFT DETECTED"}
+            </span>
+            <h4>Resolved {replay.projectionId} twice @ {replay.clock}</h4>
+            <span className="spacer" />
+            <span className="const-derived">snapshot {replay.snapshotIdA}</span>
+          </div>
+          <div className="const-enforces">
+            <span className="badge neutral" title="fingerprint of first resolve">{replay.fingerprintA}</span>
+            <span className="badge neutral" title="fingerprint of replayed resolve">{replay.fingerprintB}</span>
+            <span className="badge accent" title="runtime version graph hash">graph {replay.runtimeGraphHash}</span>
+          </div>
+        </Card>
+      </section>
+
+      <section>
         <h3 className="const-section-title">Execution authority</h3>
         <p className="const-section-note">
           Every actor — human or AI — submits an intent to the kernel, which issues a signed, expiring
@@ -275,24 +299,27 @@ function AuditLens({
       </section>
 
       <section>
-        <h3 className="const-section-title">Execution ledger</h3>
+        <h3 className="const-section-title">Execution journal</h3>
         <p className="const-section-note">
-          The append-only operational history. Every governed behavior — authority granted/denied, projection
-          rendered, mutation committed — is recorded here and can never be altered.
+          The canonical, append-only event stream — the replay source. Every step of the lifecycle (intent
+          received, authority granted/denied, snapshot created, projection rendered, mutation prepared/committed)
+          is recorded in causal order and can never be altered.
         </p>
         <div className="const-list">
-          {ledger.map((e) => (
+          {journal.map((e) => (
             <Card key={e.entryId} className="const-row">
               <div className="const-item-head">
-                <span className={`badge ${e.kind.endsWith("denied") ? "bad" : "neutral"}`}>{e.kind}</span>
+                <span className={`badge ${e.kind === "AuthorityDenied" ? "bad" : e.kind.startsWith("Authority") || e.kind.startsWith("Mutation") ? "good" : "neutral"}`}>
+                  {e.kind}
+                </span>
                 <h4>{e.summary}</h4>
                 <span className="spacer" />
                 <span className="const-derived">#{e.seq} · {e.actorKind}</span>
               </div>
               <p className="const-derived">
                 {e.at}
+                {e.snapshotId ? ` · snapshot ${e.snapshotId}` : ""}
                 {e.authorityId ? ` · authority ${e.authorityId}` : ""}
-                {e.decisionId ? ` · decision ${e.decisionId}` : ""}
               </p>
             </Card>
           ))}
