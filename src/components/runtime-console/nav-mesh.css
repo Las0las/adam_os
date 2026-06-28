@@ -1,0 +1,579 @@
+/* ───────────────────────────────────────────────────────────────────────
+   LIS-003 · Three-Layer Navigation Mesh + Pattern 2 inline projections
+   Scoped under .lis-mesh. IDE-dark framing on the LAWRENCE token system.
+   Layers: workspace rail · object surface tabs · omnibar pivot engine.
+   ─────────────────────────────────────────────────────────────────────── */
+
+.lis-mesh {
+  /* tokens (scoped copy so the mesh is portable) */
+  --m-bg: #07090d;
+  --m-panel: #0c0f15;
+  --m-panel-2: #11151d;
+  --m-rail: #06080b;
+  --m-line: #1b2230;
+  --m-line-soft: #141a24;
+  --m-ink: #e6edf6;
+  --m-ink-dim: #8a97a8;
+  --m-ink-faint: #5b6675;
+  --m-accent: #44b0b1; /* verdigris */
+  --m-accent-deep: #2d8a8b;
+  --m-good: #36c08a;
+  --m-warn: #e0a23b;
+  --m-bad: #e0604f;
+  --m-speculative: #6ea8fe;
+
+  --m-dur-fast: 120ms;
+  --m-dur: 180ms;
+  --m-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  position: absolute;
+  inset: 0;
+  display: flex;
+  background: var(--m-bg);
+  color: var(--m-ink);
+  font-family: var(--font-sans, "Poppins", system-ui, sans-serif);
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.lis-mesh *,
+.lis-mesh *::before,
+.lis-mesh *::after {
+  box-sizing: border-box;
+}
+
+/* focus ring shared with LIS-001 */
+.lis-mesh .lis-focusable:focus-visible {
+  outline: 2px solid var(--m-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ── Layer 1 · rail ───────────────────────────────────────────────────── */
+.lis-rail {
+  width: 60px;
+  flex: 0 0 60px;
+  background: var(--m-rail);
+  border-right: 1px solid var(--m-line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+}
+.lis-rail-mark {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  color: var(--m-accent);
+  margin-bottom: 6px;
+}
+.lis-rail-btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--m-ink-faint);
+  cursor: pointer;
+  transition: background var(--m-dur) var(--m-ease), color var(--m-dur) var(--m-ease);
+}
+.lis-rail-btn:hover {
+  background: var(--m-panel-2);
+  color: var(--m-ink);
+}
+.lis-rail-btn.active {
+  background: var(--m-panel-2);
+  color: var(--m-accent);
+}
+.lis-rail-active {
+  position: absolute;
+  left: -10px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--m-accent);
+}
+
+/* ── main column ──────────────────────────────────────────────────────── */
+.lis-mesh-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.lis-mesh-header {
+  height: 52px;
+  flex: 0 0 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--m-line);
+  background: var(--m-panel);
+}
+.lis-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.lis-crumb-obj {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--m-ink-faint);
+  font-weight: 600;
+}
+.lis-crumb-sep {
+  color: var(--m-ink-faint);
+  font-size: 11px;
+}
+.lis-crumb-id {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--m-ink);
+}
+
+/* ── Layer 2 · surface tabs ───────────────────────────────────────────── */
+.lis-tabs {
+  height: 38px;
+  flex: 0 0 38px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--m-line);
+  background: var(--m-bg);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.lis-tabs::-webkit-scrollbar {
+  display: none;
+}
+.lis-tab {
+  height: 27px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--m-ink-dim);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--m-dur) var(--m-ease), color var(--m-dur) var(--m-ease);
+}
+.lis-tab > svg {
+  color: var(--m-ink-faint);
+  transition: color var(--m-dur) var(--m-ease);
+}
+.lis-tab:hover {
+  background: var(--m-panel-2);
+  color: var(--m-ink);
+}
+.lis-tab.active {
+  background: var(--m-panel-2);
+  color: var(--m-ink);
+}
+.lis-tab.active > svg {
+  color: var(--m-accent);
+}
+.lis-tab.pinned .lis-tab-pin.on {
+  opacity: 0.7;
+}
+.lis-tab-pin {
+  display: inline-grid;
+  place-items: center;
+  color: var(--m-ink-faint);
+  opacity: 0;
+  transition: opacity var(--m-dur) var(--m-ease), color var(--m-dur) var(--m-ease);
+  cursor: pointer;
+}
+.lis-tab:hover .lis-tab-pin {
+  opacity: 0.5;
+}
+.lis-tab-pin:hover {
+  opacity: 1 !important;
+  color: var(--m-accent);
+}
+.lis-tab-pin.on {
+  color: var(--m-accent);
+}
+
+/* ── viewport · non-destructive surface stack ────────────────────────────── */
+.lis-viewport {
+  flex: 1;
+  position: relative;
+  background: var(--m-bg);
+  min-height: 0;
+}
+.lis-surface {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  animation: lis-surface-in var(--m-dur) var(--m-ease);
+}
+@keyframes lis-surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.lis-mesh-cachenote {
+  position: absolute;
+  right: 14px;
+  bottom: 10px;
+  font-size: 10.5px;
+  color: var(--m-ink-faint);
+  background: color-mix(in srgb, var(--m-panel) 80%, transparent);
+  border: 1px solid var(--m-line-soft);
+  padding: 4px 9px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+/* ── panes ────────────────────────────────────────────────────────────── */
+.lis-pane {
+  min-height: 100%;
+}
+.lis-pane-pad {
+  padding: 26px 28px;
+}
+.lis-pane-center {
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+}
+.lis-pane-ghost {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  color: var(--m-ink-faint);
+  letter-spacing: 0.04em;
+}
+.lis-pane-h {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--m-ink);
+  margin: 0 0 4px;
+}
+.lis-pane-sub {
+  font-size: 12.5px;
+  color: var(--m-ink-dim);
+  margin: 0;
+}
+.lis-pane-card {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: var(--m-panel-2);
+  border: 1px solid var(--m-line);
+  border-radius: 10px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  color: var(--m-ink-dim);
+}
+
+/* grid */
+.lis-grid {
+  border: 1px solid var(--m-line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--m-panel);
+}
+.lis-grid-head,
+.lis-grid-row {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 0.6fr;
+  gap: 12px;
+  padding: 11px 14px;
+  align-items: center;
+}
+.lis-grid-head {
+  background: var(--m-panel-2);
+  border-bottom: 1px solid var(--m-line);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--m-ink-dim);
+}
+.lis-grid-row {
+  border-bottom: 1px solid var(--m-line-soft);
+  font-size: 13px;
+  color: var(--m-ink);
+  transition: background var(--m-dur-fast) var(--m-ease);
+}
+.lis-grid-row:last-child {
+  border-bottom: 0;
+}
+.lis-grid-row:hover {
+  background: var(--m-panel-2);
+}
+.lis-grid-val {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12.5px;
+  color: var(--m-ink-dim);
+}
+.lis-grid-delta {
+  font-weight: 600;
+  font-size: 12px;
+}
+.lis-grid-delta.t-good {
+  color: var(--m-good);
+}
+.lis-grid-delta.t-muted {
+  color: var(--m-ink-faint);
+}
+
+/* document */
+.lis-doc {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 32px 28px;
+}
+.lis-doc-h {
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--m-ink);
+  margin: 0 0 18px;
+}
+.lis-doc-p {
+  font-size: 14px;
+  line-height: 1.65;
+  color: #c4ccd8;
+  margin: 0 0 14px;
+}
+.lis-doc-edit {
+  width: 100%;
+  min-height: 120px;
+  margin-top: 10px;
+  background: var(--m-panel);
+  border: 1px solid var(--m-line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  resize: vertical;
+  color: #c4ccd8;
+  font-size: 13px;
+  line-height: 1.6;
+  font-family: var(--font-sans, "Poppins", sans-serif);
+}
+.lis-doc-edit:focus {
+  outline: none;
+  border-color: var(--m-accent-deep);
+}
+
+/* ── Layer 3 · omnibar ────────────────────────────────────────────────── */
+.lis-omni {
+  position: relative;
+}
+.lis-omni-trigger {
+  height: 32px;
+  width: 280px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  background: var(--m-panel-2);
+  border: 1px solid var(--m-line);
+  border-radius: 8px;
+  color: var(--m-ink-faint);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color var(--m-dur) var(--m-ease);
+}
+.lis-omni-trigger:hover {
+  border-color: var(--m-accent-deep);
+}
+.lis-omni-trigger > span {
+  flex: 1;
+  text-align: left;
+}
+.lis-omni-trigger kbd {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10px;
+  background: var(--m-bg);
+  border: 1px solid var(--m-line);
+  padding: 2px 6px;
+  border-radius: 5px;
+  color: var(--m-ink-dim);
+}
+.lis-omni-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+}
+.lis-omni-panel {
+  position: absolute;
+  right: 0;
+  top: 40px;
+  width: 420px;
+  z-index: 50;
+  background: var(--m-panel);
+  border: 1px solid var(--m-line);
+  border-radius: 12px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  animation: lis-omni-in var(--m-dur) var(--m-ease);
+}
+@keyframes lis-omni-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.lis-omni-field {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--m-line);
+  background: var(--m-bg);
+  color: var(--m-ink-faint);
+}
+.lis-omni-field input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--m-ink);
+  font-size: 14px;
+  font-family: var(--font-sans, "Poppins", sans-serif);
+}
+.lis-omni-field input::placeholder {
+  color: var(--m-ink-faint);
+}
+.lis-omni-list {
+  padding: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.lis-omni-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--m-dur-fast) var(--m-ease);
+}
+.lis-omni-item:hover {
+  background: var(--m-panel-2);
+}
+.lis-omni-cmd {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  color: var(--m-accent);
+  flex: 0 0 auto;
+}
+.lis-omni-desc {
+  font-size: 12px;
+  color: var(--m-ink-dim);
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   Pattern 2 · inline projections & ghost text
+   ─────────────────────────────────────────────────────────────────────── */
+.lis-inline {
+  position: relative;
+  white-space: nowrap;
+}
+.lis-inline.is-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--m-line);
+  background: var(--m-panel-2);
+}
+
+/* streaming · ghost text, no reflow: invisible base reserves the box */
+.lis-inline-stack {
+  position: relative;
+  display: inline-block;
+}
+.lis-inline-ghosted {
+  visibility: hidden;
+}
+.lis-inline-ghost {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-style: italic;
+  color: color-mix(in srgb, var(--m-ink) 55%, transparent);
+}
+.lis-inline-caret {
+  display: inline-block;
+  width: 1px;
+  height: 1em;
+  margin-left: 1px;
+  background: var(--m-accent);
+  vertical-align: text-bottom;
+  animation: lis-caret 900ms steps(2, start) infinite;
+}
+@keyframes lis-caret {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  61%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* optimistic · speculative deletion + insertion inline */
+.lis-inline-del[data-state="speculative-deletion"] {
+  color: var(--m-ink-faint);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--m-bad) 70%, transparent);
+  margin-right: 6px;
+}
+.lis-inline-ins[data-state="speculative-insertion"] {
+  color: var(--m-speculative);
+  border-bottom: 1px dashed color-mix(in srgb, var(--m-speculative) 70%, transparent);
+  padding-bottom: 1px;
+}
+
+/* rejected · brief flash, reverts to base */
+.lis-inline[data-state="rejected"] {
+  animation: lis-reject 600ms var(--m-ease);
+}
+@keyframes lis-reject {
+  0% {
+    background: color-mix(in srgb, var(--m-bad) 28%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lis-mesh *,
+  .lis-mesh *::before,
+  .lis-mesh *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

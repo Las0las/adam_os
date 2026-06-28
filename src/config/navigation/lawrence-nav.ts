@@ -39,6 +39,7 @@ export const lawrenceNav: NavSection[] = [
     items: [
       { label: "Enterprise Object Runtime", href: "/runtime-console" },
       { label: "Workspace Shell (Canvas · Shelf)", href: "/workspace-shell" },
+      { label: "Navigation Mesh (Rail · Tabs · Omnibar)", href: "/nav-mesh" },
       { label: "EPR Runtime (Job · Candidate)", href: "/epr" },
       { label: "Universal Workspace", href: "/workspace" },
       { label: "Job Intake Studio", href: "/job-intake" },
