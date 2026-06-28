@@ -52,8 +52,12 @@
   inline-size: 100%;
   block-size: 100%;
   display: grid;
-  grid-template-columns: var(--lis-lc) minmax(0, 1fr) var(--lis-rc);
-  grid-template-rows: minmax(0, 1fr) var(--lis-br);
+  /* Middle column is a DEFINITE calc track, not minmax(0,1fr). An fr track is
+     treated as indefinite, so non-stretched grid items inside it (the flex/grid
+     rails) fall back to content-width and collapse. A definite track lets items
+     fill it reliably. */
+  grid-template-columns: var(--lis-lc) calc(100% - var(--lis-lc) - var(--lis-rc)) var(--lis-rc);
+  grid-template-rows: calc(100% - var(--lis-br)) var(--lis-br);
   grid-template-areas:
     "left canvas right"
     "left bottom right";
@@ -111,10 +115,6 @@
   background: var(--shell-rail);
   overflow: hidden;
   min-inline-size: 0;
-  /* Fill the assigned grid cell. Without this, a grid item that is also a flex
-     container sizes to its content — the bottom bar would collapse to ~60px and
-     the side rails only matched their track by coincidence. */
-  inline-size: 100%;
 }
 .lis-rail-left {
   grid-area: left;
@@ -237,8 +237,14 @@
 /* ── Bottom terminal ─────────────────────────────────────────────────────── */
 .lis-rail-bottom {
   grid-area: bottom;
-  flex-direction: column;
+  /* A column-flex grid item shrink-wraps its width (justify-self:stretch is not
+     honored for it). Use display:grid like the canvas, which stretches its
+     cell reliably; rows = the 40px bar + the terminal panel. */
+  display: grid;
+  grid-template-rows: 40px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   border-block-start: 1px solid var(--shell-line);
+  min-inline-size: 0;
 }
 .lis-bar {
   flex: 0 0 40px;
