@@ -1,0 +1,176 @@
+// L0 kernel — representative live authority grants for the audit lens.
+//
+// Not fixtures: each entry submits a representative Intent to the REAL kernel,
+// which authorizes it against the Constitution Runtime, mints an
+// ExecutionAuthority, and records the grant/denial to the Execution Ledger. The
+// audit lens renders these so an operator can see authority being ISSUED (and
+// withheld) — and the ledger entries they produced.
+
+import { Kernel } from "./kernel-runtime";
+import type { ExecutionAuthority, Intent } from "./contracts";
+import { createSnapshot, type RuntimeSnapshot } from "./runtime-snapshot";
+
+/** A serializable summary of one issued authority, for the audit lens. */
+export interface AuthoritySummary {
+  authorityId: string;
+  decisionId: string;
+  scenario: string;
+  outcome: ExecutionAuthority["outcome"];
+  granted: boolean;
+  actorKind: string;
+  capabilities: string[];
+  rights: string[];
+  restrictions: string[];
+  mission: string | null;
+  expiresAt: string;
+  signature: string;
+}
+
+function summarize(scenario: string, a: ExecutionAuthority): AuthoritySummary {
+  return {
+    authorityId: a.authorityId,
+    decisionId: a.decisionId,
+    scenario,
+    outcome: a.outcome,
+    granted: a.granted,
+    actorKind: a.actor.kind,
+    capabilities: a.capabilities,
+    rights: a.rights,
+    restrictions: a.restrictions,
+    mission: a.mission?.title ?? null,
+    expiresAt: a.expiresAt,
+    signature: a.signature,
+  };
+}
+
+/**
+ * Run a representative set of intents through the kernel. The clock is fixed so
+ * authority ids/signatures are deterministic across renders. Side effect: each
+ * call appends grant/denial entries to the Execution Ledger.
+ */
+export function liveSampleAuthorities(now = Date.parse("2026-01-01T00:00:00.000Z")): AuthoritySummary[] {
+  const tenant = "lawrence";
+  const scenarios: { label: string; intent: Intent }[] = [
+    {
+      label: "Recruiter requests authority to create a candidate",
+      intent: {
+        kind: "object.create",
+        actor: { kind: "human", id: "user_recruiter_01", tenantId: tenant, permissions: ["candidate:create"] },
+        enterpriseId: tenant,
+        object: { objectType: "candidate", isMutation: false },
+        audited: true,
+      },
+    },
+    {
+      label: "AI agent requests authority to source a candidate",
+      intent: {
+        kind: "object.create",
+        actor: { kind: "agent", id: "agent_sourcing_01", tenantId: tenant, permissions: ["candidate:create"] },
+        enterpriseId: tenant,
+        object: { objectType: "candidate", isMutation: false },
+        audited: true,
+      },
+    },
+    {
+      label: "System resolves a projection",
+      intent: {
+        kind: "projection.resolve",
+        actor: { kind: "system", id: null, tenantId: tenant, permissions: ["candidate:read"] },
+        enterpriseId: tenant,
+        projection: { objectType: "candidate", projectionId: "candidate.detail", surface: "fullPage" },
+        audited: true,
+      },
+    },
+    {
+      label: "Anonymous principal requests write authority",
+      intent: {
+        kind: "object.create",
+        actor: { kind: "anonymous", id: null, tenantId: tenant, permissions: [] },
+        enterpriseId: tenant,
+        object: { objectType: "candidate", isMutation: false },
+        audited: true,
+      },
+    },
+    {
+      label: "Write request carrying no granted authority",
+      intent: {
+        kind: "object.update",
+        actor: { kind: "human", id: "user_recruiter_01", tenantId: tenant, permissions: [] },
+        enterpriseId: tenant,
+        object: { objectType: "candidate", isMutation: true },
+        audited: true,
+      },
+    },
+  ];
+
+  return scenarios.map((s) => summarize(s.label, Kernel.requestAuthority(s.intent, now)));
+}
+
+/**
+ * Run a representative authorized intent through the full Authority → Decision
+ * path so the audit lens can show the concrete plan an authority decomposes
+ * into. Side effect: journals a DecisionComposed entry. Fixed clock = stable.
+ */
+export function liveSampleDecision(now = Date.parse("2026-01-01T00:00:00.000Z")) {
+  const tenant = "lawrence";
+  const { authority, decision } = Kernel.decide(
+    {
+      kind: "object.create",
+      actor: { kind: "human", id: "user_recruiter_01", tenantId: tenant, permissions: ["candidate:create"] },
+      enterpriseId: tenant,
+      object: { objectType: "candidate", isMutation: false },
+      audited: true,
+    },
+    now,
+  );
+  return {
+    scenario: "Authorized Candidate.Create decomposed into its execution plan",
+    decisionPlanId: decision.decisionPlanId,
+    authorityId: authority.authorityId,
+    intentKind: decision.intentKind,
+    primaryStepId: decision.primaryStepId,
+    steps: decision.steps.map((s) => ({
+      id: s.id,
+      label: s.label,
+      execution: s.execution,
+      mutates: s.mutates,
+      dependsOn: s.dependsOn,
+    })),
+  };
+}
+
+export type SampleDecision = ReturnType<typeof liveSampleDecision>;
+
+/**
+ * Capture a representative RuntimeSnapshot so the Kernel Explorer can show the
+ * single most important reproduction primitive in full: the content-hashed,
+ * fully-serializable context that makes an execution replayable bit-for-bit.
+ * Deterministic — fixed clock and fixed inputs yield a stable snapshotId.
+ */
+export function liveSampleSnapshot(now = Date.parse("2026-01-01T00:00:00.000Z")): RuntimeSnapshot {
+  const tenant = "lawrence";
+  const authority = Kernel.requestAuthority(
+    {
+      kind: "projection.resolve",
+      actor: { kind: "human", id: "user_recruiter_01", tenantId: tenant, permissions: ["candidate:read"] },
+      enterpriseId: tenant,
+      projection: { objectType: "candidate", projectionId: "candidate.detail", surface: "fullPage" },
+      audited: true,
+    },
+    now,
+  );
+  return createSnapshot({
+    authority,
+    enterpriseId: tenant,
+    host: { surface: "server", now: new Date(now).toISOString() },
+    runtimeState: {
+      instance: null,
+      surface: "fullPage",
+      mode: "view",
+      locale: "en-US",
+      user: { tenantId: tenant, userId: "user_recruiter_01", displayName: "Recruiter One" },
+      permissions: ["candidate:read"],
+      policy: { requireApprovalFor: [], blockedIntents: [] },
+    },
+  });
+}

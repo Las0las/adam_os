@@ -1,0 +1,520 @@
+"use client";
+
+import { useState } from "react";
+import {
+  CONSTITUTION_LENSES,
+  type ConstitutionLens,
+  type ConstitutionHeadline,
+  type ConstitutionView,
+  type DecisionSummary,
+} from "@/lib/constitution";
+import type { AuthoritySummary, JournalEntry, SampleDecision, ConformanceReport, ReconstructionReport } from "@/lib/kernel";
+import type { ReplayProof } from "@/lib/projection-runtime";
+
+interface Props {
+  constitution: ConstitutionView;
+  headline: ConstitutionHeadline;
+  decisions: DecisionSummary[];
+  authorities: AuthoritySummary[];
+  decisionPlan: SampleDecision;
+  conformance: ConformanceReport;
+  reconstruction: ReconstructionReport;
+  journal: JournalEntry[];
+  replay: ReplayProof;
+}
+
+export function ConstitutionLenses({ constitution: c, headline, decisions, authorities, decisionPlan, conformance, reconstruction, journal, replay }: Props) {
+  const [lens, setLens] = useState<ConstitutionLens>("document");
+
+  return (
+    <div className="stack">
+      <div className="seg" role="tablist" aria-label="Constitution lens">
+        {CONSTITUTION_LENSES.map((l) => (
+          <button
+            key={l.id}
+            role="tab"
+            aria-selected={lens === l.id}
+            className={lens === l.id ? "active" : ""}
+            onClick={() => setLens(l.id)}
+          >
+            {l.label}
+          </button>
+        ))}
+      </div>
+      <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+        {CONSTITUTION_LENSES.find((l) => l.id === lens)?.blurb}
+      </p>
+
+      {lens === "document" && <DocumentLens c={c} />}
+      {lens === "executive" && <ExecutiveLens c={c} headline={headline} />}
+      {lens === "developer" && <DeveloperLens c={c} />}
+      {lens === "audit" && (
+        <AuditLens
+          c={c}
+          decisions={decisions}
+          authorities={authorities}
+          decisionPlan={decisionPlan}
+          conformance={conformance}
+          reconstruction={reconstruction}
+          journal={journal}
+          replay={replay}
+        />
+      )}
+    </div>
+  );
+}
+
+function Card({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <div className={`card ${className ?? ""}`}>{children}</div>;
+}
+
+// ── Document lens ────────────────────────────────────────────────────────────
+function DocumentLens({ c }: { c: ConstitutionView }) {
+  return (
+    <div className="stack">
+      <Card className="const-hero">
+        <div className="const-eyebrow">Enterprise Identity · v{c.version}</div>
+        <h2 className="const-identity-name">{c.identity.name}</h2>
+        <p className="const-descriptor">{c.identity.descriptor}</p>
+        <div className="const-identity-meta">
+          {c.identity.jurisdictions.map((j) => (
+            <span key={j} className="badge neutral">{j}</span>
+          ))}
+        </div>
+        <div className="const-mission">
+          <div className="const-eyebrow">Mission</div>
+          <p className="const-mission-statement">{c.mission.statement}</p>
+          <ul className="const-measures">
+            {c.mission.measures.map((m) => <li key={m}>{m}</li>)}
+          </ul>
+        </div>
+      </Card>
+
+      <section>
+        <h3 className="const-section-title">Principles</h3>
+        <p className="const-section-note">The beliefs that shape interpretation of every rule.</p>
+        <div className="const-grid">
+          {c.principles.map((p) => (
+            <Card key={p.id} className="const-item">
+              <div className="const-item-head">
+                <span className="badge accent">{p.id}</span>
+                <h4>{p.title}</h4>
+              </div>
+              <p>{p.statement}</p>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <div className="const-two-col">
+        <section>
+          <h3 className="const-section-title">Rights</h3>
+          <p className="const-section-note">What actors may expect from the enterprise.</p>
+          <div className="const-list">
+            {c.rights.map((r) => (
+              <Card key={r.id} className="const-row">
+                <div className="const-item-head">
+                  <span className="badge neutral">{r.id}</span>
+                  <span className="muted" style={{ fontSize: 11 }}>{r.holder}</span>
+                </div>
+                <p>{r.statement}</p>
+              </Card>
+            ))}
+          </div>
+        </section>
+        <section>
+          <h3 className="const-section-title">Responsibilities</h3>
+          <p className="const-section-note">What actors owe in return.</p>
+          <div className="const-list">
+            {c.responsibilities.map((r) => (
+              <Card key={r.id} className="const-row">
+                <div className="const-item-head">
+                  <span className="badge neutral">{r.id}</span>
+                  <span className="muted" style={{ fontSize: 11 }}>{r.bearer}</span>
+                </div>
+                <p>{r.statement}</p>
+              </Card>
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+// ── Executive lens ───────────────────────────────────────────────────────────
+function ExecutiveLens({ c, headline }: { c: ConstitutionView; headline: ConstitutionHeadline }) {
+  const tiles: { label: string; value: number }[] = [
+    { label: "Mission objectives", value: headline.objectives },
+    { label: "Principles", value: headline.principles },
+    { label: "Blocking invariants", value: headline.blockingInvariants },
+    { label: "Executable policies", value: headline.policies },
+  ];
+  return (
+    <div className="stack">
+      <div className="const-grid">
+        {tiles.map((t) => (
+          <Card key={t.label} className="const-item">
+            <div className="const-metric-value">{t.value}</div>
+            <div className="muted" style={{ fontSize: 12 }}>{t.label}</div>
+          </Card>
+        ))}
+      </div>
+      <section>
+        <h3 className="const-section-title">Mission objectives</h3>
+        <p className="const-section-note">Highest priority first — the runtime aligns actions to these.</p>
+        <div className="const-list">
+          {[...c.mission.objectives].sort((a, b) => a.priority - b.priority).map((o) => (
+            <Card key={o.id} className="const-row">
+              <div className="const-item-head">
+                <span className="badge accent">P{o.priority}</span>
+                <h4>{o.title}</h4>
+              </div>
+              <p>{o.statement}</p>
+              <p className="const-derived">Success metric — {o.successMetric}</p>
+            </Card>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// ── Developer lens ───────────────────────────────────────────────────────────
+function DeveloperLens({ c }: { c: ConstitutionView }) {
+  return (
+    <div className="stack">
+      <section>
+        <h3 className="const-section-title">Invariants</h3>
+        <p className="const-section-note">Pure predicates enforced on every governed action — fail-closed.</p>
+        <div className="const-list">
+          {c.invariants.map((i) => (
+            <Card key={i.id} className="const-row">
+              <div className="const-item-head">
+                <span className="badge accent">{i.id}</span>
+                <h4>{i.title}</h4>
+                <span className="spacer" />
+                <span className={`badge ${i.severity === "blocking" ? "bad" : "warn"}`}>{i.severity}</span>
+              </div>
+              <p>{i.statement}</p>
+              <div className="const-enforces">
+                {i.derivedFrom.map((d) => <span key={d} className="badge neutral">derives {d}</span>)}
+              </div>
+            </Card>
+          ))}
+        </div>
+      </section>
+      <section>
+        <h3 className="const-section-title">Executable policies</h3>
+        <p className="const-section-note">Self-evaluating, self-explaining objects — not text.</p>
+        <div className="const-list">
+          {c.policies.map((p) => (
+            <Card key={p.id} className="const-row">
+              <div className="const-item-head">
+                <span className="badge accent">{p.id}</span>
+                <h4>{p.title}</h4>
+              </div>
+              <p>{p.statement}</p>
+              <div className="const-enforces">
+                {p.enforces.map((e) => <span key={e} className="badge neutral">enforces {e}</span>)}
+              </div>
+            </Card>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// ── Audit lens ───────────────────────────────────────────────────────────────
+function AuditLens({
+  c,
+  decisions,
+  authorities,
+  decisionPlan,
+  conformance,
+  reconstruction,
+  journal,
+  replay,
+}: {
+  c: ConstitutionView;
+  decisions: DecisionSummary[];
+  authorities: AuthoritySummary[];
+  decisionPlan: SampleDecision;
+  conformance: ConformanceReport;
+  reconstruction: ReconstructionReport;
+  journal: JournalEntry[];
+  replay: ReplayProof;
+}) {
+  const failed = conformance.findings.filter((f) => !f.ok);
+  const blockers = reconstruction.hiddenStateRisks.filter((r) => r.severity === "blocker");
+  return (
+    <div className="stack">
+      <section>
+        <h3 className="const-section-title">Self-hosting · SB-7 reconstructability</h3>
+        <p className="const-section-note">
+          The defining property of a self-hosting OS: the platform must be able to reconstruct its complete
+          executable state from five canonical sources alone — Enterprise Objects, Runtime Definitions, the
+          Execution Journal, the Version Graph, and the Constitution — with no hidden implementation state.
+        </p>
+        <Card className="const-row">
+          <div className="const-item-head">
+            <span className={`badge ${reconstruction.reconstructable ? "good" : "bad"}`}>
+              {reconstruction.reconstructable ? "reconstructable" : "NOT RECONSTRUCTABLE"}
+            </span>
+            <h4>state root {reconstruction.stateRootHash}</h4>
+            <span className="spacer" />
+            <span className={`badge ${reconstruction.replayDeterministic ? "good" : "bad"}`} title="journal folds identically when replayed">
+              replay {reconstruction.replayDeterministic ? "deterministic" : "drift"}
+            </span>
+          </div>
+          <div className="const-enforces">
+            {reconstruction.sources.map((s) => (
+              <span
+                key={s.id}
+                className={`badge ${s.present ? "neutral" : "bad"}`}
+                title={`${s.role} · ${s.itemCount} item(s) · fp ${s.fingerprint}`}
+              >
+                {s.label} ({s.itemCount})
+              </span>
+            ))}
+          </div>
+          {reconstruction.hiddenStateRisks.length > 0 && (
+            <div className="const-enforces">
+              {reconstruction.hiddenStateRisks.map((r, i) => (
+                <span key={i} className={`badge ${r.severity === "blocker" ? "bad" : "warn"}`} title={r.detail}>
+                  {r.severity === "blocker" ? "blocks" : "advisory"}: {r.subject}
+                </span>
+              ))}
+            </div>
+          )}
+          <p className="const-derived">
+            {blockers.length === 0
+              ? "No blocking hidden state — the executable state is fully derivable from the canonical sources."
+              : `${blockers.length} blocking risk(s) must be resolved before the platform is fully self-hosting.`}
+          </p>
+        </Card>
+      </section>
+
+      <section>
+        <h3 className="const-section-title">Constitutional validation</h3>
+        <p className="const-section-note">
+          The Constitution is an executable contract. Before the runtime stack is admitted, every runtime
+          publishes a self-describing descriptor and the validator checks it against every applicable article —
+          self-description, an acyclic hierarchy, mandatory invariants, and health. A failing stack does not run.
+        </p>
+        <Card className="const-row">
+          <div className="const-item-head">
+            <span className={`badge ${conformance.conformant ? "good" : "bad"}`}>
+              {conformance.conformant ? "conformant" : "NON-CONFORMANT"}
+            </span>
+            <h4>{conformance.descriptors.length} runtimes · {conformance.findings.length} checks · {failed.length} failing</h4>
+            <span className="spacer" />
+            <span className="const-derived">v{conformance.constitutionVersion} · graph {conformance.runtimeGraphHash}</span>
+          </div>
+          <div className="const-enforces">
+            {conformance.descriptors.map((d) => (
+              <span
+                key={d.runtimeId}
+                className={`badge ${conformance.findings.some((f) => f.runtimeId === d.runtimeId && !f.ok) ? "bad" : "neutral"}`}
+                title={`${d.label} v${d.runtimeVersion} · ${d.layer} · replay=${d.replaySupport}`}
+              >
+                {d.runtimeId} v{d.runtimeVersion}
+              </span>
+            ))}
+          </div>
+          {failed.length > 0 && (
+            <div className="const-enforces">
+              {failed.map((f, i) => (
+                <span key={i} className="badge bad" title={f.article}>{f.runtimeId}: {f.detail}</span>
+              ))}
+            </div>
+          )}
+        </Card>
+      </section>
+
+      <section>
+        <h3 className="const-section-title">Replay determinism</h3>
+        <p className="const-section-note">
+          A RenderPlan is a pure function of its definition, object, authority, and runtime snapshot. Resolving
+          the same projection twice under the same snapshot must yield a byte-identical plan — the guarantee that
+          makes replay, caching, and AI reasoning sound.
+        </p>
+        <Card className="const-row">
+          <div className="const-item-head">
+            <span className={`badge ${replay.deterministic ? "good" : "bad"}`}>
+              {replay.deterministic ? "deterministic" : "DRIFT DETECTED"}
+            </span>
+            <h4>Resolved {replay.projectionId} twice @ {replay.clock}</h4>
+            <span className="spacer" />
+            <span className="const-derived">snapshot {replay.snapshotIdA}</span>
+          </div>
+          <div className="const-enforces">
+            <span className="badge neutral" title="fingerprint of first resolve">{replay.fingerprintA}</span>
+            <span className="badge neutral" title="fingerprint of replayed resolve">{replay.fingerprintB}</span>
+            <span className="badge accent" title="runtime version graph hash">graph {replay.runtimeGraphHash}</span>
+          </div>
+        </Card>
+      </section>
+
+      <section>
+        <h3 className="const-section-title">Execution authority</h3>
+        <p className="const-section-note">
+          Every actor — human or AI — submits an intent to the kernel, which issues a signed, expiring
+          ExecutionAuthority. AI never executes; it requests authority through this same path.
+        </p>
+        <div className="const-list">
+          {authorities.map((a) => (
+            <Card key={a.authorityId} className="const-row">
+              <div className="const-item-head">
+                <span className={`badge ${a.granted ? "good" : "bad"}`}>
+                  {a.granted ? "granted" : "denied"}
+                </span>
+                <h4>{a.scenario}</h4>
+                <span className="spacer" />
+                <span className="const-derived">{a.actorKind}</span>
+              </div>
+              <div className="const-enforces">
+                <span className="badge neutral" title="authority id">{a.authorityId}</span>
+                <span className="badge neutral" title="tamper-evident signature">{a.signature}</span>
+                {a.mission && <span className="badge accent" title="mission objective served">{a.mission}</span>}
+              </div>
+              {a.capabilities.length > 0 && (
+                <div className="const-enforces">
+                  {a.capabilities.map((cap) => (
+                    <span key={cap} className="badge accent">grants {cap}</span>
+                  ))}
+                </div>
+              )}
+              {a.restrictions.length > 0 && (
+                <div className="const-enforces">
+                  {a.restrictions.map((r) => (
+                    <span key={r} className="badge warn">{r}</span>
+                  ))}
+                </div>
+              )}
+              {a.granted && (
+                <p className="const-derived">Expires {a.expiresAt} · decision {a.decisionId}</p>
+              )}
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h3 className="const-section-title">Decision plan</h3>
+        <p className="const-section-note">
+          Authority answers <em>&ldquo;may this happen?&rdquo;</em>; the Decision Runtime answers <em>&ldquo;exactly
+          what will happen?&rdquo;</em> An authorized intent decomposes into a concrete, ordered plan of steps the
+          scheduler executes — each spending a capability, each recorded.
+        </p>
+        <Card className="const-row">
+          <div className="const-item-head">
+            <span className="badge good">{decisionPlan.intentKind}</span>
+            <h4>{decisionPlan.scenario}</h4>
+            <span className="spacer" />
+            <span className="const-derived">{decisionPlan.decisionPlanId}</span>
+          </div>
+          <ol className="const-steps" style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+            {decisionPlan.steps.map((s, i) => (
+              <li key={s.id} style={{ marginBottom: 4 }}>
+                <span style={{ fontWeight: s.id === decisionPlan.primaryStepId ? 600 : 400 }}>{s.label}</span>{" "}
+                <span className={`badge ${s.execution === "immediate" ? "good" : "neutral"}`}>{s.execution}</span>
+                {s.mutates && <span className="badge warn" title="performs a write">mutates</span>}
+                {s.dependsOn.length > 0 && (
+                  <span className="const-derived"> after {s.dependsOn.join(", ")}</span>
+                )}
+                {s.id === decisionPlan.primaryStepId && <span className="badge accent">primary</span>}
+              </li>
+            ))}
+          </ol>
+        </Card>
+      </section>
+
+      <section>
+        <h3 className="const-section-title">Execution journal</h3>
+        <p className="const-section-note">
+          The canonical, append-only event stream — the replay source. Every step of the lifecycle (intent
+          received, authority granted/denied, snapshot created, projection rendered, mutation prepared/committed)
+          is recorded in causal order and can never be altered.
+        </p>
+        <div className="const-list">
+          {journal.map((e) => (
+            <Card key={e.entryId} className="const-row">
+              <div className="const-item-head">
+                <span className={`badge ${e.kind === "AuthorityDenied" ? "bad" : e.kind.startsWith("Authority") || e.kind.startsWith("Mutation") ? "good" : "neutral"}`}>
+                  {e.kind}
+                </span>
+                <h4>{e.summary}</h4>
+                <span className="spacer" />
+                <span className="const-derived">#{e.seq} · {e.actorKind}</span>
+              </div>
+              <p className="const-derived">
+                {e.at}
+                {e.snapshotId ? ` · snapshot ${e.snapshotId}` : ""}
+                {e.authorityId ? ` · authority ${e.authorityId}` : ""}
+              </p>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h3 className="const-section-title">Version lineage</h3>
+        <div className="const-list">
+          {c.amendments.map((a) => (
+            <Card key={a.version} className="const-row">
+              <div className="const-item-head">
+                <span className="badge accent">v{a.version}</span>
+                <span className="muted" style={{ fontSize: 11 }}>{a.effectiveDate}</span>
+                <span className="spacer" />
+                <span className="const-derived">{a.supersedes ? `supersedes v${a.supersedes}` : "genesis ratification"}</span>
+              </div>
+              <p>{a.summary}</p>
+            </Card>
+          ))}
+        </div>
+      </section>
+      <section>
+        <h3 className="const-section-title">Live decisions</h3>
+        <p className="const-section-note">
+          Each row is the real root runtime evaluating a representative action — with the evidence behind the outcome.
+        </p>
+        <div className="const-list">
+          {decisions.map((d) => (
+            <Card key={d.decisionId} className="const-row">
+              <div className="const-item-head">
+                <span className={`badge ${d.authorized ? "good" : "bad"}`}>
+                  {d.authorized ? "authorized" : "denied"}
+                </span>
+                <h4>{d.scenario}</h4>
+                <span className="spacer" />
+                <span className="const-derived">{d.actorKind} · {d.actionKind}</span>
+              </div>
+              {d.missionObjective && <p className="const-derived">Serves — {d.missionObjective}</p>}
+              {d.violations.length > 0 && (
+                <div className="const-enforces">
+                  {d.violations.map((v) => (
+                    <span key={v.ref} className="badge bad" title={v.rationale}>{v.ref}</span>
+                  ))}
+                </div>
+              )}
+              <details className="const-evidence">
+                <summary className="const-derived">
+                  Evidence · {d.evidence.filter((e) => e.supports).length}/{d.evidence.length} supporting · {d.evaluatedTotal} elements evaluated
+                </summary>
+                <ul className="const-evidence-list">
+                  {d.evidence.map((e, idx) => (
+                    <li key={`${e.ref}-${idx}`} className={e.supports ? "ev-ok" : "ev-no"}>
+                      <span className="badge neutral">{e.kind}</span> {e.observation}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            </Card>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}

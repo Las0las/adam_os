@@ -1,0 +1,56 @@
+# LAWRENCE Platform monorepo CI (Phase 0+).
+#
+# This is a DROP-IN TEMPLATE. v0's connected GitHub App does not have the
+# `workflows` permission, so it cannot commit files under `.github/workflows/`.
+# To enable CI, copy this file to `.github/workflows/platform-ci.yml` at the
+# repo root yourself (a one-time manual step):
+#
+#     mkdir -p .github/workflows
+#     cp platform/ci/platform-ci.yml .github/workflows/platform-ci.yml
+#
+# It is scoped to `platform/**` so it is fully independent of the existing
+# application CI at the repo root.
+
+name: platform-ci
+
+on:
+  push:
+    branches: [main]
+    paths: ["platform/**", ".github/workflows/platform-ci.yml"]
+  pull_request:
+    paths: ["platform/**", ".github/workflows/platform-ci.yml"]
+
+defaults:
+  run:
+    working-directory: platform
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: platform/pnpm-lock.yaml
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint (incl. architectural layer rules)
+        run: pnpm lint
+
+      - name: Typecheck (strict)
+        run: pnpm typecheck
+
+      - name: Test (contract + constitutional harness)
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build

@@ -1,0 +1,195 @@
+/* LIS-002 demo chrome — presentational only; the shell engine lives in lis-shell.css */
+
+.lis-demo {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #04101a;
+  color: #dce8ef;
+  font-family: var(--font-poppins, "Poppins", system-ui, sans-serif);
+}
+
+.lis-demo-top {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  border-block-end: 1px solid rgba(120, 170, 190, 0.16);
+  background: #06141f;
+}
+.lis-demo-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lis-demo-mark {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #44b0b1;
+  border: 1px solid rgba(68, 176, 177, 0.4);
+  border-radius: 6px;
+  padding: 3px 7px;
+}
+.lis-demo-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #c6d6e0;
+}
+
+.lis-demo-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.lis-demo-pill {
+  display: inline-flex;
+  border: 1px solid rgba(120, 170, 190, 0.22);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.lis-demo-pill button {
+  border: 0;
+  background: transparent;
+  color: #9fb6c4;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.lis-demo-pill button:hover {
+  background: rgba(68, 176, 177, 0.12);
+  color: #e8f0f5;
+}
+.lis-demo-readout {
+  font-family: var(--font-jetbrains, ui-monospace, monospace);
+  font-size: 11px;
+  color: #7d99a8;
+  background: #081a27;
+  border: 1px solid rgba(120, 170, 190, 0.16);
+  border-radius: 7px;
+  padding: 5px 9px;
+}
+.lis-demo-reason {
+  color: #44b0b1;
+}
+.lis-demo-clear {
+  border: 1px solid rgba(120, 170, 190, 0.22);
+  background: transparent;
+  color: #9fb6c4;
+  font-size: 12px;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.lis-demo-clear:hover {
+  border-color: rgba(216, 105, 78, 0.5);
+  color: #e8a392;
+}
+
+.lis-demo-stage {
+  flex: 1 1 auto;
+  min-block-size: 0;
+  position: relative;
+}
+
+/* ── Canvas content ──────────────────────────────────────────────────────── */
+.lis-demo-canvas {
+  inline-size: 100%;
+  block-size: 100%;
+  overflow: auto;
+  padding: 40px clamp(24px, 6vw, 96px);
+}
+.lis-demo-canvas h1 {
+  font-size: clamp(24px, 3.2vw, 38px);
+  font-weight: 600;
+  margin: 6px 0 10px;
+  letter-spacing: -0.01em;
+}
+.lis-demo-lead {
+  max-inline-size: 60ch;
+  color: #9fb6c4;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-block-end: 28px;
+}
+.lis-demo-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #5f7d8c;
+  margin: 0 0 10px;
+}
+.lis-demo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.lis-demo-card {
+  block-size: 96px;
+  border: 1px solid rgba(120, 170, 190, 0.18);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(68, 176, 177, 0.06), transparent);
+  display: flex;
+  align-items: flex-end;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #c6d6e0;
+}
+
+/* ── Rail content ────────────────────────────────────────────────────────── */
+.lis-demo-nav {
+  padding: 12px;
+}
+.lis-demo-navitem {
+  display: block;
+  inline-size: 100%;
+  text-align: start;
+  border: 0;
+  background: transparent;
+  color: #c6d6e0;
+  font-size: 13px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.lis-demo-navitem:hover {
+  background: rgba(68, 176, 177, 0.1);
+}
+
+.lis-demo-inspector {
+  padding: 14px;
+}
+.lis-demo-field {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-block-end: 1px solid rgba(120, 170, 190, 0.12);
+  font-size: 13px;
+}
+.lis-demo-field span {
+  color: #7d99a8;
+}
+.lis-demo-field strong {
+  font-weight: 600;
+  color: #e8f0f5;
+}
+
+.lis-demo-terminal {
+  padding: 12px 14px;
+  font-family: var(--font-jetbrains, ui-monospace, monospace);
+  font-size: 12.5px;
+  line-height: 1.8;
+}
+.lis-demo-prompt {
+  color: #44b0b1;
+}
+.lis-demo-dim {
+  color: #5f7d8c;
+}

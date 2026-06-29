@@ -24,6 +24,32 @@ export const lawrenceNav: NavSection[] = [
     ],
   },
   {
+    title: "Govern",
+    items: [
+      { label: "Constitution", href: "/constitution" },
+      { label: "Kernel Explorer", href: "/kernel" },
+      { label: "Governed Execution", href: "/governed-execution" },
+      { label: "Architecture Primer", href: "/primer" },
+      { label: "Projection Studio", href: "/studio" },
+      { label: "Engineering Program", href: "/program" },
+    ],
+  },
+  {
+    title: "Studios",
+    items: [
+      { label: "LIS Workspace (Consolidated)", href: "/lis" },
+      { label: "Enterprise Object Runtime", href: "/runtime-console" },
+      { label: "Workspace Shell (Canvas · Shelf)", href: "/workspace-shell" },
+      { label: "Navigation Mesh (Rail · Tabs · Omnibar)", href: "/nav-mesh" },
+      { label: "EPR Runtime (Job · Candidate)", href: "/epr" },
+      { label: "Universal Workspace", href: "/workspace" },
+      { label: "Job Intake Studio", href: "/job-intake" },
+      { label: "Candidate Studio", href: "/candidate-studio" },
+      { label: "Design System (LDS-001)", href: "/design-system" },
+      { label: "Interaction Canon (STD-UX-0001)", href: "/interaction-canon" },
+    ],
+  },
+  {
     title: "DataOps",
     items: [
       { label: "Overview", href: "/dataops" },
@@ -55,6 +81,7 @@ export const lawrenceNav: NavSection[] = [
       { label: "Approvals", href: "/mission-control/approvals" },
       { label: "Notifications", href: "/mission-control/notifications" },
       { label: "Incidents", href: "/mission-control/incidents" },
+      { label: "Global Runtime", href: "/mission-control/runtime" },
       { label: "Runtime Health", href: "/mission-control/runtime/health" },
       { label: "Graph Integrity", href: "/mission-control/graph-integrity" },
       { label: "Audit", href: "/mission-control/runtime/audit" },

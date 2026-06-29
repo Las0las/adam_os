@@ -8,8 +8,8 @@
 | Authority | Architecture Standard |
 | Owner | LAWRENCE Architecture Council |
 | Effective Date | — (Draft) |
-| Derived From | LAWRENCE Constitution v1.0 |
-| Related Artifacts | AS-001, ADR-0005, RUN-001 … RUN-010, ASSESS-001 |
+| Derived From | LAWRENCE Platform Constitution v1.0 (Principle 0); LAWRENCE Constitution v1.0 (IOS) |
+| Related Artifacts | CONST-PLATFORM-LAWRENCE, AS-001, ADR-0005, ADR-0006, RUN-000 … RUN-011, ASSESS-001 |
 | Superseded By | — |
 
 > An Architecture Standard sits between the Constitution and Normative
@@ -51,6 +51,7 @@ This Standard governs:
 8. Output Materializers and materialization sinks (RUN-008).
 9. The Runtime Exception taxonomy (RUN-009).
 10. Conformance requirements and suites for the above (RUN-010).
+11. The Ontology & Event boundary binding the Runtime to Principle 0 (RUN-011).
 
 ### 2.1 Out of Scope (Non-Goals)
 
@@ -69,6 +70,13 @@ adding, wrapping, or modifying an IOS execution seam.
 
 ## 3. Binding Rules
 
+- **R0 (Subordinate to Principle 0).** The Processor Runtime SHALL be subordinate to the
+  LAWRENCE Platform Constitution and its **Principle 0 — The Ontology Owns Reality** and
+  ten Architectural Axioms. The Runtime owns **neither reality nor facts**: it SHALL NOT
+  mutate ontology objects directly; reality changes SHALL be expressed as commands
+  (intent) realized only by accepted events; only disposable projections may be
+  materialized directly. Governance (policy/authorization) SHALL precede execution. The
+  Ontology/Event boundary is specified by RUN-011. (Principle 0 §5/§9; Axioms 1–3, 7.)
 - **R1 (Sibling, not extension).** The Processor Runtime SHALL be a sibling subsystem
   governed by this Standard. It SHALL NOT introduce, modify, or depend on any IOS
   execution extension point. It SHALL NOT modify AS-001, IOS-004, or `aiops/execution/**`.
@@ -91,7 +99,9 @@ adding, wrapping, or modifying an IOS execution seam.
 - **R6 (Governed materialization).** All persistence performed by an Output Materializer
   SHALL route through existing kernel persistence, permission guards, tenant scoping,
   and audit emission. A materializer SHALL NOT write directly to a store, bypass an
-  access decision, or weaken an existing deny.
+  access decision, or weaken an existing deny. Per R0, a materializer SHALL write only
+  **disposable projections** (`ProjectionWrite`, RUN-011); it SHALL NOT mutate enterprise
+  reality — reality changes are `CommandIntent` realized by accepted events.
 - **R7 (Governance composition).** Clearance evaluation SHALL **compose with**, and
   SHALL NOT replace or relax, the existing Security access decision. A governance
   marking SHALL only ever further restrict access; it SHALL NOT broaden it.
@@ -114,6 +124,7 @@ adding, wrapping, or modifying an IOS execution seam.
 
 | Specification | Subsystem |
 |---------------|-----------|
+| RUN-000 | Runtime Architecture Library (index & ownership matrix) |
 | RUN-001 | Processor Contract |
 | RUN-002 | Input / Output Contracts |
 | RUN-003 | Execution Context (`ProcessorRunContext`) |
@@ -124,6 +135,7 @@ adding, wrapping, or modifying an IOS execution seam.
 | RUN-008 | Output Materializers |
 | RUN-009 | Runtime Exception Taxonomy |
 | RUN-010 | Conformance Tests |
+| RUN-011 | Ontology & Event Boundary (Principle 0 binding) |
 
 ## 5. Dependency Direction
 
