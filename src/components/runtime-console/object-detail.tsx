@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import {
   CANDIDATE_STAGES, runtimeStore, useRuntimeEvents, useRuntimeObject,
-  useRuntimeProjection, type RuntimeInstance, type Stage, type Tone,
+  useRuntimeProjection, type RuntimeInstance, type Stage,
 } from "./runtime-store";
 import "./object-detail.css";
 
@@ -81,8 +81,8 @@ const SARAH: PersonDetail = {
   acceptLikelihood: 78,
   whyMatch: ["Exact skills match", "Relevant industry experience", "Culture add", "Immediate impact"],
   related: [
-    { type: "Job", icon: "job", title: "JR-118 · Senior Data Engineer", sub: "TechCorp", badge: "Final Round", tone: "good" },
-    { type: "Interview", icon: "interview", title: "INT-3321 · Technical Interview", sub: "Panel · 3 interviewers", badge: "Completed", tone: "good" },
+    { type: "Job", icon: "job", title: "JR-118 · Senior Data Engineer", sub: "TechCorp", badge: "Final Round", tone: "green" },
+    { type: "Interview", icon: "interview", title: "INT-3321 · Technical Interview", sub: "Panel · 3 interviewers", badge: "Completed", tone: "green" },
     { type: "Hiring Manager", icon: "hm", title: "John Anderson", sub: "Director of Data", tone: "muted" },
     { type: "Workflow", icon: "workflow", title: "WF-776 · Hiring Workflow", sub: "5 of 6 stages", badge: "Active", tone: "amber" },
   ],
@@ -142,7 +142,7 @@ function detailFor(inst: RuntimeInstance): PersonDetail {
     acceptLikelihood: clamp(inst.metricValue - 14),
     whyMatch: inst.tags.length ? inst.tags.slice(0, 4) : ["Relevant experience", "Available now"],
     related: [
-      { type: "Job", icon: "job", title: "JR-118 · Senior Data Engineer", sub: "TechCorp", badge: inst.stage ?? "Open", tone: "good" },
+      { type: "Job", icon: "job", title: "JR-118 · Senior Data Engineer", sub: "TechCorp", badge: inst.stage ?? "Open", tone: "green" },
       { type: "Workflow", icon: "workflow", title: "WF-776 · Hiring Workflow", sub: "Active", badge: "Active", tone: "amber" },
     ],
     activity: [
@@ -163,12 +163,12 @@ function clamp(n: number) { return Math.max(0, Math.min(100, Math.round(n))); }
 function hash(s: string) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; }
 function stageIndexOf(s: Stage | null) { return s ? CANDIDATE_STAGES.indexOf(s) : -1; }
 
+// Local presentation tone for this light surface (maps 1:1 to .oer-tag CSS classes).
+type Tone = "green" | "amber" | "blue" | "muted";
 const STAGE_TONE: Record<Stage, Tone> = {
-  Sourced: "muted", Screen: "blue", Submitted: "blue", Interview: "amber", Offer: "good", Placed: "good",
+  Sourced: "muted", Screen: "blue", Submitted: "blue", Interview: "amber", Offer: "green", Placed: "green",
 };
-function toneClass(t: Tone): string {
-  return t === "good" ? "green" : t === "warn" || t === "amber" ? "amber" : t === "bad" ? "amber" : t === "accent" ? "blue" : "muted";
-}
+function toneClass(t: Tone): string { return t; }
 
 // ── Left nav + indexes config ─────────────────────────────────────────────────
 const NAV = [
